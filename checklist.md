@@ -24,6 +24,11 @@ This checklist tracks the current completion status of all core game mechanics, 
   - [x] Lockout state (Burnout) at 300 minutes of active daily work
   - [x] Potion consumption (Stamina Potion) to restore HP and reduce Fatigue
   - [x] Runic recovery using Mana to override/reset Fatigue
+- [x] **Expanded Class Roster & Multiclassing**
+  - [x] Add Lightning Mage & Multiclasses (Fire/Stone, Lightning/Earth)
+  - [x] Split the generic Knight into Wild Knight, Mercenary, Former Knight, and Assassin Knight
+  - [x] Add Mental Sovereign (Psi-Telekinetic) class with mind control and Kopfplatzen commands
+  - [x] Refine Plasmamancer spells to represent Ether/Matter/Space manipulation instead of electricity
 
 ---
 
