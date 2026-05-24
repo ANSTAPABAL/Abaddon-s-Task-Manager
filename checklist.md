@@ -10,15 +10,19 @@ This checklist tracks the current completion status of all core game mechanics, 
   - [x] Persistent character loading (skips setup if alive)
   - [x] Display status bars (HP, Mana, Fatigue)
   - [x] Quick-launch focus battles directly from the hub
-- [x] **Procedural Lore Engine (50 variations of combat)**
+- [x] **Procedural Lore Engine (120 variations of combat)**
   - [x] Custom enemy/boss names generated per task
   - [x] Contextual ADHD insights/weak points displayed for users
   - [x] Random combat modifiers/events (e.g. Double XP, Fog of War)
 - [x] **Interactive Combat System**
   - [x] Step completion triggers physical damage to the enemy
-  - [x] Floating damage numbers & screen shake on strike
-  - [x] Active class spell casting (Oorange/white/purple screen flash, custom effects)
+  - [x] Floating damage numbers & shake on strike
+  - [x] Active class spell casting (orange/white/purple screen flash, custom effects)
   - [x] Enemy retaliation damage after 90 seconds of inactivity
+- [x] **AI Battle Resolution Chronicles**
+  - [x] Victory chronicle (pride of victory, fallen enemy, overcoming fear of failure)
+  - [x] Flee chronicle (tactical retreat, shadows of Abyss, promise of a stronger return)
+  - [x] Crisis/Near-death chronicle (triggered at 10 HP, fall in the dirt, awakening at camp)
 - [x] **Fatigue & Burnout System**
   - [x] Fatigue tracking based on work duration
   - [x] Lockout state (Burnout) at 300 minutes of active daily work
@@ -28,7 +32,7 @@ This checklist tracks the current completion status of all core game mechanics, 
   - [x] Add Lightning Mage & Multiclasses (Fire/Stone, Lightning/Earth)
   - [x] Split the generic Knight into Wild Knight, Mercenary, Former Knight, and Assassin Knight
   - [x] Add Mental Sovereign (Psi-Telekinetic) class with mind control and Kopfplatzen commands
-  - [x] Refine Plasmamancer spells to represent Ether/Matter/Space manipulation instead of electricity
+  - [x] Refine Plasmamancer (Ether Mage) spells to represent Ether/Matter/Space manipulation in melee (close-range blades) and mid-range (space warp) combat
 
 ---
 
