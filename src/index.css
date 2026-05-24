@@ -1,0 +1,620 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=MedievalSharp&family=Inter:wght@300;400;600;700&display=swap');
+
+:root {
+  --color-void: hsl(280, 12%, 4%);
+  --color-iron-dark: hsl(280, 5%, 8%);
+  --color-iron: hsl(280, 5%, 15%);
+  --color-iron-light: hsl(280, 4%, 25%);
+  --color-bone: hsl(38, 28%, 82%);
+  --color-bone-dim: hsl(38, 15%, 60%);
+  --color-blood: hsl(0, 75%, 22%);
+  --color-blood-glow: hsl(0, 80%, 45%);
+  --color-mana: hsl(265, 60%, 40%);
+  --color-mana-glow: hsl(265, 80%, 65%);
+  --color-curse: hsl(125, 45%, 20%);
+  --color-curse-glow: hsl(120, 60%, 45%);
+  --color-relic: hsl(45, 75%, 35%);
+  --color-relic-glow: hsl(45, 90%, 60%);
+  
+  --font-gothic: 'Cinzel', serif;
+  --font-rpg: 'MedievalSharp', cursive;
+  --font-sans: 'Inter', sans-serif;
+  
+  --transition-speed: 0.25s;
+}
+
+/* Base resets & RPG custom cursor */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23e6dfd3' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 2v8'/%3E%3Cpath d='m9 7 3-3 3 3'/%3E%3Cpath d='M9 11v8a3 3 0 0 0 6 0v-8'/%3E%3Ccircle cx='12' cy='19' r='1' fill='%238b1a1a'/%3E%3C/svg%3E"), auto;
+}
+
+body {
+  background-color: var(--color-void);
+  color: var(--color-bone);
+  font-family: var(--font-sans);
+  min-height: 100vh;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* Background grid and ambient dark gradient */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: 
+    radial-gradient(circle at 50% 50%, transparent 40%, rgba(0, 0, 0, 0.9) 100%),
+    linear-gradient(rgba(18, 16, 20, 0.95), rgba(18, 16, 20, 0.95)),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.02) 0px, rgba(255, 255, 255, 0.02) 1px, transparent 1px, transparent 2px);
+  background-size: 100% 100%, 100% 100%, 100% 4px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Dynamic Corruption / Exhaustion overlay */
+.corruption-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 9999;
+  box-shadow: inset 0 0 60px rgba(0, 0, 0, 1);
+  transition: all 0.8s ease-in-out;
+}
+
+.corruption-overlay.level-1 {
+  box-shadow: inset 0 0 100px rgba(139, 26, 26, 0.2);
+  filter: grayscale(10%) contrast(105%);
+}
+
+.corruption-overlay.level-2 {
+  box-shadow: inset 0 0 150px rgba(139, 26, 26, 0.4);
+  filter: grayscale(25%) contrast(110%) hue-rotate(5deg);
+  animation: static-flicker 10s infinite;
+}
+
+.corruption-overlay.level-3 {
+  box-shadow: inset 0 0 200px rgba(61, 26, 90, 0.6);
+  filter: grayscale(50%) contrast(120%) hue-rotate(15deg) blur(0.3px);
+  animation: static-flicker 5s infinite, screen-shiver 0.5s infinite;
+}
+
+.corruption-overlay.level-4 {
+  box-shadow: inset 0 0 250px rgba(30, 90, 30, 0.8);
+  filter: grayscale(75%) contrast(135%) hue-rotate(30deg) blur(0.8px);
+  animation: static-flicker 2s infinite, screen-shiver 0.2s infinite;
+}
+
+.corruption-overlay.level-5 {
+  box-shadow: inset 0 0 300px rgba(139, 26, 26, 0.95);
+  filter: grayscale(90%) contrast(150%) hue-rotate(45deg) blur(1.5px);
+  animation: static-flicker 0.5s infinite, screen-shiver 0.1s infinite;
+}
+
+/* RPG Medieval Panels & Containers */
+.rpg-panel {
+  background: var(--color-iron-dark);
+  border: 2px solid var(--color-iron-light);
+  border-image: linear-gradient(to bottom, var(--color-bone-dim), var(--color-iron)) 1;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.8), inset 0 0 15px rgba(0, 0, 0, 0.5);
+  padding: 1.5rem;
+  position: relative;
+}
+
+.rpg-panel::before {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  right: -4px;
+  bottom: -4px;
+  border: 1px solid rgba(230, 223, 211, 0.1);
+  pointer-events: none;
+}
+
+/* Beautiful gothic headings */
+.gothic-title {
+  font-family: var(--font-gothic);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  text-shadow: 0 0 10px rgba(230, 223, 211, 0.3);
+}
+
+.rpg-title {
+  font-family: var(--font-rpg);
+  letter-spacing: 0.05em;
+}
+
+/* Glowing buttons */
+.rpg-btn {
+  font-family: var(--font-rpg);
+  background: var(--color-iron);
+  border: 1px solid var(--color-bone-dim);
+  color: var(--color-bone);
+  padding: 0.5rem 1.2rem;
+  transition: all var(--transition-speed) ease;
+  text-transform: uppercase;
+  font-size: 0.9rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.4);
+}
+
+.rpg-btn:hover:not(:disabled) {
+  background: var(--color-iron-light);
+  border-color: var(--color-bone);
+  color: #fff;
+  box-shadow: 0 0 12px rgba(230, 223, 211, 0.4);
+  transform: translateY(-1px);
+}
+
+.rpg-btn:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.6);
+}
+
+.rpg-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.rpg-btn-blood {
+  background: var(--color-blood);
+  border-color: var(--color-blood-glow);
+}
+.rpg-btn-blood:hover:not(:disabled) {
+  background: var(--color-blood-glow);
+  box-shadow: 0 0 15px var(--color-blood-glow);
+}
+
+.rpg-btn-mana {
+  background: var(--color-mana);
+  border-color: var(--color-mana-glow);
+}
+.rpg-btn-mana:hover:not(:disabled) {
+  background: var(--color-mana-glow);
+  box-shadow: 0 0 15px var(--color-mana-glow);
+}
+
+/* RPG Parchment inputs */
+.rpg-input {
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--color-iron-light);
+  color: var(--color-bone);
+  padding: 0.6rem 1rem;
+  font-family: var(--font-sans);
+  border-radius: 0;
+  transition: border-color 0.25s ease;
+}
+.rpg-input:focus {
+  outline: none;
+  border-color: var(--color-bone);
+  box-shadow: 0 0 8px rgba(230, 223, 211, 0.2);
+}
+
+/* Animations */
+@keyframes static-flicker {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.98; }
+  23% { opacity: 0.95; }
+  25% { opacity: 1; }
+  70% { opacity: 0.97; }
+  72% { opacity: 0.99; }
+}
+
+@keyframes screen-shiver {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(0.5px, -0.5px); }
+  50% { transform: translate(-0.5px, 0.5px); }
+  75% { transform: translate(-0.5px, -0.5px); }
+}
+
+@keyframes pulse-red {
+  0%, 100% {
+    box-shadow: inset 0 0 30px rgba(139, 26, 26, 0.2);
+  }
+  50% {
+    box-shadow: inset 0 0 70px rgba(139, 26, 26, 0.6);
+  }
+}
+
+@keyframes heartbeat-animation {
+  0% { transform: scale(1); }
+  14% { transform: scale(1.1); }
+  28% { transform: scale(1); }
+  42% { transform: scale(1.15); }
+  70% { transform: scale(1); }
+}
+
+.heartbeat-pulse {
+  animation: heartbeat-animation 1.2s infinite ease-in-out;
+}
+
+.heartbeat-pulse.fast {
+  animation-duration: 0.6s;
+}
+
+/* App frame styling */
+.app-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  z-index: 10;
+  padding: 1.5rem;
+}
+
+/* Navigation System: RPG tabs */
+.rpg-tabs {
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 2px solid var(--color-iron-light);
+  margin-bottom: 1.5rem;
+}
+
+.rpg-tab-btn {
+  font-family: var(--font-rpg);
+  font-size: 1.1rem;
+  background: linear-gradient(to bottom, var(--color-iron), var(--color-iron-dark));
+  border: 1px solid var(--color-iron-light);
+  border-bottom: none;
+  color: var(--color-bone-dim);
+  padding: 0.8rem 2rem;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  position: relative;
+  top: 2px;
+}
+
+.rpg-tab-btn:hover {
+  color: var(--color-bone);
+  background: var(--color-iron-light);
+}
+
+.rpg-tab-btn.active {
+  color: #fff;
+  background: var(--color-iron-dark);
+  border-color: var(--color-bone-dim);
+  border-bottom: 2px solid var(--color-iron-dark);
+  text-shadow: 0 0 8px rgba(230, 223, 211, 0.5);
+  top: 2px;
+}
+
+/* Tweek Planner Scrollboard */
+.tweek-scrollboard {
+  display: flex;
+  gap: 1rem;
+  overflow-x: auto;
+  padding-bottom: 1.5rem;
+  scroll-behavior: smooth;
+}
+
+.tweek-scrollboard::-webkit-scrollbar {
+  height: 8px;
+}
+.tweek-scrollboard::-webkit-scrollbar-track {
+  background: var(--color-void);
+}
+.tweek-scrollboard::-webkit-scrollbar-thumb {
+  background: var(--color-iron-light);
+  border-radius: 4px;
+}
+.tweek-scrollboard::-webkit-scrollbar-thumb:hover {
+  background: var(--color-bone-dim);
+}
+
+.tweek-day-col {
+  flex: 0 0 300px;
+  background: rgba(13, 12, 14, 0.6);
+  border: 1px solid var(--color-iron-light);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  min-height: 500px;
+}
+
+.tweek-day-col.today {
+  border-color: var(--color-bone);
+  background: rgba(230, 223, 211, 0.03);
+  box-shadow: 0 0 15px rgba(230, 223, 211, 0.05);
+}
+
+.tweek-day-header {
+  border-bottom: 1px solid var(--color-iron-light);
+  padding-bottom: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.tweek-day-title {
+  font-family: var(--font-gothic);
+  font-size: 1.2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.tweek-day-date {
+  font-size: 0.85rem;
+  color: var(--color-bone-dim);
+  font-family: var(--font-sans);
+}
+
+/* Kanban Modal Board */
+.kanban-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.kanban-col {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px dashed var(--color-iron-light);
+  padding: 1rem;
+  min-height: 350px;
+}
+
+.kanban-col-title {
+  font-family: var(--font-rpg);
+  color: var(--color-bone-dim);
+  border-bottom: 1px solid var(--color-iron-light);
+  padding-bottom: 0.5rem;
+  margin-bottom: 1rem;
+  font-size: 1.1rem;
+}
+
+/* Task Entity Cards */
+.task-card {
+  background: var(--color-iron);
+  border-left: 4px solid var(--color-bone-dim);
+  padding: 0.8rem;
+  margin-bottom: 0.8rem;
+  position: relative;
+  transition: all 0.25s ease;
+  user-select: none;
+}
+
+.task-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+  border-left-color: #fff;
+}
+
+.task-card.hunt { border-left-color: var(--color-bone); }
+.task-card.siege { border-left-color: var(--color-blood); }
+.task-card.relic { border-left-color: var(--color-relic); }
+.task-card.corpse { border-left-color: var(--color-iron-light); }
+
+.task-card.completed {
+  opacity: 0.4;
+  text-decoration: line-through;
+  border-left-color: var(--color-iron-light) !important;
+}
+
+.task-card.cursed {
+  border-left-color: var(--color-curse) !important;
+  box-shadow: 0 0 8px var(--color-curse-glow);
+  animation: text-shiver 2s infinite;
+}
+
+@keyframes text-shiver {
+  0%, 100% { transform: rotate(0deg); }
+  20% { transform: rotate(0.1deg); }
+  40% { transform: rotate(-0.1deg); }
+  60% { transform: rotate(0.05deg); }
+  80% { transform: rotate(-0.05deg); }
+}
+
+/* Dagger skull backlog styling */
+.skull-backlog-container {
+  margin-top: auto;
+  border-top: 2px solid var(--color-iron-light);
+  padding-top: 1.5rem;
+  position: relative;
+}
+
+.parchment-contract {
+  background: radial-gradient(circle, #2d261e 0%, #171410 100%);
+  border: 1px solid #4a3e31;
+  padding: 1.5rem;
+  color: #cbbba5;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.9);
+  position: relative;
+  min-height: 180px;
+}
+
+.parchment-contract::after {
+  content: '☠';
+  position: absolute;
+  bottom: 10px;
+  right: 15px;
+  font-size: 3rem;
+  opacity: 0.08;
+  color: var(--color-bone);
+}
+
+.dagger-pin {
+  width: 25px;
+  height: 55px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238b1a1a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 2v14'/%3E%3Cpath d='M9 13h6'/%3E%3Cpath d='m8 16 4 6 4-6'/%3E%3C/svg%3E");
+  background-size: contain;
+  background-repeat: no-repeat;
+  position: absolute;
+  top: -15px;
+  left: 50%;
+  transform: translateX(-50%) rotate(15deg);
+  pointer-events: none;
+}
+
+/* Spotify floating vessel status bar */
+.spotify-vessel-bar {
+  background: #000;
+  border: 1px solid var(--color-iron-light);
+  padding: 0.8rem 1.2rem;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  justify-content: space-between;
+  margin-top: 1.5rem;
+}
+
+.spotify-track-status {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  font-size: 0.9rem;
+}
+
+.spotify-green-glow {
+  color: #1db954;
+  text-shadow: 0 0 10px rgba(29, 185, 84, 0.6);
+}
+
+/* HP & MP bar indicators */
+.character-bar {
+  width: 100%;
+  height: 18px;
+  background: #000;
+  border: 1px solid var(--color-iron-light);
+  position: relative;
+  overflow: hidden;
+}
+
+.character-bar-fill {
+  height: 100%;
+  transition: width 0.4s cubic-bezier(0.1, 0.8, 0.1, 1);
+}
+
+.character-bar-fill.hp {
+  background: linear-gradient(to right, var(--color-blood), var(--color-blood-glow));
+}
+
+.character-bar-fill.mp {
+  background: linear-gradient(to right, var(--color-mana), var(--color-mana-glow));
+}
+
+.character-bar-text {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 0.75rem;
+  font-family: var(--font-rpg);
+  color: #fff;
+  text-shadow: 1px 1px 2px #000;
+}
+
+/* Recovery screen panic triggers */
+.panic-pill {
+  border: 1px solid var(--color-blood);
+  color: var(--color-bone-dim);
+  padding: 0.75rem 1rem;
+  background: var(--color-iron-dark);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: var(--font-rpg);
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.panic-pill:hover {
+  background: var(--color-blood);
+  color: #fff;
+  box-shadow: 0 0 12px var(--color-blood-glow);
+}
+
+/* Guided question modal popup */
+.gothic-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(5px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+}
+
+.gothic-modal-content {
+  max-width: 700px;
+  width: 90%;
+  background: radial-gradient(circle, var(--color-iron) 0%, var(--color-iron-dark) 100%);
+  border: 2px solid var(--color-bone-dim);
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 1), inset 0 0 20px rgba(0, 0, 0, 0.5);
+  padding: 2rem;
+  position: relative;
+}
+
+/* Paperdoll styling */
+.paperdoll-grid {
+  display: grid;
+  grid-template-columns: 1fr 2fr 1fr;
+  gap: 0.75rem;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--color-iron-light);
+  padding: 1rem;
+  border-radius: 0;
+  position: relative;
+}
+
+.paperdoll-slot {
+  aspect-ratio: 1;
+  background: rgba(20, 18, 22, 0.8);
+  border: 1px dashed var(--color-iron-light);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  font-size: 0.7rem;
+  color: var(--color-bone-dim);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.paperdoll-slot:hover {
+  border-color: var(--color-bone);
+  background: var(--color-iron);
+  color: #fff;
+}
+
+.paperdoll-slot.equipped {
+  border-style: solid;
+  border-color: var(--color-relic-glow);
+  box-shadow: 0 0 8px rgba(253, 184, 19, 0.2);
+}
+
+.paperdoll-avatar-center {
+  border: 1px solid var(--color-iron-light);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #100f13 0%, #1d1822 100%);
+  padding: 0.5rem;
+}
+
+.paperdoll-avatar-img {
+  max-height: 190px;
+  object-fit: contain;
+  opacity: 0.75;
+  filter: drop-shadow(0 0 10px rgba(139, 26, 26, 0.3));
+}
