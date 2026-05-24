@@ -205,14 +205,40 @@ export default function SpotifyPlayer({
       });
 
       if (!response.ok) {
-        throw new Error("API call failed");
+        let errMessage = `HTTP error ${response.status}`;
+        try {
+          const errData = await response.json();
+          if (errData && errData.error && errData.error.message) {
+            errMessage = errData.error.message;
+          }
+        } catch (_) {}
+        
+        const error = new Error(errMessage);
+        error.status = response.status;
+        throw error;
       }
       setIsPlaying(true);
       setSpotifyError('');
     } catch (e) {
       console.error(e);
-      setSpotifyError("Не удалось запустить трек. Запустите Spotify Premium на ПК/телефоне и попробуйте снова!");
-      setTimeout(() => setSpotifyError(''), 7000);
+      let userFriendlyError = "Не удалось запустить трек. Запустите Spotify Premium на ПК/телефоне и попробуйте снова!";
+      
+      const status = e.status;
+      const msg = e.message ? e.message.toLowerCase() : "";
+      
+      if (status === 401 || msg.includes("token expired") || msg.includes("401")) {
+        userFriendlyError = "Срок действия токена Spotify истек. Пожалуйста, переподключите аккаунт!";
+        setSpotifyToken(''); // Clear the expired token so user can connect again
+      } else if (status === 403 || msg.includes("premium") || msg.includes("403")) {
+        userFriendlyError = "Для работы плеера требуется подписка Spotify Premium. Проверьте ваш аккаунт!";
+      } else if (status === 404 || msg.includes("device") || msg.includes("404")) {
+        userFriendlyError = "Устройство Focus Vessel не найдено или не готово. Убедитесь, что Spotify Premium запущен на ПК или телефоне!";
+      } else if (e.message) {
+        userFriendlyError = `Ошибка Spotify: ${e.message}. Откройте плеер на ПК/телефоне и попробуйте снова.`;
+      }
+      
+      setSpotifyError(userFriendlyError);
+      setTimeout(() => setSpotifyError(''), 10000);
     }
   };
 
