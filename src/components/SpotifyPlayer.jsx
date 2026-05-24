@@ -115,23 +115,31 @@ export default function SpotifyPlayer({
   useEffect(() => {
     if (!spotifyToken) return;
 
-    // Load Spotify Playback SDK script dynamically
-    if (!window.onSpotifyWebPlaybackSDKReady) {
-      window.onSpotifyWebPlaybackSDKReady = () => {
-        setSdkLoaded(true);
-      };
+    // If Spotify is already loaded, set SDK loaded directly
+    if (window.Spotify && window.Spotify.Player) {
+      setSdkLoaded(true);
+      return;
+    }
+
+    // Set or chain the SDK ready callback
+    const prevCallback = window.onSpotifyWebPlaybackSDKReady;
+    window.onSpotifyWebPlaybackSDKReady = () => {
+      if (prevCallback) prevCallback();
+      setSdkLoaded(true);
+    };
+
+    // Load Spotify Playback SDK script dynamically if not already present
+    if (!document.querySelector('script[src="https://sdk.scdn.co/spotify-player.js"]')) {
       const script = document.createElement("script");
       script.src = "https://sdk.scdn.co/spotify-player.js";
       script.async = true;
       document.body.appendChild(script);
-    } else {
-      setSdkLoaded(true);
     }
   }, [spotifyToken]);
 
   // Initialize Spotify Player when SDK is ready
   useEffect(() => {
-    if (!sdkLoaded || !spotifyToken || player) return;
+    if (!sdkLoaded || !spotifyToken) return;
 
     const newPlayer = new window.Spotify.Player({
       name: "Abaddon's Focus Vessel",
@@ -165,7 +173,10 @@ export default function SpotifyPlayer({
     setPlayer(newPlayer);
 
     return () => {
-      if (player) player.disconnect();
+      newPlayer.removeListener('ready');
+      newPlayer.removeListener('player_state_changed');
+      newPlayer.disconnect();
+      setPlayer(null);
     };
   }, [sdkLoaded, spotifyToken]);
 

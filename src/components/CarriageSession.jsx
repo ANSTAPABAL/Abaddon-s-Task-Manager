@@ -60,6 +60,51 @@ const COMBAT_VARIATIONS = [
   { type: "туман", icon: "🌫️", prefix: "Густой Туман", suffix: "Неясных Шагов", desc: "Вы не знаете с чего начать, и враг прячется в этой дымке." }
 ];
 
+// НПС-встречи Бездны: мотиваторы, помощники, провокаторы, Зеркала Истины
+const NPC_ENCOUNTERS = [
+  { name: "Странствующий Монах Ордена Тишины", type: "motivating", icon: "🧙", prompt: "мудрый старец-монах, говорящий притчами о силе разума и стойкости духа" },
+  { name: "Призрак Бывалого Воина", type: "motivating", icon: "⚔️", prompt: "грубый но добрый ветеран-призрак, знающий цену каждому мгновению отдыха в бою" },
+  { name: "Светлая Жрица Источника", type: "motivating", icon: "✨", prompt: "жрица света из разрушенного храма, излучающая спокойствие и веру в героя" },
+  { name: "Бард Перекрёстка", type: "motivating", icon: "🎶", prompt: "весёлый бард, поднимающий дух песнями и напоминающий что отдых — часть победы" },
+  { name: "Лесная Целительница", type: "helping", icon: "🌿", prompt: "тихая травница, лечащая тело и разум настоями и мудрыми словами" },
+  { name: "Кузнец Рунного Горна", type: "helping", icon: "🔨", prompt: "мастер-кузнец, объясняющий что даже лучший клинок нужно остужать и закалять" },
+  { name: "Разведчик Приграничья", type: "helping", icon: "🏹", prompt: "быстрый разведчик, помогающий расставлять приоритеты в хаосе задач" },
+  { name: "Алхимик Серебряной Луны", type: "helping", icon: "⚗️", prompt: "алхимик, объясняющий химию восстановления мозга через метафору зельеварения" },
+  { name: "Тёмный Дуэлянт", type: "provoking", icon: "🗡️", prompt: "надменный дуэлянт, подначивающий героя доказать силу действием после отдыха" },
+  { name: "Демон-Искуситель Лени", type: "provoking", icon: "😈", prompt: "демон, шепчущий бросить всё — его нужно победить, встав и сделав активность" },
+  { name: "Каргахаульский Надзиратель", type: "provoking", icon: "⛓️", prompt: "бывший надзиратель из повозки, угрожающий вернуть кандалы при долгом безделье" },
+  { name: "Зеркало Истины (Малое)", type: "mirror", icon: "🪞", prompt: "безжалостное магическое зеркало, показывающее грехи прокрастинации как духовные раны" },
+  { name: "Зеркало Истины (Великое)", type: "mirror", icon: "🔮", prompt: "древнее зеркало Бездны, порицающее прокрастинацию как смертный грех и напоминающее что герой мог бы не оказаться здесь будь он чутче к себе" },
+  { name: "Оракул Потерянных Часов", type: "mirror", icon: "⏳", prompt: "оракул-скелет, считающий потерянные часы жизни героя и показывающий что время невозвратимо" },
+  { name: "Дух Совести", type: "mirror", icon: "💀", prompt: "дух, напоминающий герою о всех откладываемых делах как о неоплаченных долгах перед собой" },
+];
+
+// Мини-перерывы (каждые 30 минут активной работы)
+const MINI_BREAK_ACTIVITIES = [
+  { id: 'breathing', label: '🫁 Дыхательная техника (4-4-4-4)', lore: 'ритуал очищения дыхания у древнего алтаря' },
+  { id: 'meditation', label: '🧘 Закрыть глаза на 1 минуту', lore: 'медитация у затухающего костра лагеря' },
+  { id: 'window', label: '🪟 Посмотреть вдаль (20-20-20)', lore: 'наблюдение с дозорной башни за горизонтом Бездны' },
+  { id: 'grip', label: '💪 Пожамкать эспандер', lore: 'тренировка хвата на рукояти боевого оружия' },
+  { id: 'stretch', label: '🤸 Потянуться и размяться', lore: 'разминка мышц перед следующей фазой сражения' },
+  { id: 'walk', label: '🚶 Встать и пройтись', lore: 'обход лагерного периметра и проверка ловушек' },
+  { id: 'water', label: '💧 Попить воды', lore: 'глоток из Источника Чистой Воли' },
+  { id: 'eyes', label: '👀 Гимнастика для глаз', lore: 'упражнение Орлиного Зрения рейнджеров Приграничья' },
+  { id: 'ball', label: '✋ Помять антистресс-мяч', lore: 'сжатие артефакта спокойствия из лавки Торговца' },
+  { id: 'music', label: '🎵 Послушать 1 любимый трек', lore: 'бард играет восстанавливающую балладу у костра' },
+  { id: 'face', label: '🧊 Умыть лицо холодной водой', lore: 'обряд ледяного крещения для бодрости духа' },
+  { id: 'snack', label: '🍎 Съесть фрукт или орехи', lore: 'перекус эльфийским хлебом и лесными ягодами' },
+];
+
+// Большие перерывы (каждые 1.5 часа)
+const BIG_BREAK_ACTIVITIES = [
+  { id: 'eat', label: '🍲 Полноценный приём пищи', lore: 'пир воинов у большого костра лагеря героев' },
+  { id: 'tea', label: '☕ Чай или кофе ритуал', lore: 'варка зелья бодрости у котла алхимика' },
+  { id: 'walk_long', label: '🚶 Прогулка 10-15 минут', lore: 'разведывательная вылазка за стены лагеря' },
+  { id: 'shower', label: '🚿 Умыться / освежиться', lore: 'омовение в священных водах Лунного Источника' },
+  { id: 'nap', label: '😴 Короткий сон (power nap)', lore: 'магический сон восстановления в шатре целителя' },
+  { id: 'nature', label: '🌳 Выйти на свежий воздух', lore: 'сбор целебных трав и дыхание в лесу Приграничья' },
+];
+
 export default function CarriageSession({ 
   character, 
   setCharacter, 
@@ -115,6 +160,15 @@ export default function CarriageSession({
   const [meditationTimeLeft, setMeditationTimeLeft] = useState(60);
   const [meditationPhase, setMeditationPhase] = useState('inhale'); // inhale (4s), hold-in (4s), exhale (4s), hold-out (4s)
   const [meditationPulseCounter, setMeditationPulseCounter] = useState(0);
+
+  // Система Перерывов и НПС-Встреч (Break Events)
+  const sessionElapsedRef = useRef(0);
+  const lastMiniBreakRef = useRef(0);
+  const lastBigBreakRef = useRef(0);
+  const [breakEvent, setBreakEvent] = useState(null);
+  const [breakActivityChoice, setBreakActivityChoice] = useState('breathing');
+  const [breakAiText, setBreakAiText] = useState('');
+  const [breakAiLoading, setBreakAiLoading] = useState(false);
 
   // --- LEGACY LEGEND & WIN CONDITION FUNCTIONS ---
 
@@ -593,6 +647,120 @@ export default function CarriageSession({
     return () => clearInterval(medInterval);
   }, [meditationActive, meditationTimeLeft]);
 
+  // Break Event Timer: мини-перерыв каждые 30 мин, большой привал каждые 1.5 часа активной работы
+  useEffect(() => {
+    let breakTimer = null;
+    if (setupStage === 'active' && isRunning && !meditationActive && !breakEvent) {
+      breakTimer = setInterval(() => {
+        sessionElapsedRef.current += 1;
+        const elapsed = sessionElapsedRef.current;
+        const sinceLastMini = elapsed - lastMiniBreakRef.current;
+        const sinceLastBig = elapsed - lastBigBreakRef.current;
+
+        if (sinceLastBig >= 5400) {
+          triggerBreakEvent('big');
+          lastBigBreakRef.current = elapsed;
+          lastMiniBreakRef.current = elapsed;
+        } else if (sinceLastMini >= 1800) {
+          triggerBreakEvent('mini');
+          lastMiniBreakRef.current = elapsed;
+        }
+      }, 1000);
+    }
+    return () => clearInterval(breakTimer);
+  }, [setupStage, isRunning, meditationActive, breakEvent]);
+
+  const triggerBreakEvent = (type) => {
+    playClick();
+    setIsRunning(false);
+    const npc = NPC_ENCOUNTERS[Math.floor(Math.random() * NPC_ENCOUNTERS.length)];
+    setBreakEvent({ type, npc });
+    setBreakAiText('');
+    setBreakAiLoading(false);
+    setBreakActivityChoice(type === 'big' ? 'eat' : 'breathing');
+    setAtmosphereMood('recovery');
+  };
+
+  const handleBreakAiGenerate = async () => {
+    if (!breakEvent) return;
+    setBreakAiLoading(true);
+    setBreakAiText('');
+    const activities = breakEvent.type === 'big' ? BIG_BREAK_ACTIVITIES : MINI_BREAK_ACTIVITIES;
+    const activity = activities.find(a => a.id === breakActivityChoice) || activities[0];
+    const npc = breakEvent.npc;
+
+    let prompt = '';
+    if (npc.type === 'mirror') {
+      prompt = `Ты — ${npc.name}, ${npc.prompt}. Герой (класс: ${character.class}, раса: ${character.race}, ур.${character.level}) выбрал перерыв: «${activity.label}» (в лоре: ${activity.lore}). Порицай его прокрастинацию как грех изгнанника, напомни что он мог бы избежать Бездны будь он внимательнее к себе, но дай шанс искупиться через эту активность. Жёстко но справедливо, тёмное фэнтези. 4-5 предложений.`;
+    } else if (npc.type === 'provoking') {
+      prompt = `Ты — ${npc.name}, ${npc.prompt}. Герой (класс: ${character.class}, ур.${character.level}) делает перерыв: «${activity.label}» (${activity.lore}). Подначь его, спровоцируй вернуться в бой после перерыва ещё сильнее. Дерзко но с уважением. Тёмное фэнтези. 3-4 предложения.`;
+    } else if (npc.type === 'helping') {
+      prompt = `Ты — ${npc.name}, ${npc.prompt}. Герой (класс: ${character.class}, раса: ${character.race}) делает перерыв: «${activity.label}» (${activity.lore}). Помоги практическим советом в стиле своего персонажа. Объясни пользу через метафору мира Абаддона. 3-4 предложения.`;
+    } else {
+      prompt = `Ты — ${npc.name}, ${npc.prompt}. Герой (класс: ${character.class}, раса: ${character.race}, ур.${character.level}) делает перерыв: «${activity.label}» (${activity.lore}). Мотивируй его, скажи мудрое и ободряющее в стиле тёмного фэнтези мира Абаддона. 3-4 предложения.`;
+    }
+    if (breakEvent.type === 'big') {
+      prompt += ' Это БОЛЬШОЙ привал (1.5 часа работы). Опиши восстановление ран, маны, еду у костра. Подчеркни важность полноценного отдыха для когнитивного здоровья.';
+    }
+
+    try {
+      const response = await fetch('http://localhost:3001/api/ai/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: [{ role: 'user', content: prompt }] })
+      });
+      if (!response.ok) throw new Error('AI недоступен');
+      const data = await response.json();
+      setBreakAiText(data.choices[0].message.content);
+      playSuccess();
+    } catch (e) {
+      const fallbacks = {
+        mirror: `«${npc.name} смотрит сквозь тебя ледяным взглядом»\n\nТвоя слабость — не в теле, а в разуме. Ты откладывал, прятался, убегал от себя. Именно поэтому ты здесь, в Бездне. Но сейчас у тебя есть выбор: сделать ${activity.label.toLowerCase()}, и доказать что ты сильнее своих демонов.`,
+        provoking: `«${npc.name} усмехается»\n\nХа! Ты думаешь, что заслужил отдых? Может быть. Но не затягивай — враги не ждут. Сделай ${activity.label.toLowerCase()} и возвращайся. Докажи, что ты не трус.`,
+        helping: `«${npc.name} кивает»\n\n${activity.label} — мудрый выбор, путник. В мире Бездны даже короткий привал может спасти жизнь. Позаботься о себе, чтобы потом сражаться с удвоенной силой.`,
+        motivating: `«${npc.name} улыбается»\n\nТы уже прошёл так далеко, воин. ${activity.label} — это не слабость, это мудрость. Даже величайшие герои отдыхали у костра перед решающей битвой.`
+      };
+      setBreakAiText(fallbacks[npc.type] || fallbacks.motivating);
+    } finally {
+      setBreakAiLoading(false);
+    }
+  };
+
+  const handleDismissBreak = (applyRewards) => {
+    playClick();
+    if (applyRewards && breakEvent) {
+      playSuccess();
+      triggerFlash('heal');
+      if (breakEvent.type === 'big') {
+        setCharacter(prev => ({
+          ...prev,
+          hp: Math.min(prev.maxHp, prev.hp + 20),
+          mana: Math.min(prev.maxMana, prev.mana + 15),
+          dailyWorkMinutes: Math.max(0, prev.dailyWorkMinutes - 30),
+          meditationsCount: (prev.meditationsCount || 0) + 1
+        }));
+        spawnFloater('+20 HP', 'heal-hp');
+        spawnFloater('+15 MP', 'restore-mp');
+        spawnFloater('-30мин Усталости', 'fatigue-recovery');
+        setCombatLog(log => [`🏕️ Большой привал завершён! Раны залечены, мана восстановлена, усталость отступила.`, ...log.slice(0, 5)]);
+      } else {
+        setCharacter(prev => ({
+          ...prev,
+          hp: Math.min(prev.maxHp, prev.hp + 8),
+          mana: Math.min(prev.maxMana, prev.mana + 5),
+          dailyWorkMinutes: Math.max(0, prev.dailyWorkMinutes - 10)
+        }));
+        spawnFloater('+8 HP', 'heal-hp');
+        spawnFloater('+5 MP', 'restore-mp');
+        setCombatLog(log => [`🕯️ Мини-привал завершён. Встреча с «${breakEvent.npc.name}» укрепила дух.`, ...log.slice(0, 5)]);
+      }
+    }
+    setBreakEvent(null);
+    setBreakAiText('');
+    setIsRunning(true);
+    setAtmosphereMood(activeTask?.type === 'siege' ? 'siege' : 'hunt');
+  };
+
   const toggleTimer = () => {
     playClick();
     setIsRunning(!isRunning);
@@ -780,6 +948,88 @@ export default function CarriageSession({
       ...log.slice(0, 5)
     ]);
   };
+
+  // --- RENDERING: BREAK EVENT NPC ENCOUNTER OVERLAY ---
+  if (breakEvent) {
+    const isBig = breakEvent.type === 'big';
+    const activities = isBig ? BIG_BREAK_ACTIVITIES : MINI_BREAK_ACTIVITIES;
+    const selectedActivity = activities.find(a => a.id === breakActivityChoice) || activities[0];
+    const npc = breakEvent.npc;
+    const npcTypeBorder = { motivating: '#d4af37', helping: '#2ecc71', provoking: '#e74c3c', mirror: '#9b59b6' };
+    const npcTypeLabel = { motivating: '💛 Мотиватор', helping: '💚 Помощник', provoking: '🔴 Провокатор', mirror: '🪞 Зеркало Истины' };
+    const borderColor = npcTypeBorder[npc.type] || '#d4af37';
+
+    return (
+      <div className="break-event-overlay animate-fade-in">
+        <div className="break-event-card" style={{ borderColor }}>
+          {/* NPC Header */}
+          <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+            <div style={{ fontSize: '3.5rem', marginBottom: '0.5rem', filter: `drop-shadow(0 0 15px ${borderColor})` }}>{npc.icon}</div>
+            <h1 className="gothic-title" style={{ fontSize: isBig ? '1.8rem' : '1.5rem', color: borderColor, marginBottom: '0.3rem' }}>
+              {isBig ? '🏕️ Большой Привал' : '🕯️ Встреча на Пути'}
+            </h1>
+            <h2 className="rpg-title" style={{ fontSize: '1.2rem', color: '#fff', marginBottom: '0.4rem' }}>{npc.name}</h2>
+            <span style={{ fontSize: '0.75rem', padding: '2px 10px', background: `${borderColor}22`, border: `1px solid ${borderColor}`, color: borderColor, fontFamily: 'var(--font-rpg)' }}>
+              {npcTypeLabel[npc.type]}
+            </span>
+            {isBig && (
+              <p style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)', marginTop: '0.8rem', fontStyle: 'italic', maxWidth: '500px', margin: '0.8rem auto 0' }}>
+                «Ты сражался 1.5 часа без остановки. Твоё тело и разум требуют полноценного восстановления. Раны, мана, усталость — всё нуждается в заботе.»
+              </p>
+            )}
+          </div>
+
+          {/* Activity Dropdown */}
+          <div style={{ marginBottom: '1.2rem' }}>
+            <label style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)', fontFamily: 'var(--font-rpg)', display: 'block', marginBottom: '0.4rem' }}>
+              {isBig ? '🍽️ Выбери способ восстановления:' : '🎯 Выбери активность перерыва:'}
+            </label>
+            <select className="rpg-input" style={{ width: '100%', fontSize: '0.95rem', padding: '0.6rem' }} value={breakActivityChoice} onChange={(e) => setBreakActivityChoice(e.target.value)}>
+              {activities.map(a => (<option key={a.id} value={a.id}>{a.label}</option>))}
+            </select>
+            <div style={{ fontSize: '0.7rem', color: '#8c7d6b', fontStyle: 'italic', marginTop: '4px' }}>В мире Бездны: «{selectedActivity.lore}»</div>
+          </div>
+
+          {/* AI Generate Button */}
+          {!breakAiText && !breakAiLoading && (
+            <button className="rpg-btn rpg-btn-mana" style={{ width: '100%', padding: '0.7rem', fontSize: '0.95rem', marginBottom: '1rem' }} onClick={handleBreakAiGenerate}>
+              {npc.icon} ПРИЗВАТЬ {npc.name.toUpperCase()}
+            </button>
+          )}
+
+          {/* Loading */}
+          {breakAiLoading && (
+            <div style={{ textAlign: 'center', padding: '1.5rem' }}>
+              <RefreshCw className="heartbeat-pulse fast" style={{ color: borderColor, marginBottom: '0.5rem' }} size={28} />
+              <p style={{ fontStyle: 'italic', fontSize: '0.85rem', color: 'var(--color-bone-dim)' }}>{npc.name} приближается из тумана Бездны...</p>
+            </div>
+          )}
+
+          {/* AI NPC Response */}
+          {breakAiText && (
+            <div style={{ background: 'rgba(0,0,0,0.5)', border: `1px solid ${borderColor}44`, borderLeft: `3px solid ${borderColor}`, padding: '1.2rem', marginBottom: '1.2rem' }}>
+              <p style={{ fontSize: '0.95rem', color: '#e6dfd3', lineHeight: '1.7', fontFamily: 'Georgia, serif', whiteSpace: 'pre-line' }}>{breakAiText}</p>
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+            <button className="rpg-btn rpg-btn-mana" style={{ flex: 1, padding: '0.7rem', fontSize: '0.9rem' }} onClick={() => handleDismissBreak(true)}>
+              ✅ {isBig ? 'ЗАВЕРШИТЬ ПРИВАЛ' : 'ВЫПОЛНЕНО — В БОЙ'}
+            </button>
+            <button className="rpg-btn rpg-btn-blood" style={{ padding: '0.7rem', fontSize: '0.8rem' }} onClick={() => handleDismissBreak(false)}>
+              ⏭️ Пропустить
+            </button>
+          </div>
+
+          {/* Rewards Preview */}
+          <div style={{ marginTop: '0.8rem', fontSize: '0.7rem', color: 'var(--color-bone-dim)', textAlign: 'center', borderTop: '1px solid var(--color-iron-light)', paddingTop: '0.6rem' }}>
+            Награда за выполнение: {isBig ? '❤️+20 HP, 🔮+15 MP, ⚡-30мин усталости' : '❤️+8 HP, 🔮+5 MP, ⚡-10мин усталости'}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // --- BURNOUT BLOCK OVERLAY (Mandatory Rest Camp Screen) ---
   if (character && character.dailyWorkMinutes >= 300) {
