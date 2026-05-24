@@ -99,6 +99,9 @@ export default function CarriageSession({
   const [damageFloats, setDamageFloats] = useState([]);
   const [screenFlash, setScreenFlash] = useState(null);
 
+  // СДВГ-оптимизация интерфейса (предотвращение перегруза кнопками)
+  const [actionTab, setActionTab] = useState('spells'); // spells, rest, log
+
   // Лагерь Отдыха и Медитация
   const [meditationActive, setMeditationActive] = useState(false);
   const [meditationDuration, setMeditationDuration] = useState(60); 
@@ -1268,193 +1271,253 @@ export default function CarriageSession({
               </div>
             </div>
 
-            {/* 2. Combat Log Parchment Scroll */}
-            <div style={{ 
-              flex: 1, 
-              background: 'radial-gradient(circle, #1a1613 0%, #0d0b09 100%)', 
-              border: '1px solid #4a3e31', 
-              padding: '0.8rem', 
-              color: '#cbbba5',
-              display: 'flex',
-              flexDirection: 'column',
-              minHeight: '140px'
-            }}>
-              <h4 style={{ fontSize: '0.78rem', fontFamily: 'var(--font-rpg)', borderBottom: '1px solid #33281e', paddingBottom: '3px', marginBottom: '6px', color: '#c5b59f' }}>
-                📜 СВИТОК БОЕВЫХ СОБЫТИЙ:
-              </h4>
-              <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.73rem', lineHeight: '1.3' }}>
-                {combatLog.map((log, idx) => (
-                  <div key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)', paddingBottom: '2px' }}>
-                    {log}
+            {/* Action Deck Tabs to avoid choice paralysis (ADHD Optimization) */}
+            <div style={{ display: 'flex', background: '#0a080c', border: '1px solid var(--color-iron-light)', padding: '2px', gap: '2px', marginTop: '0.5rem' }}>
+              <button 
+                onClick={() => { playClick(); setActionTab('spells'); }}
+                style={{
+                  flex: 1, padding: '8px 4px', fontSize: '0.72rem', fontFamily: 'var(--font-rpg)', background: actionTab === 'spells' ? 'var(--color-iron)' : 'none',
+                  border: 'none', color: actionTab === 'spells' ? 'var(--color-mana-glow)' : 'var(--color-bone-dim)', borderBottom: actionTab === 'spells' ? '2px solid var(--color-mana)' : 'none', cursor: 'pointer',
+                  fontWeight: 'bold', textShadow: actionTab === 'spells' ? '0 0 5px var(--color-mana-glow)' : 'none'
+                }}
+              >
+                🧙 ЗАКЛИНАНИЯ
+              </button>
+              <button 
+                onClick={() => { playClick(); setActionTab('rest'); }}
+                style={{
+                  flex: 1, padding: '8px 4px', fontSize: '0.72rem', fontFamily: 'var(--font-rpg)', background: actionTab === 'rest' ? 'var(--color-iron)' : 'none',
+                  border: 'none', color: actionTab === 'rest' ? 'var(--color-relic-glow)' : 'var(--color-bone-dim)', borderBottom: actionTab === 'rest' ? '2px solid var(--color-relic)' : 'none', cursor: 'pointer',
+                  fontWeight: 'bold', textShadow: actionTab === 'rest' ? '0 0 5px var(--color-relic-glow)' : 'none'
+                }}
+              >
+                🎒 СУМКА & ПРИВАЛ
+              </button>
+              <button 
+                onClick={() => { playClick(); setActionTab('log'); }}
+                style={{
+                  flex: 1, padding: '8px 4px', fontSize: '0.72rem', fontFamily: 'var(--font-rpg)', background: actionTab === 'log' ? 'var(--color-iron)' : 'none',
+                  border: 'none', color: actionTab === 'log' ? '#cbbba5' : 'var(--color-bone-dim)', borderBottom: actionTab === 'log' ? '2px solid #4a3e31' : 'none', cursor: 'pointer',
+                  fontWeight: 'bold', textShadow: actionTab === 'log' ? '0 0 5px #cbbba5' : 'none'
+                }}
+              >
+                📜 ЖУРНАЛ БОЯ
+              </button>
+            </div>
+
+            {/* TAB CONTENT: 1. Spells Deck */}
+            {actionTab === 'spells' && (
+              <div style={{ background: 'rgba(0,0,0,0.3)', padding: '0.8rem', border: '1px solid var(--color-iron-light)', minHeight: '165px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                <div style={{ fontSize: '0.65rem', color: 'var(--color-bone-dim)', marginBottom: '8px', textTransform: 'uppercase', fontFamily: 'var(--font-rpg)', borderBottom: '1px dashed rgba(255,255,255,0.05)', paddingBottom: '3px' }}>
+                  🧙 Классовые заклинания фокуса:
+                </div>
+                
+                <div className="skill-grid">
+                  {/* 1. Fire Mage Skills */}
+                  {character.class.includes("огня") && (
+                    <>
+                      <button className="skill-btn special" onClick={() => castClassSkill("Вспышка страсти", "mana", 10, 25, "fire")}>
+                        <span>🔥 Вспышка страсти</span>
+                        <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>10 MP • 25 Урона</span>
+                      </button>
+                      <button className="skill-btn" onClick={() => castClassSkill("Огненный щит", "mana", 8, 15, "stone")}>
+                        <span>🛡️ Огненный щит</span>
+                        <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>8 MP • 15 Урона</span>
+                      </button>
+                    </>
+                  )}
+
+                  {/* 2. Earth Mage Skills */}
+                  {character.class.includes("земли") && (
+                    <>
+                      <button className="skill-btn special" onClick={() => castClassSkill("Каменное упорство", "mana", 12, 30, "earth")}>
+                        <span>🪨 Сдвиг плит</span>
+                        <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>12 MP • 30 Урона</span>
+                      </button>
+                      <button className="skill-btn" onClick={() => castClassSkill("Заземление тревоги", "mana", 7, 15, "stone")}>
+                        <span>🌾 Заземление</span>
+                        <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>7 MP • 15 Урона</span>
+                      </button>
+                    </>
+                  )}
+
+                  {/* 3. Stone Mage Skills */}
+                  {character.class.includes("камня") && (
+                    <>
+                      <button className="skill-btn special" onClick={() => castClassSkill("Нерушимый фокус", "mana", 15, 30, "stone")}>
+                        <span>💎 Гранит фокуса</span>
+                        <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>15 MP • 30 Урона</span>
+                      </button>
+                      <button className="skill-btn" onClick={() => castClassSkill("Руна защиты", "mana", 6, 12, "stone")}>
+                        <span>🛡️ Руна защиты</span>
+                        <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>6 MP • 12 Урона</span>
+                      </button>
+                    </>
+                  )}
+
+                  {/* 4. Necromancer Skills */}
+                  {character.class.includes("Некромант") && (
+                    <>
+                      <button className="skill-btn blood" onClick={() => castClassSkill("Договор с костями", "hp", 15, 40, "blood")}>
+                        <span>🦴 Договор с костями</span>
+                        <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>15 HP • 40 Урона</span>
+                      </button>
+                      <button className="skill-btn" onClick={() => castClassSkill("Призыв слуги", "mana", 10, 20, "lightning")}>
+                        <span>👻 Призыв слуги</span>
+                        <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>10 MP • 20 Урона</span>
+                      </button>
+                    </>
+                  )}
+
+                  {/* 5. Rune Mage Skills */}
+                  {character.class.includes("Рунный маг") && (
+                    <>
+                      <button className="skill-btn special" onClick={() => castClassSkill("Начертание рун", "mana", 12, 28, "lightning")}>
+                        <span>📜 Начертание рун</span>
+                        <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>12 MP • 28 Урона</span>
+                      </button>
+                      <button className="skill-btn" onClick={() => castClassSkill("Магический барьер", "mana", 8, 16, "stone")}>
+                        <span>🛡️ Барьер</span>
+                        <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>8 MP • 16 Урона</span>
+                      </button>
+                    </>
+                  )}
+
+                  {/* 6. Sword Knight Skills */}
+                  {character.class.includes("меча") && (
+                    <>
+                      <button className="skill-btn special" onClick={() => castClassSkill("Удар по прокрастинации", "mana", 10, 30, "stone")}>
+                        <span>⚔️ Тяжелый удар</span>
+                        <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>10 MP • 30 Урона</span>
+                      </button>
+                      <button className="skill-btn" onClick={() => castClassSkill("Закаленная воля", "mana", 8, 18, "stone")}>
+                        <span>🛡️ Закаленная воля</span>
+                        <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>8 MP • 18 Урона</span>
+                      </button>
+                    </>
+                  )}
+
+                  {/* 7. Blood Mage / Chemomancer Skills */}
+                  {character.class.includes("Химомансер") && (
+                    <>
+                      <button className="skill-btn blood" onClick={handleSacrificeHP}>
+                        <span>🩸 Жертва крови</span>
+                        <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>10 HP • Шаг квеста</span>
+                      </button>
+                      <button className="skill-btn" onClick={() => castClassSkill("Сгущение скверны", "mana", 9, 22, "blood")}>
+                        <span>💥 Химо-взрыв</span>
+                        <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>9 MP • 22 Урона</span>
+                      </button>
+                    </>
+                  )}
+
+                  {/* 8. Plasmamancer Skills */}
+                  {character.class.includes("Плазмомансер") && (
+                    <>
+                      <button className="skill-btn special" onClick={() => castClassSkill("Разряд молнии", "mana", 15, 45, "lightning")}>
+                        <span>⚡ Разряд молнии</span>
+                        <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>15 MP • 45 Урона</span>
+                      </button>
+                      <button className="skill-btn" onClick={() => castClassSkill("Плазменный щит", "mana", 8, 20, "lightning")}>
+                        <span>🛡️ Плазменный щит</span>
+                        <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>8 MP • 20 Урона</span>
+                      </button>
+                    </>
+                  )}
+
+                  {/* Fallback generic skills if none match */}
+                  {!character.class.includes("огня") && !character.class.includes("земли") && !character.class.includes("камня") && !character.class.includes("Некромант") && !character.class.includes("Рунный") && !character.class.includes("меча") && !character.class.includes("Химомансер") && !character.class.includes("Плазмомансер") && (
+                    <>
+                      <button className="skill-btn special" onClick={() => castClassSkill("Ментальный удар", "mana", 8, 18, "lightning")}>
+                        <span>🔮 Ментальный удар</span>
+                        <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>8 MP • 18 Урона</span>
+                      </button>
+                      <button className="skill-btn" onClick={() => castClassSkill("Рунный барьер", "mana", 6, 12, "stone")}>
+                        <span>🛡️ Рунный барьер</span>
+                        <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>6 MP • 12 Урона</span>
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* TAB CONTENT: 2. Backpack & Rest & Potions Deck */}
+            {actionTab === 'rest' && (
+              <div style={{ background: 'rgba(0,0,0,0.3)', padding: '0.8rem', border: '1px solid var(--color-iron-light)', minHeight: '165px', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                <div style={{ fontSize: '0.65rem', color: 'var(--color-bone-dim)', textTransform: 'uppercase', fontFamily: 'var(--font-rpg)', borderBottom: '1px dashed rgba(255,255,255,0.05)', paddingBottom: '3px' }}>
+                  🎒 Припасы рюкзака и Отдых:
+                </div>
+                
+                {/* Stamina potion usage */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.4)', padding: '6px 10px', border: '1px solid var(--color-iron-light)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '1.2rem' }}>🧪</span>
+                    <div style={{ textAlign: 'left' }}>
+                      <div style={{ fontSize: '0.78rem', color: '#fff', fontWeight: 'bold' }}>Зелье Выносливости</div>
+                      <div style={{ fontSize: '0.62rem', color: 'var(--color-bone-dim)' }}>В рюкзаке: {potionCount} шт</div>
+                    </div>
                   </div>
-                ))}
-              </div>
-            </div>
+                  <button 
+                    className="rpg-btn" 
+                    style={{ fontSize: '0.72rem', padding: '3px 8px', borderColor: 'var(--color-mana-glow)' }}
+                    onClick={useStaminaPotion}
+                    disabled={potionCount === 0}
+                  >
+                    ВЫПИТЬ
+                  </button>
+                </div>
 
-            {/* 3. WOW Active Class Skills panel */}
-            <div style={{ background: 'rgba(0,0,0,0.3)', padding: '0.6rem', border: '1px solid var(--color-iron-light)' }}>
-              <div style={{ fontSize: '0.7rem', color: 'var(--color-bone-dim)', marginBottom: '5px', textTransform: 'uppercase', fontFamily: 'var(--font-rpg)' }}>
-                🧙 Способности беглеца:
-              </div>
-              
-              <div className="skill-grid">
-                {/* 1. Fire Mage Skills */}
-                {character.class.includes("огня") && (
-                  <>
-                    <button className="skill-btn special" onClick={() => castClassSkill("Вспышка страсти", "mana", 10, 25, "fire")}>
-                      <span>🔥 Вспышка страсти</span>
-                      <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>10 MP • 25 Урона</span>
-                    </button>
-                    <button className="skill-btn" onClick={() => castClassSkill("Огненный щит", "mana", 8, 15, "stone")}>
-                      <span>🛡️ Огненный щит</span>
-                      <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>8 MP • 15 Урона</span>
-                    </button>
-                  </>
-                )}
+                <div style={{ display: 'flex', gap: '0.3rem', marginTop: 'auto' }}>
+                  <button 
+                    className="rpg-btn" 
+                    style={{ flex: 1, fontSize: '0.75rem', padding: '6px', background: 'rgba(0,0,0,0.5)', borderColor: 'var(--color-relic-glow)' }}
+                    onClick={() => startTimedMeditation(180)}
+                  >
+                    🎪 Войти в Лагерь (3м)
+                  </button>
+                  <button 
+                    className="rpg-btn" 
+                    style={{ flex: 1, fontSize: '0.75rem', padding: '6px' }} 
+                    onClick={handleExtend}
+                  >
+                    ⏳ Продлить (+10м)
+                  </button>
+                </div>
 
-                {/* 2. Earth Mage Skills */}
-                {character.class.includes("земли") && (
-                  <>
-                    <button className="skill-btn special" onClick={() => castClassSkill("Каменное упорство", "mana", 12, 30, "earth")}>
-                      <span>🪨 Сдвиг плит</span>
-                      <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>12 MP • 30 Урона</span>
-                    </button>
-                    <button className="skill-btn" onClick={() => castClassSkill("Заземление тревоги", "mana", 7, 15, "stone")}>
-                      <span>🌾 Заземление</span>
-                      <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>7 MP • 15 Урона</span>
-                    </button>
-                  </>
-                )}
-
-                {/* 3. Stone Mage Skills */}
-                {character.class.includes("камня") && (
-                  <>
-                    <button className="skill-btn special" onClick={() => castClassSkill("Нерушимый фокус", "mana", 15, 30, "stone")}>
-                      <span>💎 Гранит фокуса</span>
-                      <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>15 MP • 30 Урона</span>
-                    </button>
-                    <button className="skill-btn" onClick={() => castClassSkill("Руна защиты", "mana", 6, 12, "stone")}>
-                      <span>🛡️ Руна защиты</span>
-                      <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>6 MP • 12 Урона</span>
-                    </button>
-                  </>
-                )}
-
-                {/* 4. Necromancer Skills */}
-                {character.class.includes("Некромант") && (
-                  <>
-                    <button className="skill-btn blood" onClick={() => castClassSkill("Договор с костями", "hp", 15, 40, "blood")}>
-                      <span>🦴 Договор с костями</span>
-                      <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>15 HP • 40 Урона</span>
-                    </button>
-                    <button className="skill-btn" onClick={() => castClassSkill("Призыв слуги", "mana", 10, 20, "lightning")}>
-                      <span>👻 Призыв слуги</span>
-                      <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>10 MP • 20 Урона</span>
-                    </button>
-                  </>
-                )}
-
-                {/* 5. Rune Mage Skills */}
-                {character.class.includes("Рунный маг") && (
-                  <>
-                    <button className="skill-btn special" onClick={() => castClassSkill("Начертание рун", "mana", 12, 28, "lightning")}>
-                      <span>📜 Начертание рун</span>
-                      <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>12 MP • 28 Урона</span>
-                    </button>
-                    <button className="skill-btn" onClick={() => castClassSkill("Магический барьер", "mana", 8, 16, "stone")}>
-                      <span>🛡️ Барьер</span>
-                      <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>8 MP • 16 Урона</span>
-                    </button>
-                  </>
-                )}
-
-                {/* 6. Sword Knight Skills */}
-                {character.class.includes("меча") && (
-                  <>
-                    <button className="skill-btn special" onClick={() => castClassSkill("Удар по прокрастинации", "mana", 10, 30, "stone")}>
-                      <span>⚔️ Тяжелый удар</span>
-                      <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>10 MP • 30 Урона</span>
-                    </button>
-                    <button className="skill-btn" onClick={() => castClassSkill("Закаленная воля", "mana", 8, 18, "stone")}>
-                      <span>🛡️ Закаленная воля</span>
-                      <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>8 MP • 18 Урона</span>
-                    </button>
-                  </>
-                )}
-
-                {/* 7. Blood Mage / Chemomancer Skills */}
-                {character.class.includes("Химомансер") && (
-                  <>
-                    <button className="skill-btn blood" onClick={handleSacrificeHP}>
-                      <span>🩸 Жертва крови</span>
-                      <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>10 HP • Шаг квеста</span>
-                    </button>
-                    <button className="skill-btn" onClick={() => castClassSkill("Сгущение скверны", "mana", 9, 22, "blood")}>
-                      <span>💥 Химо-взрыв</span>
-                      <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>9 MP • 22 Урона</span>
-                    </button>
-                  </>
-                )}
-
-                {/* 8. Plasmamancer Skills */}
-                {character.class.includes("Плазмомансер") && (
-                  <>
-                    <button className="skill-btn special" onClick={() => castClassSkill("Разряд молнии", "mana", 15, 45, "lightning")}>
-                      <span>⚡ Разряд молнии</span>
-                      <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>15 MP • 45 Урона</span>
-                    </button>
-                    <button className="skill-btn" onClick={() => castClassSkill("Плазменный щит", "mana", 8, 20, "lightning")}>
-                      <span>🛡️ Плазменный щит</span>
-                      <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>8 MP • 20 Урона</span>
-                    </button>
-                  </>
-                )}
-
-                {/* Fallback generic skills if none match */}
-                {!character.class.includes("огня") && !character.class.includes("земли") && !character.class.includes("камня") && !character.class.includes("Некромант") && !character.class.includes("Рунный") && !character.class.includes("меча") && !character.class.includes("Химомансер") && !character.class.includes("Плазмомансер") && (
-                  <>
-                    <button className="skill-btn special" onClick={() => castClassSkill("Ментальный удар", "mana", 8, 18, "lightning")}>
-                      <span>🔮 Ментальный удар</span>
-                      <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>8 MP • 18 Урона</span>
-                    </button>
-                    <button className="skill-btn" onClick={() => castClassSkill("Рунный барьер", "mana", 6, 12, "stone")}>
-                      <span>🛡️ Рунный барьер</span>
-                      <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>6 MP • 12 Урона</span>
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* 4. Support Actions: Timed meditation and Potions */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-              <div style={{ display: 'flex', gap: '0.3rem' }}>
                 <button 
-                  className="rpg-btn" 
-                  style={{ flex: 1, fontSize: '0.78rem', padding: '6px', background: 'rgba(0,0,0,0.5)', borderColor: 'var(--color-relic-glow)' }}
-                  onClick={() => startTimedMeditation(180)}
+                  className="rpg-btn rpg-btn-blood" 
+                  style={{ width: '100%', fontSize: '0.75rem', padding: '6px' }} 
+                  onClick={handleFlee}
                 >
-                  🎪 Привал в Лагере (3м)
-                </button>
-                <button 
-                  className="rpg-btn" 
-                  style={{ flex: 1, fontSize: '0.78rem', padding: '6px', background: 'rgba(0,0,0,0.5)', borderColor: 'var(--color-mana-glow)' }}
-                  onClick={useStaminaPotion}
-                  disabled={potionCount === 0}
-                >
-                  🧪 Выпить Зелье ({potionCount})
-                </button>
-              </div>
-
-              <div style={{ display: 'flex', gap: '0.3rem' }}>
-                <button className="rpg-btn" style={{ flex: 1, fontSize: '0.75rem', padding: '5px' }} onClick={handleExtend}>
-                  ⏳ Продлить (+10м)
-                </button>
-                <button className="rpg-btn rpg-btn-blood" style={{ flex: 1, fontSize: '0.75rem', padding: '5px' }} onClick={handleFlee}>
                   🏃 Сбежать с поля боя
                 </button>
               </div>
-            </div>
+            )}
+
+            {/* TAB CONTENT: 3. Combat History Log */}
+            {actionTab === 'log' && (
+              <div style={{ 
+                background: 'radial-gradient(circle, #1a1613 0%, #0d0b09 100%)', 
+                border: '1px solid #4a3e31', 
+                padding: '0.8rem', 
+                color: '#cbbba5',
+                display: 'flex',
+                flexDirection: 'column',
+                minHeight: '165px'
+              }}>
+                <h4 style={{ fontSize: '0.75rem', fontFamily: 'var(--font-rpg)', borderBottom: '1px solid #33281e', paddingBottom: '3px', marginBottom: '6px', color: '#c5b59f' }}>
+                  📜 СВИТОК БОЕВЫХ СОБЫТИЙ:
+                </h4>
+                <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.7rem', lineHeight: '1.3' }}>
+                  {combatLog.map((log, idx) => (
+                    <div key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)', paddingBottom: '2px' }}>
+                      {log}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
           </div>
 
