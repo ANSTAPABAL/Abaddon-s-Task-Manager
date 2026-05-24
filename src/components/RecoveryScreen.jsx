@@ -75,7 +75,9 @@ export default function RecoveryScreen({
     setCharacter(prev => ({
       ...prev,
       mana: prev.mana - 15,
-      gold: prev.gold + 20 // instant gold boost to reward salvage behavior!
+      gold: prev.gold + 20, // instant gold boost to reward salvage behavior!
+      totalManaSpent: (prev.totalManaSpent || 0) + 15,
+      totalGoldEarned: (prev.totalGoldEarned || 0) + 20
     }));
     alert("Вы соткали заклинание Руны Азарта! Скверна скуки временно отступила. Получено +20 Золота!");
   };

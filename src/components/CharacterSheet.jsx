@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { Shield, Sparkles, BookOpen, AlertCircle, RefreshCw, Trash2, Heart, Award, Key, DollarSign, Package, Eye, FileText } from 'lucide-react';
 import { useAudio } from '../hooks/useAudio';
 
-export default function CharacterSheet({ character, setCharacter, tasks, setTasks, requestDeconstruction }) {
+export default function CharacterSheet({ character, setCharacter, tasks, setTasks, requestDeconstruction, pedestals = [], savePedestals }) {
   const { playClick, playBoneCrack, playSuccess } = useAudio();
   const [selectedTask, setSelectedTask] = useState(null);
+  const [sheetTab, setSheetTab] = useState('sheet'); // sheet, pedestals
   
   // Guided Deconstruction (ADHD Interview) States
   const [guidedModalOpen, setGuidedModalOpen] = useState(false);
@@ -60,7 +61,8 @@ export default function CharacterSheet({ character, setCharacter, tasks, setTask
           ...prev,
           hp: nextHp,
           dailyWorkMinutes: nextFatigue,
-          inventory: newInventory
+          inventory: newInventory,
+          potionsDrunk: (prev.potionsDrunk || 0) + 1
         };
       });
       alert("Вы выпили Зелье Когнитивной Выносливости! Восстановлено 25 HP здоровья разума, усталость снижена на 60 минут.");
@@ -224,10 +226,35 @@ export default function CharacterSheet({ character, setCharacter, tasks, setTask
   };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1.25fr 1.75fr', gap: '1.5rem' }}>
-      
-      {/* LEFT COLUMN: Character Paperdoll, Inventory Backpack, and Merchant Shop */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+      {/* Top Sheet Tabs */}
+      <div style={{ display: 'flex', gap: '5px', background: '#0a090c', padding: '3px', border: '1px solid var(--color-iron-light)', maxWidth: '420px', alignSelf: 'flex-start' }}>
+        <button 
+          onClick={() => { playClick(); setSheetTab('sheet'); }}
+          style={{
+            flex: 1, padding: '8px 15px', fontSize: '0.8rem', fontFamily: 'var(--font-rpg)', background: sheetTab === 'sheet' ? 'var(--color-iron)' : 'none',
+            border: 'none', color: sheetTab === 'sheet' ? 'var(--color-relic-glow)' : 'var(--color-bone-dim)', borderBottom: sheetTab === 'sheet' ? '2px solid var(--color-relic)' : 'none', cursor: 'pointer',
+            fontWeight: 'bold'
+          }}
+        >
+          👤 ПЕРСОНАЖ & ЛАВКА
+        </button>
+        <button 
+          onClick={() => { playClick(); setSheetTab('pedestals'); }}
+          style={{
+            flex: 1, padding: '8px 15px', fontSize: '0.8rem', fontFamily: 'var(--font-rpg)', background: sheetTab === 'pedestals' ? 'var(--color-iron)' : 'none',
+            border: 'none', color: sheetTab === 'pedestals' ? 'var(--color-mana-glow)' : 'var(--color-bone-dim)', borderBottom: sheetTab === 'pedestals' ? '2px solid var(--color-mana)' : 'none', cursor: 'pointer',
+            fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center'
+          }}
+        >
+          🏛️ ЗАЛ ПЬЕДЕСТАЛОВ ({pedestals.length})
+        </button>
+      </div>
+
+      {sheetTab === 'sheet' ? (
+        <div style={{ display: 'grid', gridTemplateColumns: '1.25fr 1.75fr', gap: '1.5rem' }}>
+          {/* LEFT COLUMN: Character Paperdoll, Inventory Backpack, and Merchant Shop */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         
         {/* 1. Paperdoll Board */}
         <div className="rpg-panel">
@@ -683,6 +710,81 @@ export default function CharacterSheet({ character, setCharacter, tasks, setTask
         </div>
       )}
 
+        </div>
+      ) : (
+        /* Persistent Hall of Pedestals (Legends Gallery) */
+        <div className="rpg-panel" style={{ background: 'radial-gradient(circle, #0e0a0f 0%, #050406 100%)', border: '2px solid var(--color-relic-glow)', padding: '2rem' }}>
+          <h2 className="gothic-title" style={{ fontSize: '1.8rem', color: 'var(--color-relic-glow)', textAlign: 'center', marginBottom: '1.5rem', letterSpacing: '0.1em' }}>
+            🏛️ Зал Бессмертных Легенд Абаддона
+          </h2>
+          <p style={{ color: 'var(--color-bone-dim)', fontSize: '0.9rem', textAlign: 'center', maxWidth: '650px', margin: '0 auto 2.5rem auto', lineHeight: '1.5', fontStyle: 'italic' }}>
+            «В этих холодных стенах застыли души тех беглецов, что сотворили великую добродетель, запечатали Скверну 
+            и с триумфом покинули мрачные границы Абаддона, обретя новые благородные цели.»
+          </p>
+
+          {pedestals.length > 0 ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '1.5rem' }}>
+              {pedestals.map((legend, idx) => (
+                <div 
+                  key={idx} 
+                  style={{
+                    background: '#0a080c',
+                    border: '2px solid #d4af37',
+                    borderImage: 'linear-gradient(to bottom, #d4af37, #aa820a, #1a1505) 1',
+                    padding: '1.5rem',
+                    boxShadow: '0 10px 25px rgba(0,0,0,0.8), inset 0 0 15px rgba(212,175,55,0.05)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '1rem'
+                  }}
+                >
+                  <div style={{ borderBottom: '1px solid #4a3e31', paddingBottom: '0.8rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '1.5rem' }}>☀️</span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--color-relic-glow)', fontFamily: 'var(--font-rpg)' }}>ЛЕГЕНДА #{idx + 1}</span>
+                    </div>
+                    <h3 className="gothic-title" style={{ fontSize: '1.3rem', color: '#ffb813', marginTop: '4px' }}>{legend.name}</h3>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)', marginTop: '2px' }}>
+                      {legend.race} • {legend.class} • <b>Уровень {legend.level}</b>
+                    </div>
+                  </div>
+
+                  {/* Eulogy stats grid */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem', fontSize: '0.75rem', color: 'var(--color-bone-dim)', background: 'rgba(0,0,0,0.3)', padding: '8px', border: '1px solid var(--color-iron-light)', textAlign: 'left' }}>
+                    <div>📜 Квесты: <b>{legend.completedTasksCount || 0} шт</b></div>
+                    <div>👹 Боссы: <b>{legend.completedSiegesCount || 0} шт</b></div>
+                    <div>🪙 Золото: <b>{legend.totalGoldEarned || 0}</b></div>
+                    <div>🔮 Мана: <b>{legend.totalManaSpent || 0} MP</b></div>
+                    <div>🧪 Зелья: <b>{legend.potionsDrunk || 0} шт</b></div>
+                    <div>🎪 Медитации: <b>{legend.meditationsCount || 0}</b></div>
+                    <div style={{ gridColumn: 'span 2' }}>🩸 Пролито здоровья: <b>{legend.totalHpSacrificed || 0} HP</b></div>
+                  </div>
+
+                  {/* Unfolding AI Scroll */}
+                  <div style={{ background: 'radial-gradient(circle, #1a1613 0%, #0d0b09 100%)', border: '1px solid #4a3e31', padding: '1rem', color: '#cbbba5', textAlign: 'left' }}>
+                    <h4 style={{ fontSize: '0.78rem', fontFamily: 'var(--font-rpg)', borderBottom: '1px solid #33281e', paddingBottom: '3px', marginBottom: '8px', color: '#ffb813', textTransform: 'uppercase' }}>
+                      📜 Летопись Искупления ИИ:
+                    </h4>
+                    <div style={{ fontSize: '0.75rem', lineHeight: '1.4', overflowY: 'auto', maxHeight: '180px', textAlign: 'justify', whiteSpace: 'pre-line' }}>
+                      {legend.pedestalEulogy}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ border: '1px dashed #4a3e31', padding: '3rem', textAlign: 'center', background: 'rgba(0,0,0,0.2)', maxWidth: '500px', margin: '0 auto' }}>
+              <Skull size={32} style={{ color: 'var(--color-iron-light)', marginBottom: '0.8rem' }} />
+              <p style={{ fontSize: '0.9rem', color: 'var(--color-bone-dim)', fontStyle: 'italic' }}>
+                Зал Пьедесталов пуст и погружен во тьму. Ваши герои еще не взошли на постамент бессмертия.
+              </p>
+              <p style={{ fontSize: '0.8rem', color: 'var(--color-iron-light)', marginTop: '8px', lineHeight: '1.4' }}>
+                ☀️ Запечатайте как минимум <b>15 контрактов</b> и одолейте <b>3 тяжелых Осады (Боссов)</b>, чтобы разблокировать Ритуал Искупления в боевом штабе Повозки и вписать своего первого героя в вечные летописи Света!
+              </p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

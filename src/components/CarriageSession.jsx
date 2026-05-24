@@ -66,7 +66,10 @@ export default function CarriageSession({
   tasks, 
   setTasks, 
   parseMessyTasks,
-  playActiveSessionTrack
+  playActiveSessionTrack,
+  generateRedemptionEulogy,
+  pedestals = [],
+  savePedestals
 }) {
   const { playClick, playBoneCrack, playSuccess, startHeartbeat, stopHeartbeat, setAtmosphereMood } = useAudio();
   const [messyText, setMessyText] = useState('');
@@ -102,12 +105,139 @@ export default function CarriageSession({
   // СДВГ-оптимизация интерфейса (предотвращение перегруза кнопками)
   const [actionTab, setActionTab] = useState('spells'); // spells, rest, log
 
+  // Церемония Искупления (Redemption)
+  const [redemptionLoading, setRedemptionLoading] = useState(false);
+  const [redemptionEulogyText, setRedemptionEulogyText] = useState('');
+
   // Лагерь Отдыха и Медитация
   const [meditationActive, setMeditationActive] = useState(false);
   const [meditationDuration, setMeditationDuration] = useState(60); 
   const [meditationTimeLeft, setMeditationTimeLeft] = useState(60);
   const [meditationPhase, setMeditationPhase] = useState('inhale'); // inhale (4s), hold-in (4s), exhale (4s), hold-out (4s)
   const [meditationPulseCounter, setMeditationPulseCounter] = useState(0);
+
+  // --- LEGACY LEGEND & WIN CONDITION FUNCTIONS ---
+
+  const handleWinActiveSession = (task) => {
+    setIsRunning(false);
+    playSuccess();
+    
+    const isSiege = task?.type === 'siege';
+    const expReward = isSiege ? 60 : 25;
+    const goldReward = isSiege ? 15 : 5;
+    
+    setCharacter(prev => {
+      const nextXp = prev.xp + expReward;
+      const xpNeeded = prev.level * 100;
+      let nextLevel = prev.level;
+      let remXp = nextXp;
+      let extraGold = 0;
+      
+      if (remXp >= xpNeeded) {
+        nextLevel += 1;
+        remXp -= xpNeeded;
+        extraGold = 15;
+        playSuccess();
+      }
+      
+      const earnedGold = goldReward + extraGold;
+      
+      return {
+        ...prev,
+        level: nextLevel,
+        xp: remXp,
+        gold: (prev.gold || 0) + earnedGold,
+        hp: nextLevel > prev.level ? prev.maxHp : prev.hp,
+        completedTasksCount: (prev.completedTasksCount || 0) + 1,
+        completedSiegesCount: (prev.completedSiegesCount || 0) + (isSiege ? 1 : 0),
+        totalGoldEarned: (prev.totalGoldEarned || 0) + earnedGold
+      };
+    });
+
+    if (task) {
+      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: 'completed' } : t));
+    }
+    
+    localStorage.removeItem('active_task_id');
+    localStorage.removeItem('combat_time_left');
+    
+    alert(`🎉 Сражение завершено! Вы одолели врага ${enemyName}! Получено +${expReward} XP и +${goldReward} Золота.`);
+
+    const willQualify = (character.completedTasksCount || 0) + 1 >= 15 && 
+                        (character.completedSiegesCount || 0) + (isSiege ? 1 : 0) >= 3;
+    
+    if (willQualify) {
+      setSetupStage('redemption');
+      handleTriggerRedemptionCeremony();
+    } else {
+      setSetupStage('hub');
+    }
+  };
+
+  const handleTriggerRedemptionCeremony = async () => {
+    if (!generateRedemptionEulogy) return;
+    setRedemptionLoading(true);
+    setAtmosphereMood('recovery');
+    try {
+      const text = await generateRedemptionEulogy(character);
+      setRedemptionEulogyText(text);
+    } catch (err) {
+      setRedemptionEulogyText("«Его воля сокрушила прокрастинацию и навеки разогнала Скверну Абаддона...»\n\n(Не удалось соединиться с сервером AI для составления индивидуальной летописи, но духи помнят твой подвиг!)");
+    } finally {
+      setRedemptionLoading(false);
+    }
+  };
+
+  const handleEnshrineLegend = () => {
+    playSuccess();
+    
+    const newLegend = {
+      name: character.name || "Безымянный Герой",
+      race: character.race || "Человек",
+      class: character.class || "Воин",
+      level: character.level || 1,
+      completedTasksCount: character.completedTasksCount || 15,
+      completedSiegesCount: character.completedSiegesCount || 3,
+      totalGoldEarned: character.totalGoldEarned || 0,
+      totalManaSpent: character.totalManaSpent || 0,
+      totalHpSacrificed: character.totalHpSacrificed || 0,
+      potionsDrunk: character.potionsDrunk || 0,
+      meditationsCount: character.meditationsCount || 0,
+      pedestalEulogy: redemptionEulogyText || "Его воля спасла Бездну..."
+    };
+
+    const updatedPedestals = [...pedestals, newLegend];
+    savePedestals(updatedPedestals);
+
+    // Reset character
+    setCharacter({
+      name: "Изгнанник",
+      race: "Каргахаулец",
+      class: "Химомансер (Маг крови)",
+      level: 1,
+      xp: 0,
+      hp: 100,
+      maxHp: 100,
+      mana: 50,
+      maxMana: 50,
+      gold: 0,
+      equipped: { weapon: null, shield: null, armor: null, ring: null },
+      inventory: [],
+      perks: ["Сгусток крови"],
+      shacklesBroken: false,
+      intensity: "grim",
+      completedTasksCount: 0,
+      completedSiegesCount: 0,
+      totalGoldEarned: 0,
+      totalManaSpent: 0,
+      totalHpSacrificed: 0,
+      potionsDrunk: 0,
+      meditationsCount: 0
+    });
+
+    setSetupStage('lore');
+    setAtmosphereMood('escape');
+  };
 
   // 1. Persistent Character Check (Skips lore setup if alive!)
   useEffect(() => {
@@ -393,24 +523,7 @@ export default function CarriageSession({
         });
       }, 1000);
     } else if (timeLeft === 0 && isRunning) {
-      setIsRunning(false);
-      playSuccess();
-      alert("Сражение завершено! Вы очистили область пути и одолели врага.");
-      const expReward = activeTask?.type === 'siege' ? 60 : 25;
-      setCharacter(prev => {
-        const nextXp = prev.xp + expReward;
-        const xpNeeded = prev.level * 100;
-        if (nextXp >= xpNeeded) {
-          playSuccess();
-          return { ...prev, level: prev.level + 1, xp: nextXp - xpNeeded, gold: prev.gold + 15, hp: prev.maxHp };
-        }
-        return { ...prev, xp: nextXp, gold: prev.gold + 5 };
-      });
-      if (activeTask) {
-        setTasks(prev => prev.map(t => t.id === activeTask.id ? { ...t, status: 'completed' } : t));
-        localStorage.removeItem('active_task_id');
-      }
-      setSetupStage('hub');
+      handleWinActiveSession(activeTask);
     }
     return () => clearInterval(timer);
   }, [setupStage, isRunning, timeLeft, meditationActive]);
@@ -464,6 +577,10 @@ export default function CarriageSession({
       // Completed meditation chimes
       setMeditationActive(false);
       playSuccess();
+      setCharacter(prev => ({
+        ...prev,
+        meditationsCount: (prev.meditationsCount || 0) + 1
+      }));
       alert("Медитация в Лагере завершена! Силы разума полностью очищены от скверны.");
       setAtmosphereMood(activeTask?.type === 'siege' ? 'siege' : 'hunt');
     }
@@ -491,7 +608,13 @@ export default function CarriageSession({
       
       // Calculate damage dealt based on step size
       const dmg = Math.ceil(100 / sessionSteps.length);
-      setEnemyHp(prev => Math.max(0, prev - dmg));
+      setEnemyHp(prev => {
+        const nextHp = Math.max(0, prev - dmg);
+        if (nextHp <= 0) {
+          setTimeout(() => handleWinActiveSession(activeTask), 100);
+        }
+        return nextHp;
+      });
       triggerFlash('fire');
       spawnFloater(`-${dmg} HP!`, 'hero-damage');
       
@@ -553,11 +676,23 @@ export default function CarriageSession({
     setCharacter(hero => {
       const nextHp = costType === 'hp' ? hero.hp - costVal : hero.hp;
       const nextMp = costType === 'mana' ? hero.mana - costVal : hero.mana;
-      return { ...hero, hp: nextHp, mana: nextMp };
+      return { 
+        ...hero, 
+        hp: nextHp, 
+        mana: nextMp,
+        totalManaSpent: (hero.totalManaSpent || 0) + (costType === 'mana' ? costVal : 0),
+        totalHpSacrificed: (hero.totalHpSacrificed || 0) + (costType === 'hp' ? costVal : 0)
+      };
     });
 
     // Deal damage
-    setEnemyHp(prev => Math.max(0, prev - damage));
+    setEnemyHp(prev => {
+      const nextHp = Math.max(0, prev - damage);
+      if (nextHp <= 0) {
+        setTimeout(() => handleWinActiveSession(activeTask), 100);
+      }
+      return nextHp;
+    });
     spawnFloater(`-${damage} HP!`, 'hero-damage');
     
     if (costType === 'hp') {
@@ -577,7 +712,11 @@ export default function CarriageSession({
     if (character.hp <= 15) return;
     playBoneCrack();
     triggerFlash('blood');
-    setCharacter(prev => ({ ...prev, hp: prev.hp - 10 }));
+    setCharacter(prev => ({ 
+      ...prev, 
+      hp: prev.hp - 10,
+      totalHpSacrificed: (prev.totalHpSacrificed || 0) + 10
+    }));
     spawnFloater("-10 HP", "enemy-strike");
     
     const firstIncomplete = sessionSteps.find(s => !s.completed);
@@ -622,7 +761,8 @@ export default function CarriageSession({
         ...hero,
         hp: nextHp,
         dailyWorkMinutes: nextFatigue,
-        inventory: newInv
+        inventory: newInv,
+        potionsDrunk: (hero.potionsDrunk || 0) + 1
       };
     });
 
@@ -1523,6 +1663,120 @@ export default function CarriageSession({
 
         </div>
 
+      </div>
+    );
+  }
+
+  if (setupStage === 'redemption') {
+    return (
+      <div className="rpg-panel rest-camp-overlay animate-fade-in" style={{ 
+        maxWidth: '800px', 
+        margin: '2rem auto', 
+        padding: '2.5rem', 
+        border: '3px solid #d4af37', 
+        borderRadius: '8px', 
+        boxShadow: '0 0 35px rgba(212,175,55,0.25)',
+        background: 'radial-gradient(circle, #100b05 0%, #000000 100%)',
+        textAlign: 'center',
+        position: 'relative'
+      }}>
+        <div style={{
+          position: 'absolute',
+          top: 0, left: 0, right: 0, bottom: 0,
+          background: 'radial-gradient(circle, rgba(212,175,55,0.05) 0%, transparent 70%)',
+          pointerEvents: 'none'
+        }} />
+
+        <span style={{ fontSize: '4rem', filter: 'drop-shadow(0 0 15px rgba(212,175,55,0.4))' }}>☀️</span>
+        
+        <h1 className="gothic-title" style={{ color: '#ffb813', fontSize: '2.4rem', marginBottom: '0.5rem', letterSpacing: '2px', textShadow: '0 0 10px rgba(212,175,55,0.3)' }}>
+          Церемония Великого Искупления
+        </h1>
+        <p style={{ color: 'var(--color-bone-dim)', fontSize: '0.95rem', maxWidth: '600px', margin: '0 auto 2rem auto', lineHeight: '1.5', fontStyle: 'italic' }}>
+          «Ты с честью выдержал бесконечные испытания, запечатал 15 квестов и одолел 3 Осадных Боссов. 
+          Твоя воля спасла этот мир от вечной Скверны прокрастинации.»
+        </p>
+
+        {redemptionLoading ? (
+          <div style={{ padding: '3rem 0' }}>
+            <RefreshCw className="heartbeat-pulse fast" style={{ color: '#ffb813', marginBottom: '1rem' }} size={40} />
+            <p style={{ fontFamily: 'var(--font-rpg)', fontSize: '1.1rem', color: '#ffb813' }}>
+              Летописец Бездны расшифровывает летопись твоего разума...
+            </p>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', alignItems: 'center' }}>
+            <div style={{ 
+              background: 'radial-gradient(circle, #1e1812 0%, #0e0a07 100%)', 
+              border: '2px solid #8c6a2c', 
+              borderRadius: '4px',
+              padding: '1.8rem', 
+              maxWidth: '650px',
+              width: '100%',
+              boxShadow: 'inset 0 0 20px rgba(0,0,0,0.8), 0 10px 25px rgba(0,0,0,0.6)',
+              color: '#cbbba5',
+              textAlign: 'justify'
+            }}>
+              <h3 className="rpg-title" style={{ fontSize: '1rem', borderBottom: '1px solid #4a381c', paddingBottom: '5px', marginBottom: '1rem', color: '#ffb813', textTransform: 'uppercase', letterSpacing: '1px', textAlign: 'center' }}>
+                📜 Вечная Хроника: {character.name}
+              </h3>
+              
+              <div style={{ fontSize: '0.85rem', lineHeight: '1.6', fontFamily: 'Georgia, serif', whiteSpace: 'pre-line', marginBottom: '1.5rem' }}>
+                {redemptionEulogyText}
+              </div>
+
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(3, 1fr)', 
+                gap: '0.5rem', 
+                fontSize: '0.75rem', 
+                background: 'rgba(0,0,0,0.4)', 
+                padding: '10px', 
+                border: '1px solid #4a381c',
+                color: 'var(--color-bone-dim)',
+                textAlign: 'left'
+              }}>
+                <div>🏹 Квестов: <b style={{ color: '#fff' }}>{character.completedTasksCount || 0}</b></div>
+                <div>👹 Боссов: <b style={{ color: '#fff' }}>{character.completedSiegesCount || 0}</b></div>
+                <div>🪙 Золото: <b style={{ color: '#ffb813' }}>{character.totalGoldEarned || 0}</b></div>
+                <div>🔮 MP потрачено: <b style={{ color: 'var(--color-mana-glow)' }}>{character.totalManaSpent || 0}</b></div>
+                <div>🧪 Выпито зелий: <b style={{ color: 'var(--color-relic-glow)' }}>{character.potionsDrunk || 0}</b></div>
+                <div>🎪 Медитаций: <b style={{ color: '#fff' }}>{character.meditationsCount || 0}</b></div>
+                <div style={{ gridColumn: 'span 3', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '4px', marginTop: '4px' }}>
+                  🩸 Жертва HP здоровья разума: <b style={{ color: 'var(--color-blood-glow)' }}>{character.totalHpSacrificed || 0} HP</b>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+              <button 
+                className="rpg-btn" 
+                style={{ padding: '0.8rem 2rem' }}
+                onClick={() => {
+                  playClick();
+                  setSetupStage('hub');
+                }}
+              >
+                Вернуться в штаб
+              </button>
+              
+              <button 
+                className="rpg-btn rpg-btn-mana heartbeat-pulse"
+                style={{ 
+                  padding: '0.8rem 3rem', 
+                  fontSize: '1rem', 
+                  borderColor: '#d4af37', 
+                  color: '#ffd700', 
+                  boxShadow: '0 0 25px rgba(212,175,55,0.5)',
+                  fontWeight: 'bold'
+                }}
+                onClick={handleEnshrineLegend}
+              >
+                ☀️ УВЕКОВЕЧИТЬ В ЗАЛЕ СЛАВЫ
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     );
   }

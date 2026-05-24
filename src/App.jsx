@@ -27,8 +27,19 @@ export default function App() {
     inventory: [],
     perks: ["Сгусток крови"],
     shacklesBroken: false,
-    intensity: "grim" // grim, soft_grim, quiet_focus
+    intensity: "grim", // grim, soft_grim, quiet_focus
+    
+    // Новые счетчики СДВГ-статистики (Win Condition & Legacy)
+    completedTasksCount: 0,
+    completedSiegesCount: 0,
+    totalGoldEarned: 0,
+    totalManaSpent: 0,
+    totalHpSacrificed: 0,
+    potionsDrunk: 0,
+    meditationsCount: 0
   });
+
+  const [pedestals, setPedestals] = useState([]);
 
   // Spotify integration states
   const [spotifyToken, setSpotifyToken] = useState(() => localStorage.getItem('spotify_token') || '');
@@ -75,6 +86,15 @@ export default function App() {
       })
       .then(data => setCharacter(data))
       .catch(err => console.warn("Using in-memory character (Backend server offline)"));
+
+    // 3. Load pedestals hall
+    fetch('http://localhost:3001/api/pedestals')
+      .then(res => {
+        if (!res.ok) throw new Error("Backend offline");
+        return res.json();
+      })
+      .then(data => setPedestals(data))
+      .catch(err => console.warn("Using in-memory pedestals hall"));
   }, []);
 
   // Save tasks on edit
@@ -96,7 +116,50 @@ export default function App() {
     }).catch(err => console.warn("Could not save character to backend"));
   }, [character]);
 
+  // Save pedestals when modified
+  const savePedestals = (updatedPedestals) => {
+    setPedestals(updatedPedestals);
+    fetch('http://localhost:3001/api/pedestals', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updatedPedestals)
+    }).catch(err => console.warn("Could not save pedestals to backend"));
+  };
+
   // --- DEEPSEEK CORE INTEGRATIONS (AI TUNNEL) ---
+
+  const generateRedemptionEulogy = async (hero) => {
+    const systemPrompt = `Ты — Летописец Бездны во вселенной Абаддона. Твоя задача — написать великолепную, мрачную и триумфальную RPG-эпитафию (eulogy) о завершении истории уходящего в Легенды искупившегося героя.
+Анализируй его поведение и СДВГ-статистику:
+- Имя: ${hero.name}, Раса: ${hero.race}, Класс: ${hero.class}, Уровень: ${hero.level}.
+- Запечатано квестов: ${hero.completedTasksCount || 0} (включая ${hero.completedSiegesCount || 0} тяжелых Осад-боссов).
+- Собрано золота: ${hero.totalGoldEarned || 0}.
+- Выпито зелий: ${hero.potionsDrunk || 0}.
+- Потрачено маны: ${hero.totalManaSpent || 0} MP.
+- Проведено медитаций у костра: ${hero.meditationsCount || 0}.
+- Принесено очков здоровья в жертву: ${hero.totalHpSacrificed || 0} HP.
+
+Напиши летопись на русском языке, состоящую из 2-3 атмосферных абзацев. Нахваливай игрока за его поведение:
+- Если он часто жертвовал HP (высокий totalHpSacrificed), похвали его за железную жертвенность и волю пробить прокрастинацию любой ценой.
+- Если он часто медитировал (высокий meditationsCount), похвали его за дзен-выносливость, когнитивную мудрость и умение беречь баланс.
+- Если он одолел много Осад, воспой его победы над древними Боссами когнитивного страха.
+Сделай текст вдохновляющим для СДВГ-человека, совершившего подвиг!`;
+
+    const response = await fetch('http://localhost:3001/api/ai/complete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: 'Пожалуйста, напиши великую летопись моего искупления.' }
+        ]
+      })
+    });
+
+    if (!response.ok) throw new Error("AI Tunnel eulogy compilation failed");
+    const data = await response.json();
+    return data.choices[0].message.content.trim();
+  };
 
   const parseMessyTasks = async (textBlob) => {
     const systemPrompt = `Ты — Бездна во вселенной Абаддона. Твоя задача — взять хаотичные мысли СДВГ-пользователя и превратить их в структурированный JSON-массив задач, оформленных как квесты из мрачной RPG.
@@ -247,6 +310,9 @@ export default function App() {
             setTasks={setTasks}
             parseMessyTasks={parseMessyTasks}
             playActiveSessionTrack={playActiveSessionTrack}
+            generateRedemptionEulogy={generateRedemptionEulogy}
+            pedestals={pedestals}
+            savePedestals={savePedestals}
           />
         )}
 
@@ -257,6 +323,8 @@ export default function App() {
             tasks={tasks}
             setTasks={setTasks}
             requestDeconstruction={requestDeconstruction}
+            pedestals={pedestals}
+            savePedestals={savePedestals}
           />
         )}
 

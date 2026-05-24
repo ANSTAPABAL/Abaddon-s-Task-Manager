@@ -201,23 +201,39 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
     playSuccess();
     setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: 'completed' } : t));
     
-    // Reward XP & Gold
+    // Reward XP & Gold & update ADHD stats
     setCharacter(prev => {
       const target = tasks.find(t => t.id === taskId);
-      const reward = target?.type === 'siege' ? 50 : target?.type === 'relic' ? 35 : 15;
+      const isSiege = target?.type === 'siege';
+      const reward = isSiege ? 50 : target?.type === 'relic' ? 35 : 15;
       const nextXp = prev.xp + reward;
       const xpNeeded = prev.level * 100;
       
-      if (nextXp >= xpNeeded) {
-        return {
-          ...prev,
-          level: prev.level + 1,
-          xp: nextXp - xpNeeded,
-          gold: prev.gold + 10,
-          hp: prev.maxHp
-        };
+      let nextLevel = prev.level;
+      let remXp = nextXp;
+      let goldReward = 2; // base gold from planner
+      let levelUpGold = 0;
+      
+      if (remXp >= xpNeeded) {
+        nextLevel += 1;
+        remXp -= xpNeeded;
+        levelUpGold = 10;
       }
-      return { ...prev, xp: nextXp, gold: prev.gold + 2 };
+      
+      const totalEarned = goldReward + levelUpGold;
+      
+      return {
+        ...prev,
+        level: nextLevel,
+        xp: remXp,
+        gold: (prev.gold || 0) + totalEarned,
+        hp: nextLevel > prev.level ? prev.maxHp : prev.hp,
+        
+        // ADHD stats updates
+        completedTasksCount: (prev.completedTasksCount || 0) + 1,
+        completedSiegesCount: (prev.completedSiegesCount || 0) + (isSiege ? 1 : 0),
+        totalGoldEarned: (prev.totalGoldEarned || 0) + totalEarned
+      };
     });
   };
 

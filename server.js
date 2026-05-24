@@ -18,6 +18,7 @@ app.use(express.json());
 const DATA_DIR = path.join(__dirname, 'data');
 const TASKS_FILE = path.join(DATA_DIR, 'tasks.json');
 const CHARACTER_FILE = path.join(DATA_DIR, 'character.json');
+const PEDESTALS_FILE = path.join(DATA_DIR, 'pedestals.json');
 
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR);
@@ -25,6 +26,10 @@ if (!fs.existsSync(DATA_DIR)) {
 
 if (!fs.existsSync(TASKS_FILE)) {
   fs.writeFileSync(TASKS_FILE, JSON.stringify([], null, 2));
+}
+
+if (!fs.existsSync(PEDESTALS_FILE)) {
+  fs.writeFileSync(PEDESTALS_FILE, JSON.stringify([], null, 2));
 }
 
 const DEFAULT_CHARACTER = {
@@ -93,6 +98,26 @@ app.post('/api/character', (req, res) => {
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: "Failed to save character stats" });
+  }
+});
+
+// 2.5. Pedestals Hall API Endpoints
+app.get('/api/pedestals', (req, res) => {
+  try {
+    const data = fs.readFileSync(PEDESTALS_FILE, 'utf8');
+    res.json(JSON.parse(data));
+  } catch (error) {
+    res.status(500).json({ error: "Failed to load pedestals list" });
+  }
+});
+
+app.post('/api/pedestals', (req, res) => {
+  try {
+    const pedestals = req.body;
+    fs.writeFileSync(PEDESTALS_FILE, JSON.stringify(pedestals, null, 2));
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to save pedestals list" });
   }
 });
 
