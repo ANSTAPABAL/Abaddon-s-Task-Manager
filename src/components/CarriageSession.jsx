@@ -343,6 +343,8 @@ export default function CarriageSession({
     playClick();
     const classes = [
       "Маг огня", "Маг земли", "Маг камня", "Некромант", "Рунный маг", "Рыцарь меча",
+      "Маг света", "Маг тьмы", "Маг бездны",
+      "Маг меток (Сфрагист) [РЕДКОЕ]",
       "Химомансер (Маг крови) [РЕДКОЕ]", "Плазмомансер [УЛЬТРА-РЕДКОЕ]"
     ];
     const races = ["Человек", "Эльф", "Нежить", "Тролль", "Каргахаулец (Бледный гигант)"];
@@ -350,9 +352,13 @@ export default function CarriageSession({
       "Маг огня": ["Огненный щит", "Вспышка страсти"],
       "Маг земли": ["Каменное упорство", "Заземление тревоги"],
       "Маг камня": ["Руна защиты", "Нерушимый фокус"],
-      "Некромант": ["Воскрешение мертвых", "Договор с костями"],
+      "Некромант": ["Воскрешение зомби-помощника", "Стрела тьмы"],
       "Рунный маг": ["Начертание рун", "Магический барьер"],
       "Рыцарь меча": ["Закаленная воля", "Удар по прокрастинации"],
+      "Маг света": ["Вспышка озарения", "Световой барьер"],
+      "Маг тьмы": ["Покров теней", "Сгущение тьмы"],
+      "Маг бездны": ["Зов Бездны", "Щит Забвения"],
+      "Маг меток (Сфрагист) [РЕДКОЕ]": ["Метка слабости", "Печать отсечения"],
       "Химомансер (Маг крови) [РЕДКОЕ]": ["Жертва крови (HP -> Мгновенный шаг)", "Сгущение скверны"],
       "Плазмомансер [УЛЬТРА-РЕДКОЕ]": ["Разряд молнии (Супер-фокус)", "Плазменный барьер"]
     };
@@ -1498,13 +1504,69 @@ export default function CarriageSession({
                   {/* 4. Necromancer Skills */}
                   {character.class.includes("Некромант") && (
                     <>
-                      <button className="skill-btn blood" onClick={() => castClassSkill("Договор с костями", "hp", 15, 40, "blood")}>
-                        <span>🦴 Договор с костями</span>
-                        <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>15 HP • 40 Урона</span>
+                      <button className="skill-btn special" onClick={() => castClassSkill("Воскрешение зомби", "mana", 12, 35, "earth")}>
+                        <span>🧟 Воскрешение зомби</span>
+                        <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>12 MP • 35 Урона</span>
                       </button>
-                      <button className="skill-btn" onClick={() => castClassSkill("Призыв слуги", "mana", 10, 20, "lightning")}>
-                        <span>👻 Призыв слуги</span>
-                        <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>10 MP • 20 Урона</span>
+                      <button className="skill-btn blood" onClick={() => castClassSkill("Магия тьмы", "hp", 10, 25, "shiver")}>
+                        <span>🌑 Магия тьмы (Стрела)</span>
+                        <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>10 HP • 25 Урона</span>
+                      </button>
+                    </>
+                  )}
+
+                  {/* 4.5. Light Mage Skills */}
+                  {character.class.includes("света") && (
+                    <>
+                      <button className="skill-btn special" style={{ borderColor: '#ffd700' }} onClick={() => castClassSkill("Вспышка озарения", "mana", 10, 24, "heal")}>
+                        <span>☀️ Вспышка озарения</span>
+                        <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>10 MP • 24 Урона</span>
+                      </button>
+                      <button className="skill-btn" onClick={() => castClassSkill("Световой барьер", "mana", 7, 15, "stone")}>
+                        <span>🛡️ Световой барьер</span>
+                        <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>7 MP • 15 Урона</span>
+                      </button>
+                    </>
+                  )}
+
+                  {/* 4.6. Dark Mage Skills */}
+                  {character.class.includes("тьмы") && !character.class.includes("Некромант") && (
+                    <>
+                      <button className="skill-btn special" style={{ borderColor: '#4b0082' }} onClick={() => castClassSkill("Сгущение тьмы", "mana", 11, 26, "shiver")}>
+                        <span>🌑 Сгущение тьмы</span>
+                        <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>11 MP • 26 Урона</span>
+                      </button>
+                      <button className="skill-btn" onClick={() => castClassSkill("Покров теней", "mana", 7, 16, "shiver")}>
+                        <span>👥 Покров теней</span>
+                        <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>7 MP • 16 Урона</span>
+                      </button>
+                    </>
+                  )}
+
+                  {/* 4.7. Abyss Mage Skills */}
+                  {character.class.includes("бездны") && (
+                    <>
+                      <button className="skill-btn special" style={{ borderColor: '#8a2be2' }} onClick={() => castClassSkill("Зов Бездны", "mana", 14, 33, "shiver")}>
+                        <span>🕳️ Зов Бездны</span>
+                        <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>14 MP • 33 Урона</span>
+                      </button>
+                      <button className="skill-btn" onClick={() => castClassSkill("Щит Забвения", "mana", 8, 18, "stone")}>
+                        <span>🛡️ Щит Забвения</span>
+                        <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>8 MP • 18 Урона</span>
+                      </button>
+                    </>
+                  )}
+
+                  {/* 4.8. Mark Mage Skills */}
+                  {character.class.includes("меток") && (
+                    <>
+                      <button className="skill-btn special" style={{ borderColor: '#ff007f' }} onClick={() => castClassSkill("Метка слабости", "mana", 10, 22, "lightning")}>
+                        <span>🎯 Метка слабости</span>
+                        <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>10 MP • 22 Урона</span>
+                      </button>
+                      <button className="skill-btn" style={{ borderColor: '#ff007f' }} onClick={() => castClassSkill("Печать отсечения", "mana", 12, 28, "fire")}>
+                        <span>💮 Печать отсечения</span>
+                        <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>12 MP • 28 Урона</span>
                       </button>
                     </>
                   )}
@@ -1566,7 +1628,7 @@ export default function CarriageSession({
                   )}
 
                   {/* Fallback generic skills if none match */}
-                  {!character.class.includes("огня") && !character.class.includes("земли") && !character.class.includes("камня") && !character.class.includes("Некромант") && !character.class.includes("Рунный") && !character.class.includes("меча") && !character.class.includes("Химомансер") && !character.class.includes("Плазмомансер") && (
+                  {!character.class.includes("огня") && !character.class.includes("земли") && !character.class.includes("камня") && !character.class.includes("Некромант") && !character.class.includes("Рунный") && !character.class.includes("меча") && !character.class.includes("Химомансер") && !character.class.includes("Плазмомансер") && !character.class.includes("света") && !character.class.includes("тьмы") && !character.class.includes("бездны") && !character.class.includes("меток") && (
                     <>
                       <button className="skill-btn special" onClick={() => castClassSkill("Ментальный удар", "mana", 8, 18, "lightning")}>
                         <span>🔮 Ментальный удар</span>

@@ -222,6 +222,10 @@ export default function CharacterSheet({ character, setCharacter, tasks, setTask
     if (character.class.includes("огня")) return "🔥";
     if (character.class.includes("крови")) return "🩸";
     if (character.class.includes("Плазма")) return "⚡";
+    if (character.class.includes("света")) return "☀️";
+    if (character.class.includes("тьмы")) return "🌑";
+    if (character.class.includes("бездны")) return "🕳️";
+    if (character.class.includes("меток")) return "💮";
     return "✨";
   };
 
