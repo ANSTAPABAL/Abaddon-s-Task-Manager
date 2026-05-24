@@ -22,7 +22,8 @@ export default function CharacterSheet({ character, setCharacter, tasks, setTask
     { id: 'item_sword', name: 'Палаш Кровавого Алтаря', slot: 'weapon', price: 25, bonus: '+25% к сбору Золота', icon: '⚔️' },
     { id: 'item_shield', name: 'Рунический Эгис Файрвола', slot: 'shield', price: 15, bonus: '+10 HP при отходе', icon: '🛡️' },
     { id: 'item_armor', name: 'Мантия Безмятежности', slot: 'armor', price: 30, bonus: '+25 к Макс HP', icon: '👘' },
-    { id: 'item_ring', name: 'Перстень Допаминовой Сети', slot: 'ring', price: 20, bonus: '+5 MP за микро-действия', icon: '💍' }
+    { id: 'item_ring', name: 'Перстень Допаминовой Сети', slot: 'ring', price: 20, bonus: '+5 MP за микро-действия', icon: '💍' },
+    { id: 'item_potion', name: 'Зелье Когнитивной Выносливости', slot: 'potion', price: 8, bonus: 'Мгновенный сброс 60м усталости, лечит 25 HP', icon: '🧪' }
   ];
 
   // --- SHOP HANDLERS ---
@@ -45,6 +46,27 @@ export default function CharacterSheet({ character, setCharacter, tasks, setTask
   };
 
   const handleEquipFromInventory = (item, index) => {
+    if (item.slot === 'potion') {
+      playClick();
+      playSuccess();
+      setCharacter(prev => {
+        const newInventory = [...prev.inventory];
+        newInventory.splice(index, 1);
+        
+        const nextHp = Math.min(prev.maxHp, prev.hp + 25);
+        const nextFatigue = Math.max(0, prev.dailyWorkMinutes - 60);
+        
+        return {
+          ...prev,
+          hp: nextHp,
+          dailyWorkMinutes: nextFatigue,
+          inventory: newInventory
+        };
+      });
+      alert("Вы выпили Зелье Когнитивной Выносливости! Восстановлено 25 HP здоровья разума, усталость снижена на 60 минут.");
+      return;
+    }
+
     playClick();
     playSuccess();
 
@@ -360,7 +382,7 @@ export default function CharacterSheet({ character, setCharacter, tasks, setTask
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
             {merchantItems.map(item => {
-              const alreadyBought = character.inventory?.some(i => i.id === item.id) || Object.values(character.equipped).some(i => i && i.id === item.id);
+              const alreadyBought = item.slot !== 'potion' && (character.inventory?.some(i => i.id === item.id) || Object.values(character.equipped).some(i => i && i.id === item.id));
               
               return (
                 <div 

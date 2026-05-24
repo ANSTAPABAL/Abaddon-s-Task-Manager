@@ -265,7 +265,8 @@ export default function SpotifyPlayer({
               </code>
             </div>
           </div>
-        ) : (
+        </div>
+      ) : (
           <div>
           {/* Dynamic Non-Blocking ADHD Error HUD */}
           {spotifyError && (

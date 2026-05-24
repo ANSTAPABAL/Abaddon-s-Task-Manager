@@ -355,7 +355,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
             placeholder="Вбейте контракт (задачу)..." 
             value={newTaskTitle}
             onChange={(e) => setNewTaskTitle(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleCreateTask(null)}
+            onKeyDown={(e) => e.key === 'Enter' && handleCreateTask(new Date().toISOString().split('T')[0])}
           />
         </div>
         
@@ -374,11 +374,11 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
 
           <button 
             className="rpg-btn rpg-btn-mana"
-            onClick={() => handleCreateTask(null)}
+            onClick={() => handleCreateTask(new Date().toISOString().split('T')[0])}
             disabled={!newTaskTitle.trim()}
           >
             <Plus size={16} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />
-            ПРИБИТЬ К ДОГОВОРУ
+            ПРИБИТЬ К ДОГОВОРУ ДНЯ
           </button>
         </div>
       </div>
