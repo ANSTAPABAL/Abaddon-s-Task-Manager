@@ -163,7 +163,7 @@ app.post('/api/ai/complete', async (req, res) => {
 const DIST_DIR = path.join(__dirname, 'dist');
 if (fs.existsSync(DIST_DIR)) {
   app.use(express.static(DIST_DIR));
-  app.get('*', (req, res) => {
+  app.get('*splat', (req, res) => {
     res.sendFile(path.join(DIST_DIR, 'index.html'));
   });
 }

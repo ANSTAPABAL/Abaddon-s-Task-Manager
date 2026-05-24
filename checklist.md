@@ -78,3 +78,12 @@ This checklist tracks the current completion status of all core game mechanics, 
   - [x] Unlocked after completing 15 tasks (with at least 3 Boss Sieges)
   - [x] Generates AI-compiled eulogy summarizing the hero's actions, class, spelling, HP sacrifice, and meditation stats
   - [x] Immortalizes the hero in `data/pedestals.json` (Hall of Fame) and resets the character to start a new adventure
+
+---
+
+## 🚀 Automation & Scripts
+
+- [x] **Windows Easy Startup / Shutdown**
+  - [x] `start.bat` - Launch backend & frontend concurrently and open browser automatically at loopback IP (127.0.0.1:5173)
+  - [x] `stop.bat` - Port-based task killing to cleanly shut down Node.exe processes (Ports 3001, 5173) without affecting other applications
+
