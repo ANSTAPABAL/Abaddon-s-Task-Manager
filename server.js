@@ -124,11 +124,11 @@ app.post('/api/pedestals', (req, res) => {
 // 3. AI Proxy Endpoint
 app.post('/api/ai/complete', async (req, res) => {
   const { messages } = req.body;
-  const API_KEY = process.env.AI_TUNNEL_KEY || 'your_sk_aitunnel_key_here';
+  const API_KEY = process.env.AI_TUNNEL_KEY;
   const BASE_URL = 'https://api.aitunnel.ru/v1/chat/completions';
 
-  if (!process.env.AI_TUNNEL_KEY) {
-    console.warn("⚠️ Warning: AI_TUNNEL_KEY environment variable is missing. Falling back to default credential.");
+  if (!API_KEY) {
+    console.warn("⚠️ Warning: AI_TUNNEL_KEY environment variable is missing.");
   }
 
   try {
