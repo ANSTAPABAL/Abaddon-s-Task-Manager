@@ -226,6 +226,22 @@ export default function CarriageSession({
   const sessionElapsedRef = useRef(0);
   const lastMiniBreakRef = useRef(0);
   const lastBigBreakRef = useRef(0);
+  
+  const activeTaskRef = useRef(activeTask);
+  const timeLeftRef = useRef(timeLeft);
+  const setupStageRef = useRef(setupStage);
+
+  useEffect(() => {
+    activeTaskRef.current = activeTask;
+  }, [activeTask]);
+
+  useEffect(() => {
+    timeLeftRef.current = timeLeft;
+  }, [timeLeft]);
+
+  useEffect(() => {
+    setupStageRef.current = setupStage;
+  }, [setupStage]);
   const [breakEvent, setBreakEvent] = useState(null);
   const [breakActivityChoice, setBreakActivityChoice] = useState('breathing');
   const [breakAiText, setBreakAiText] = useState('');
@@ -281,16 +297,16 @@ export default function CarriageSession({
   // Unmount cleanup: Save time and release indicators
   useEffect(() => {
     return () => {
-      if (setupStage === 'active' && activeTask) {
+      if (setupStageRef.current === 'active' && activeTaskRef.current) {
         const storedTime = localStorage.getItem('combat_time_left');
-        const finalTime = storedTime !== null ? Number(storedTime) : timeLeft;
-        setTasks(prev => prev.map(t => t.id === activeTask.id ? { ...t, timeLeft: finalTime } : t));
+        const finalTime = storedTime !== null ? Number(storedTime) : timeLeftRef.current;
+        setTasks(prev => prev.map(t => t.id === activeTaskRef.current.id ? { ...t, timeLeft: finalTime } : t));
         localStorage.removeItem('active_task_id');
         localStorage.removeItem('combat_time_left');
         localStorage.setItem('combat_is_running', 'false');
       }
     };
-  }, [setupStage, activeTask, timeLeft, setTasks]);
+  }, [setTasks]);
 
   // Visibility tab auto-pause
   useEffect(() => {

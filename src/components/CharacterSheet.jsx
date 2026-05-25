@@ -419,6 +419,54 @@ export default function CharacterSheet({ character, setCharacter, tasks, setTask
             </div>
           )}
 
+          {/* Race description box */}
+          {(() => {
+            const raceDescriptions = {
+              'Человек': {
+                lore: 'Ловкий и гибкий духом. Потомок строителей старого мира. Не имеет ярко выраженных слабостей, но быстрее приспосабливается к когнитивной нагрузке.',
+                trait: '✨ Адаптивность: Сбалансированное восстановление сил.',
+                icon: '👤'
+              },
+              'Эльф': {
+                lore: 'Древнее создание, чье восприятие времени растянуто на века. Обладает высоким запасом ментальных сил, но склонен к меланхолии и глубокой прокрастинации.',
+                trait: '🍃 Вневременной фокус: Повышенная регенерация маны.',
+                icon: '🧝'
+              },
+              'Нежить': {
+                lore: 'Существо, восставшее из могил прошлого. Ему чужды усталость плоти, но скверна незавершенных дел сильнее разъедает его разум.',
+                trait: '💀 Оковы смерти: Устойчивость к усталости, но повышенный урон от просроченных дел.',
+                icon: '💀'
+              },
+              'Тролль': {
+                lore: 'Дикий житель окраин, обладающий колоссальной регенерацией и силой, но с трудом справляющийся со сложными рунами.',
+                trait: '🐗 Регенерация плоти: Повышенное исцеление HP при использовании зелий.',
+                icon: '🐗'
+              },
+              'Каргахаулец (Бледный гигант)': {
+                lore: 'Суровый исполин из заснеженных клыков Каргахаула. Привык преодолевать ледяные бури и колоссальные препятствия.',
+                trait: '👹 Ледяная стойкость: Увеличенный максимальный запас HP разума.',
+                icon: '👹'
+              }
+            };
+            const raceInfo = Object.entries(raceDescriptions).find(([name]) => character.race && character.race.includes(name));
+            if (!raceInfo) return null;
+            const [raceName, info] = raceInfo;
+            return (
+              <div style={{ background: 'rgba(25, 20, 30, 0.4)', padding: '0.6rem 0.8rem', border: '1px dashed var(--color-relic-glow)', fontSize: '0.75rem', marginBottom: '1rem', marginTop: '0.5rem' }}>
+                <h4 style={{ fontFamily: 'var(--font-rpg)', color: 'var(--color-relic-glow)', margin: '0 0 4px 0', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span>{info.icon}</span>
+                  <span>Наследие Расы: {raceName}</span>
+                </h4>
+                <p style={{ color: 'var(--color-bone-dim)', margin: '0 0 6px 0', fontStyle: 'italic', lineHeight: '1.3' }}>
+                  {info.lore}
+                </p>
+                <div style={{ color: '#ffb813', fontWeight: 'bold' }}>
+                  {info.trait}
+                </div>
+              </div>
+            );
+          })()}
+
           {/* visual Inventory Backpack */}
           <div style={{ background: '#0a090b', padding: '0.8rem', border: '1px solid var(--color-iron-light)' }}>
             <h4 style={{ fontSize: '0.75rem', color: '#fff', marginBottom: '6px', fontFamily: 'var(--font-rpg)', display: 'flex', alignItems: 'center', gap: '3px' }}>

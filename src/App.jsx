@@ -8,6 +8,7 @@ import RecoveryScreen from './components/RecoveryScreen';
 import RuneOfReturnModal from './components/RuneOfReturnModal';
 import { useAudio } from './hooks/useAudio';
 import { Settings as SettingsIcon, Volume2, VolumeX, Sliders } from 'lucide-react';
+import { getVirtualTodayStr, getVirtualTomorrowStr } from './utils/dateUtils';
 
 export default function App() {
   const { initAudio, setAtmosphereMood, playClick, playSuccess, setMuted, setVolume, setUseLocalDoublePlaylist, synthInstance } = useAudio();
@@ -120,7 +121,7 @@ export default function App() {
 
     try {
       const activeTasks = overrideTasks || tasks;
-      const todayStr = new Date().toISOString().split('T')[0];
+      const todayStr = getVirtualTodayStr();
       const todayTasks = activeTasks.filter(t => t.date === todayStr && t.status === 'active');
       const backlogTasks = activeTasks.filter(t => t.date === null && t.status === 'active');
 
@@ -520,7 +521,7 @@ export default function App() {
         setTasks(migrated);
 
         // Trigger Daily Judgment Ceremony for overdue active contracts
-        const todayStr = new Date().toISOString().split('T')[0];
+        const todayStr = getVirtualTodayStr();
         const overdue = migrated.filter(t => t.status === 'active' && t.date && t.date < todayStr);
         if (overdue.length > 0) {
           setJudgmentTasks(overdue);
@@ -1358,7 +1359,7 @@ export default function App() {
                       playClick();
                       const task = judgmentTasks[judgmentIndex];
                       triggerRuneOfReturn(task, (runeData) => {
-                        const todayStr = new Date().toISOString().split('T')[0];
+                        const todayStr = getVirtualTodayStr();
                         setTasks(prev => prev.map(t => t.id === task.id ? { ...t, date: todayStr, curseLevel: Math.min(5, (t.curseLevel || 0) + 1), runeOfReturn: runeData } : t));
                         
                         // Move next
@@ -1380,9 +1381,7 @@ export default function App() {
                       playClick();
                       const task = judgmentTasks[judgmentIndex];
                       triggerRuneOfReturn(task, (runeData) => {
-                        const tomorrow = new Date();
-                        tomorrow.setDate(tomorrow.getDate() + 1);
-                        const tomorrowStr = tomorrow.toISOString().split('T')[0];
+                        const tomorrowStr = getVirtualTomorrowStr();
                         setTasks(prev => prev.map(t => t.id === task.id ? { ...t, date: tomorrowStr, curseLevel: Math.min(5, (t.curseLevel || 0) + 1), runeOfReturn: runeData } : t));
 
                         // Move next

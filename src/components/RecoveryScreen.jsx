@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Skull, HelpCircle, Sparkles, RefreshCw, Send, ArrowLeft } from 'lucide-react';
 import { useAudio } from '../hooks/useAudio';
+import { getVirtualTodayStr } from '../utils/dateUtils';
 
 export default function RecoveryScreen({ 
   character, 
@@ -31,7 +32,7 @@ export default function RecoveryScreen({
     setChatLog([]);
     setAtmosphereMood('recovery');
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getVirtualTodayStr();
     const todayTasks = tasks.filter(t => t.date === todayStr && t.status === 'active');
     const backlogTasks = tasks.filter(t => t.date === null && t.status === 'active');
 
