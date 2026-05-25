@@ -14,10 +14,24 @@ const getRacePortraitUrl = (race) => {
 export default function Navigation({ 
   activeTab, 
   setActiveTab, 
-  character 
+  character,
+  activeTask,
+  timeLeft,
+  isRunning
 }) {
   const { playClick } = useAudio();
   const portraitUrl = getRacePortraitUrl(character.race);
+
+  const formatTime = (secs) => {
+    const isNegative = secs < 0;
+    const absSecs = Math.abs(secs);
+    const m = Math.floor(absSecs / 60).toString().padStart(2, '0');
+    const s = (absSecs % 60).toString().padStart(2, '0');
+    return `${isNegative ? '-' : ''}${m}:${s}`;
+  };
+
+  const isTimeCritical = activeTask ? (timeLeft <= 0 || timeLeft < (activeTask.pomodoroTime * 60) * 0.2) : false;
+  const formattedTime = timeLeft !== undefined ? formatTime(timeLeft) : '00:00';
 
   const handleTabClick = (tab) => {
     playClick();
@@ -131,6 +145,7 @@ export default function Navigation({
       {/* Right Side: Tab Buttons - Floating Widget Card */}
       <div style={{ 
         display: 'flex', 
+        alignItems: 'center',
         gap: '0.5rem',
         background: 'rgba(20, 16, 22, 0.75)',
         backdropFilter: 'blur(10px)',
@@ -139,6 +154,50 @@ export default function Navigation({
         padding: '0.5rem 0.8rem',
         boxShadow: '0 8px 32px rgba(0, 0, 0, 0.65), inset 0 0 10px rgba(255, 255, 255, 0.02)'
       }}>
+        {activeTab !== 'escape' && activeTask && (
+          <div 
+            className={isTimeCritical ? "pulsating-red-frame" : "golden-frame"} 
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.6rem',
+              borderRadius: '6px',
+              padding: '4px 10px',
+              height: '32px',
+              marginRight: '0.4rem',
+              boxSizing: 'border-box'
+            }}
+          >
+            {/* Timer */}
+            <span style={{
+              fontFamily: 'monospace',
+              fontSize: '1rem',
+              fontWeight: 'bold',
+              color: isTimeCritical ? '#ff2424' : 'var(--color-relic-glow, #ffb813)',
+              textShadow: isTimeCritical ? '0 0 6px #ff2424' : 'none'
+            }}>
+              {formattedTime}
+            </span>
+            
+            {/* Divider */}
+            <span style={{ color: 'rgba(230, 223, 211, 0.25)' }}>|</span>
+            
+            {/* Task Name */}
+            <span style={{
+              fontSize: '0.72rem',
+              color: '#fff',
+              fontWeight: 'bold',
+              textDecoration: 'underline',
+              maxWidth: '120px',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              letterSpacing: '0.5px'
+            }} title={activeTask.title}>
+              {activeTask.title}
+            </span>
+          </div>
+        )}
         <button 
           style={getButtonStyle('escape')}
           onClick={() => handleTabClick('escape')}

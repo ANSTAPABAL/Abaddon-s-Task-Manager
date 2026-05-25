@@ -160,6 +160,34 @@ const BIG_BREAK_ACTIVITIES = [
   { id: 'nature', label: '🌳 Выйти на свежий воздух', lore: 'сбор целебных трав и дыхание в лесу Приграничья' },
 ];
 
+
+const generateEnrichedEnemyDescription = (enemyName, taskTitle, toxicity, variation) => {
+  const intros = [
+    `Из темного влажного грота, волоча за собой шлейф удушливого тумана, медленно выползает темный клубок шевелящихся, суставчатых конечностей.`,
+    `С тихим шорохом костей и ржавой стали из провала в полу выползает бесформенный черный клубок переплетенных лап и бритвенно-острых когтей.`,
+    `Из бездонного разлома к вам тянется содрогающийся клубок смоляных щупалец и костлявых отростков, окружая ваше сознание холодным дыханием сомнения.`,
+    `Окутанный багровым паром, из зловещей темноты грота выкатывается плотный шевелящийся конгломерат искаженных конечностей и слепых, моргающих глаз.`
+  ];
+  
+  const hashStr = enemyName + taskTitle;
+  let hash = 0;
+  for (let i = 0; i < hashStr.length; i++) {
+    hash = hashStr.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  hash = Math.abs(hash);
+  const intro = intros[hash % intros.length];
+
+  const descriptions = {
+    scary: `Существо соткано из вашего первобытного страха перед началом. Оно застывает на месте, готовясь к резкому прыжку, если вы проявите нерешительность. Однако в его движениях сквозит фатальная медлительность: резкий шаг вперед, простое физическое действие расколет его хрупкий панцирь. Одолеть его можно, совершив мгновенный выпад — сделайте простейшее микро-действие прямо сейчас!`,
+    tedious: `Тварь медлительна, но неумолимо давит своим весом, пытаясь погрузить ваш разум в вязкое болото скуки. Она не выносит резкого темпа и быстрой музыки. Ваша лучшая стратегия — двигаться быстро, обходя ее громоздкие фланги. Резкий и короткий шаг (работа ровно 10 минут) заставит монстра споткнуться и откроет его уязвимое ядро!`,
+    vague: `Этот монстр постоянно меняет очертания, расплываясь в воздухе туманными пятнами. Он слепнет от яркого света конкретики. Чтобы одолеть его, совершите точный, выверенный шаг — зафиксируйте в мыслях конкретное физическое действие, и его размытая форма материализуется, став уязвимой для вашего клинка!`,
+    standard: `Теневой паразит, питающийся вашим временем. Он медленно кружит вокруг, выжидая, когда вы отвлечетесь. У него есть скрытая слабость — он неповоротлив и впадает в ступор при виде планомерной атаки. Резкий шаг, даже самый скромный, собьет его с толку. Не давайте ему передышки, наносите удары по очереди!`
+  };
+
+  const body = descriptions[toxicity] || descriptions.standard;
+  return `${intro} Он приближается, распространяя вокруг ауру «${taskTitle}». ${body}`;
+};
+
 export default function CarriageSession({ 
   character, 
   setCharacter, 
@@ -193,6 +221,16 @@ export default function CarriageSession({
   const [timeLeft, setTimeLeft] = useState(1500); 
   const [isRunning, setIsRunning] = useState(false);
   const [sessionSteps, setSessionSteps] = useState([]);
+
+  const [resolutionNpc, setResolutionNpc] = useState(null);
+  const [npcNewTaskTitle, setNpcNewTaskTitle] = useState('');
+
+  // Sync state to parent layout
+  useEffect(() => {
+    if (onStateSync) {
+      onStateSync({ activeTask, timeLeft, isRunning });
+    }
+  }, [activeTask, timeLeft, isRunning, onStateSync]);
   
   // Active RPG Combat Arena States
   const [enemyName, setEnemyName] = useState('Призрак Прокрастинации');
@@ -339,9 +377,118 @@ export default function CarriageSession({
 
   // --- LEGACY LEGEND & WIN CONDITION FUNCTIONS ---
 
-  const handleWinActiveSession = (task) => {
+  
+  const handleStartCombatSession = (task) => {
+    const runStart = (mode) => {
+      setActiveTask(task);
+      const initialTime = task.timeLeft !== undefined ? task.timeLeft : task.pomodoroTime * 60;
+      setTimeLeft(initialTime);
+      setSessionSteps(task.steps || []);
+      setSetupStage('active');
+      generateCombatEncounter(task);
+      localStorage.setItem('active_task_id', task.id);
+      localStorage.setItem('combat_time_left', initialTime);
+      setDeadlineDmgApplied(false);
+      if (mode === 'timer') {
+        localStorage.setItem('combat_timer_start_time', Date.now());
+        localStorage.setItem('combat_timer_start_value', initialTime);
+        localStorage.setItem('combat_is_running', 'true');
+        setIsRunning(true);
+      } else {
+        localStorage.setItem('combat_is_running', 'false');
+        setIsRunning(false);
+      }
+      setAtmosphereMood(task.type === 'siege' ? 'siege' : 'hunt');
+      if (playActiveSessionTrack) playActiveSessionTrack(task.type === 'siege' ? 'siege' : 'hunt');
+    };
+
+    if (!task.executionMode || task.executionMode === 'ask_later') {
+      requestTaskExecutionModeSelect(task, (chosenMode) => {
+        runStart(chosenMode);
+      });
+    } else {
+      runStart(task.executionMode);
+    }
+  };
+
+  const handleCreateAndStartTaskFromNpc = async () => {
+    if (!npcNewTaskTitle.trim()) return;
+    const title = npcNewTaskTitle;
+    setNpcNewTaskTitle('');
+    playClick();
+    
+    // Local classify
+    let initialType = 'hunt';
+    const lower = title.toLowerCase();
+    if (lower.includes('прочитать') || lower.includes('изучить') || lower.includes('почитать') || lower.includes('нарисовать')) {
+      initialType = 'relic';
+    } else if (lower.includes('проект') || lower.includes('сложн') || lower.includes('сдать') || lower.includes('курсов') || lower.includes('диплом') || lower.includes('написать')) {
+      initialType = 'siege';
+    } else if (lower.includes('хвост') || lower.includes('долг') || lower.includes('старый') || lower.includes('разобрать')) {
+      initialType = 'corpse';
+    }
+
+    const taskId = `task-${Date.now()}`;
+    const todayStr = new Date().toISOString().split('T')[0];
+    const newTask = {
+      id: taskId,
+      title: title,
+      type: initialType,
+      status: 'active',
+      date: todayStr, 
+      pomodoroTime: initialType === 'siege' ? 50 : 25,
+      pomodoroSpent: 0,
+      toxicity: 'standard',
+      barrierType: null,
+      curseLevel: 0,
+      steps: [],
+      intent: '',
+      isLongJourney: false
+    };
+
+    setTasks(prev => [...prev, newTask]);
+    handleStartCombatSession(newTask);
+    playSuccess();
+
+    try {
+      const systemPrompt = `Ты — Распределитель Контрактов Бездны. Твоя задача — классифицировать задачу по типу сложности для ADHD/СДВГ-игрока.
+Возвращай ТОЛЬКО JSON {"type": "siege"|"relic"|"hunt"|"corpse"}.`;
+      const response = await fetch('http://localhost:3001/api/ai/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: `Определи тип для задачи: "${title}"` }
+          ]
+        })
+      });
+      if (response.ok) {
+        const data = await response.json();
+        let text = data.choices[0].message.content.trim();
+        if (text.startsWith("\x60\x60\x60json")) text = text.slice(7);
+        if (text.endsWith("\x60\x60\x60")) text = text.slice(0, -3);
+        const parsed = JSON.parse(text.trim());
+        if (['hunt', 'siege', 'relic', 'corpse'].includes(parsed.type)) {
+          setTasks(prev => prev.map(t => t.id === taskId ? {
+            ...t,
+            type: parsed.type,
+            pomodoroTime: parsed.type === 'siege' ? 50 : 25
+          } : t));
+        }
+      }
+    } catch (err) {
+      console.warn("AI background classification failed", err);
+    }
+  };
+
+const handleWinActiveSession = (task) => {
     setIsRunning(false);
     playSuccess();
+    
+    // Choose random NPC for encounter
+    const randNpc = NPC_ENCOUNTERS[Math.floor(Math.random() * NPC_ENCOUNTERS.length)];
+    setResolutionNpc(randNpc);
     
     const isSiege = task?.type === 'siege';
     const expReward = isSiege ? 60 : 25;
@@ -536,12 +683,20 @@ export default function CarriageSession({
       ];
       const randomEvent = events[hash % events.length];
 
+      const enemyName = `${variation.prefix} ${variation.suffix}`;
+      const detailedDesc = generateEnrichedEnemyDescription(
+        enemyName,
+        task.title,
+        task.toxicity || 'standard',
+        variation
+      );
+
       lore = {
-        enemyName: `${variation.prefix} ${variation.suffix}`,
+        enemyName: enemyName,
         visualType: variation.type,
         weakPoints: weakPoints,
         randomEvent: randomEvent,
-        loreDescription: `${variation.desc} Рожден силой ваших мыслей об этой задаче.`
+        loreDescription: detailedDesc
       };
     }
 
@@ -1438,12 +1593,15 @@ export default function CarriageSession({
   }
 
   // --- RENDERING: BATTLE RESOLUTION SCREEN ---
+    // --- RENDERING: BATTLE RESOLUTION SCREEN ---
   if (setupStage === 'resolution') {
     const isVictory = resolutionType === 'victory';
     const isFlee = resolutionType === 'flee';
     const isDeath = resolutionType === 'death';
     const borderColor = isVictory ? '#d4af37' : isFlee ? '#8c7d6b' : '#ff0000';
     const title = isVictory ? '🏆 Триумф Воли' : isFlee ? '🌫️ Бегство в Тени' : '💀 Падение Изгнанника';
+    
+    const activeTasksToOffer = tasks.filter(t => t.status === 'active');
 
     return (
       <div className="break-event-overlay animate-fade-in">
@@ -1464,10 +1622,85 @@ export default function CarriageSession({
               </p>
             </div>
           ) : (
-            <div style={{ background: 'rgba(0,0,0,0.5)', border: `1px solid ${borderColor}44`, borderLeft: `3px solid ${borderColor}`, padding: '1.5rem', marginBottom: '1.5rem', borderRadius: '4px' }}>
-              <p style={{ fontSize: '1rem', color: '#e6dfd3', lineHeight: '1.7', fontFamily: 'Georgia, serif', whiteSpace: 'pre-line', textAlign: 'justify' }}>
-                {resolutionText}
-              </p>
+            <div>
+              <div style={{ background: 'rgba(0,0,0,0.5)', border: `1px solid ${borderColor}44`, borderLeft: `3px solid ${borderColor}`, padding: '1.5rem', marginBottom: '1.5rem', borderRadius: '4px' }}>
+                <p style={{ fontSize: '1rem', color: '#e6dfd3', lineHeight: '1.7', fontFamily: 'Georgia, serif', whiteSpace: 'pre-line', textAlign: 'justify' }}>
+                  {resolutionText}
+                </p>
+              </div>
+
+              {isVictory && resolutionNpc && (
+                <div style={{ 
+                  background: 'rgba(25, 20, 30, 0.75)', 
+                  border: '1px solid rgba(255, 184, 19, 0.25)', 
+                  borderRadius: '6px', 
+                  padding: '1.2rem', 
+                  marginBottom: '1.5rem',
+                  boxShadow: '0 4px 15px rgba(0,0,0,0.5)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '1.5rem' }}>{resolutionNpc.icon}</span>
+                    <h3 className="gothic-title" style={{ fontSize: '1.1rem', color: 'var(--color-relic-glow)', margin: 0 }}>
+                      {resolutionNpc.name}
+                    </h3>
+                  </div>
+                  <p style={{ fontSize: '0.88rem', color: '#e6dfd3', fontStyle: 'italic', marginBottom: '1rem', lineHeight: '1.4' }}>
+                    «Вы одолели угрозу, Изгнанник. Но тени сгущаются. Какой контракт мы запечатаем следующим?»
+                  </p>
+
+                  {/* Offer existing contracts */}
+                  {activeTasksToOffer.length > 0 && (
+                    <div style={{ marginBottom: '1rem' }}>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: 'var(--font-rpg)' }}>
+                        📜 Выбрать существующий контракт:
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        {activeTasksToOffer.slice(0, 3).map(t => (
+                          <button 
+                            key={t.id}
+                            className="rpg-btn"
+                            style={{ display: 'block', width: '100%', padding: '6px 12px', fontSize: '0.82rem', textAlign: 'left', borderColor: 'rgba(255,255,255,0.1)' }}
+                            onClick={() => {
+                              playClick();
+                              handleStartCombatSession(t);
+                            }}
+                          >
+                            ⚔️ {t.title} ({t.pomodoroTime}м)
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Create and start a new contract */}
+                  <div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: 'var(--font-rpg)' }}>
+                      ✍️ Записать новый контракт:
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <input 
+                        type="text" 
+                        placeholder="Суть нового соглашения..." 
+                        className="rpg-input" 
+                        value={npcNewTaskTitle}
+                        onChange={(e) => setNpcNewTaskTitle(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleCreateAndStartTaskFromNpc();
+                        }}
+                        style={{ flex: 1, fontSize: '0.82rem', height: '32px' }}
+                      />
+                      <button 
+                        className="rpg-btn rpg-btn-blood"
+                        onClick={handleCreateAndStartTaskFromNpc}
+                        disabled={!npcNewTaskTitle.trim()}
+                        style={{ fontSize: '0.78rem', padding: '0 12px', height: '32px' }}
+                      >
+                        🔮 В бой
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -1477,7 +1710,6 @@ export default function CarriageSession({
               style={{ padding: '0.8rem 2.5rem', fontSize: '1rem', borderColor }}
               onClick={() => {
                 playClick();
-                // Check if user qualifies for legacy redemption ceremony
                 const willQualify = (character.completedTasksCount || 0) >= 15 && 
                                     (character.completedSiegesCount || 0) >= 3;
                 if (isVictory && willQualify) {
@@ -1496,7 +1728,7 @@ export default function CarriageSession({
     );
   }
 
-  // --- BURNOUT BLOCK OVERLAY (Mandatory Rest Camp Screen) ---
+// --- BURNOUT BLOCK OVERLAY (Mandatory Rest Camp Screen) ---
   if (character && character.dailyWorkMinutes >= 300) {
     return (
       <div className="rpg-panel" style={{ maxWidth: '750px', margin: '3rem auto', padding: '2.5rem', border: '3px solid var(--color-blood)', animation: 'pulse-red 3s infinite', textAlign: 'center' }}>
@@ -1840,36 +2072,7 @@ export default function CarriageSession({
                     style={{ width: '100%', padding: '0.4rem 0', fontSize: '0.85rem', marginTop: '1rem' }}
                     onClick={() => {
                       playClick();
-                      const runStart = (mode) => {
-                        setActiveTask(task);
-                        const initialTime = task.timeLeft !== undefined ? task.timeLeft : task.pomodoroTime * 60;
-                        setTimeLeft(initialTime);
-                        setSessionSteps(task.steps || []);
-                        setSetupStage('active');
-                        generateCombatEncounter(task);
-                        localStorage.setItem('active_task_id', task.id);
-                        localStorage.setItem('combat_time_left', initialTime);
-                        setDeadlineDmgApplied(false);
-                        if (mode === 'timer') {
-                          localStorage.setItem('combat_timer_start_time', Date.now());
-                          localStorage.setItem('combat_timer_start_value', initialTime);
-                          localStorage.setItem('combat_is_running', 'true');
-                          setIsRunning(true);
-                        } else {
-                          localStorage.setItem('combat_is_running', 'false');
-                          setIsRunning(false);
-                        }
-                        setAtmosphereMood(task.type === 'siege' ? 'siege' : 'hunt');
-                        if (playActiveSessionTrack) playActiveSessionTrack(task.type === 'siege' ? 'siege' : 'hunt');
-                      };
-
-                      if (!task.executionMode || task.executionMode === 'ask_later') {
-                        requestTaskExecutionModeSelect(task, (chosenMode) => {
-                          runStart(chosenMode);
-                        });
-                      } else {
-                        runStart(task.executionMode);
-                      }
+                      handleStartCombatSession(task);
                     }}
                   >
                     {task.timeLeft !== undefined ? `⚔️ ВОЗОБНОВИТЬ (${Math.ceil(task.timeLeft / 60)}м)` : '⚔️ ВСТУПИТЬ В БОЙ'}
@@ -2422,9 +2625,23 @@ export default function CarriageSession({
                   style={{ width: `${enemyHp}%`, background: 'linear-gradient(to right, #7a1212, #ff2424)', boxShadow: '0 0 10px #ff2424' }} 
                 />
               </div>
-
-              {/* Weakness Insight box (ADHD Insights) */}
-              <div className="weakness-insight-box">
+              {/* Immersive Gothic Description */}
+              <div style={{ 
+                fontSize: '0.78rem', 
+                color: 'var(--color-bone-dim)', 
+                lineHeight: '1.45', 
+                fontStyle: 'italic', 
+                background: 'rgba(0,0,0,0.3)', 
+                borderLeft: '2px solid var(--color-blood)',
+                padding: '8px 10px', 
+                marginBottom: '10px',
+                borderRadius: '0 4px 4px 0',
+                fontFamily: 'sans-serif'
+              }}>
+                {activeTask.combatLore?.loreDescription || 
+                  (activeTask && generateEnrichedEnemyDescription(enemyName, activeTask.title, activeTask.toxicity || 'standard', variation))}
+              </div>
+      <div className="weakness-insight-box">
                 <div style={{ fontWeight: 'bold', fontSize: '0.75rem', color: '#ffb813', marginBottom: '3px', fontFamily: 'var(--font-rpg)' }}>
                   👁️ МЫСЛИ О СЛАБОСТИ ВРАГА:
                 </div>

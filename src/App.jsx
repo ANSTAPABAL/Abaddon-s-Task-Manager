@@ -48,20 +48,17 @@ export default function App() {
   const [taskPendingModeSelect, setTaskPendingModeSelect] = useState(null);
   const [modeSelectCallback, setModeSelectCallback] = useState(null);
 
-  // Tab switcher with warning & auto-pause
+  const [activeSessionSync, setActiveSessionSync] = useState({
+    activeTask: null,
+    timeLeft: 0,
+    isRunning: false
+  });
+
+  const handleTimerStateSync = (syncData) => {
+    setActiveSessionSync(syncData);
+  };
+
   const handleTabChange = (nextTab) => {
-    if (activeTab === 'escape' && nextTab !== 'escape') {
-      const activeTaskId = localStorage.getItem('active_task_id');
-      const isTimerRunning = localStorage.getItem('combat_is_running') === 'true';
-      if (activeTaskId && isTimerRunning) {
-        const activeTask = tasks.find(t => t.id === activeTaskId);
-        if (activeTask && activeTask.executionMode === 'timer') {
-          if (!window.confirm("Вы собираетесь покинуть сражение. Текущее время таймера будет приостановлено и сохранено. Продолжить?")) {
-            return;
-          }
-        }
-      }
-    }
     setActiveTab(nextTab);
   };
 
@@ -915,11 +912,14 @@ export default function App() {
           activeTab={activeTab} 
           setActiveTab={handleTabChange} 
           character={character}
+          activeTask={activeSessionSync.activeTask}
+          timeLeft={activeSessionSync.timeLeft}
+          isRunning={activeSessionSync.isRunning}
         />
 
         {/* Main Tab Controller Grid */}
         <main style={{ flex: 1, paddingBottom: '3rem' }}>
-          {activeTab === 'escape' && (
+          <div style={{ display: activeTab === 'escape' ? 'block' : 'none' }}>
             <CarriageSession 
               character={character}
               setCharacter={setCharacter}
@@ -932,8 +932,9 @@ export default function App() {
               savePedestals={savePedestals}
               requestTaskExecutionModeSelect={requestTaskExecutionModeSelect}
               communeWithSpirits={handleCommuneWithSpirits}
+              onStateSync={handleTimerStateSync}
             />
-          )}
+          </div>
 
           {activeTab === 'planner' && (
             <TweekPlanner 
