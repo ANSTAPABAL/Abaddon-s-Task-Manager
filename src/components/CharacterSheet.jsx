@@ -2,6 +2,15 @@ import React, { useState } from 'react';
 import { Shield, Sparkles, BookOpen, AlertCircle, RefreshCw, Trash2, Heart, Award, Key, DollarSign, Package, Eye, FileText } from 'lucide-react';
 import { useAudio } from '../hooks/useAudio';
 
+const getRacePortraitUrl = (race) => {
+  const r = race ? race.toLowerCase() : '';
+  if (r.includes('человек')) return 'http://localhost:3001/races/human.jpg';
+  if (r.includes('эльф')) return 'http://localhost:3001/races/elf.jpg';
+  if (r.includes('тролль')) return 'http://localhost:3001/races/troll.jpg';
+  if (r.includes('каргахаул')) return 'http://localhost:3001/races/kargahaul.jpg';
+  return null;
+};
+
 export default function CharacterSheet({ character, setCharacter, tasks, setTasks, requestDeconstruction, pedestals = [], savePedestals }) {
   const { playClick, playBoneCrack, playSuccess } = useAudio();
   const [selectedTask, setSelectedTask] = useState(null);
@@ -315,12 +324,54 @@ export default function CharacterSheet({ character, setCharacter, tasks, setTask
             </div>
 
             {/* Center avatar */}
-            <div className="paperdoll-avatar-center">
-              <span style={{ fontSize: '5.5rem', filter: 'drop-shadow(0 0 15px rgba(255,255,255,0.05))' }}>
-                {character.race === 'Каргахаулец (Бледный гигант)' ? '👹' : character.race === 'Нежить' ? '💀' : character.race === 'Эльф' ? '🧝' : '👤'}
-              </span>
-              <div style={{ position: 'absolute', bottom: '5px', width: '100%', textAlign: 'center', background: 'rgba(0,0,0,0.6)', padding: '2px', fontSize: '0.65rem' }}>
-                {character.race}
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+              <div style={{
+                width: '125px',
+                height: '170px',
+                position: 'relative',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                background: '#0d0a10',
+                border: '2px solid var(--color-relic)',
+                boxShadow: '0 0 15px rgba(0,0,0,0.9)',
+                overflow: 'hidden',
+                borderRadius: '4px'
+              }}>
+                {getRacePortraitUrl(character.race) ? (
+                  <img 
+                    src={getRacePortraitUrl(character.race)} 
+                    alt={character.race} 
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      opacity: 0.95,
+                      filter: 'contrast(1.05) brightness(0.9) drop-shadow(0 0 10px rgba(0,0,0,0.5))'
+                    }}
+                  />
+                ) : (
+                  <span style={{ fontSize: '4.5rem', filter: 'drop-shadow(0 0 15px rgba(255,255,255,0.05))' }}>
+                    {character.race === 'Каргахаулец (Бледный гигант)' ? '👹' : character.race === 'Нежить' ? '💀' : character.race === 'Эльф' ? '🧝' : '👤'}
+                  </span>
+                )}
+                
+                {/* Race Label overlay at the bottom of the frame */}
+                <div style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  background: 'linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.6) 70%, transparent 100%)',
+                  padding: '4px 2px',
+                  fontSize: '0.68rem',
+                  fontFamily: 'var(--font-rpg)',
+                  color: 'var(--color-bone)',
+                  textAlign: 'center',
+                  borderTop: '1px solid rgba(255, 255, 255, 0.05)'
+                }}>
+                  {character.race}
+                </div>
               </div>
             </div>
 

@@ -213,6 +213,9 @@ app.post('/api/ai/complete', async (req, res) => {
   }
 });
 
+// Serve races portraits folder statically
+app.use('/races', express.static(path.join(__dirname, 'races')));
+
 // Serve local atmospheric MP3 files
 app.get('/tracks/fear_and_hunger.mp3', (req, res) => {
   const filePath = path.join(__dirname, 'The Perfect Being｜Fear and Hunger Atmospheric Playlist.mp3');
