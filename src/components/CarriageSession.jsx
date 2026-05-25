@@ -229,6 +229,7 @@ export default function CarriageSession({
   const activeTaskRef = useRef(activeTask);
   const timeLeftRef = useRef(timeLeft);
   const setupStageRef = useRef(setupStage);
+  const lastTickTimeRef = useRef(Date.now());
 
   useEffect(() => {
     activeTaskRef.current = activeTask;
@@ -241,6 +242,12 @@ export default function CarriageSession({
   useEffect(() => {
     setupStageRef.current = setupStage;
   }, [setupStage]);
+
+  useEffect(() => {
+    if (isRunning) {
+      lastTickTimeRef.current = Date.now();
+    }
+  }, [isRunning]);
   const [breakEvent, setBreakEvent] = useState(null);
   const [breakActivityChoice, setBreakActivityChoice] = useState('breathing');
   const [breakAiText, setBreakAiText] = useState('');
@@ -307,17 +314,7 @@ export default function CarriageSession({
     };
   }, [setTasks]);
 
-  // Visibility tab auto-pause
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        setIsRunning(false);
-        localStorage.setItem('combat_is_running', 'false');
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, []);
+
 
   const handleRetreatToHub = () => {
     playClick();
@@ -475,10 +472,17 @@ export default function CarriageSession({
       
       if (activeTaskInTasks) {
         setActiveTask(activeTaskInTasks);
-        setTimeLeft(Number(localStorage.getItem('combat_time_left') || activeTaskInTasks.pomodoroTime * 60));
+        const storedTime = Number(localStorage.getItem('combat_time_left') || activeTaskInTasks.pomodoroTime * 60);
+        setTimeLeft(storedTime);
         setSessionSteps(activeTaskInTasks.steps || []);
         setSetupStage('active');
         generateCombatEncounter(activeTaskInTasks);
+        
+        // Start running immediately!
+        localStorage.setItem('combat_timer_start_time', Date.now());
+        localStorage.setItem('combat_timer_start_value', storedTime);
+        localStorage.setItem('combat_is_running', 'true');
+        setIsRunning(true);
       } else {
         setSetupStage('hub'); // Directly load Tasks Hub
       }
@@ -712,6 +716,7 @@ export default function CarriageSession({
         isLongJourney: t.isLongJourney || false,
         steps: t.steps ? t.steps.map((s, sIdx) => ({ id: `step-${sIdx}-${Date.now()}`, title: s, completed: false })) : [],
         intent: t.intent || '',
+        deadline: t.deadline || '',
         combatLore: {
           enemyName: t.enemyName || `${variation.prefix} ${variation.suffix}`,
           visualType: t.visualType || variation.type,
@@ -734,6 +739,11 @@ export default function CarriageSession({
 
     if (character.shacklesBroken) {
       setSetupStage('active');
+      const initialTime = target.pomodoroTime * 60;
+      localStorage.setItem('combat_timer_start_time', Date.now());
+      localStorage.setItem('combat_timer_start_value', initialTime);
+      localStorage.setItem('combat_is_running', 'true');
+      setIsRunning(true);
       setAtmosphereMood(target?.type === 'siege' ? 'siege' : 'hunt');
       if (playActiveSessionTrack) playActiveSessionTrack(target?.type === 'siege' ? 'siege' : 'hunt');
     } else {
@@ -777,76 +787,88 @@ export default function CarriageSession({
     setSurvivalCompleted(true);
     setCharacter(prev => ({ ...prev, shacklesBroken: true }));
     setSetupStage('active');
+
+    const initialTime = timeLeft;
+    localStorage.setItem('combat_timer_start_time', Date.now());
+    localStorage.setItem('combat_timer_start_value', initialTime);
+    localStorage.setItem('combat_is_running', 'true');
+    setIsRunning(true);
+
     setAtmosphereMood(activeTask?.type === 'siege' ? 'siege' : 'hunt');
     if (playActiveSessionTrack) playActiveSessionTrack(activeTask?.type === 'siege' ? 'siege' : 'hunt');
   };
 
-  // Active Session Focus Timer & Fatigue accumulation & Ticking Combat Damage
+  // Active Session Focus Timer & Fatigue accumulation & Ticking Combat Damage (Background friendly!)
   useEffect(() => {
     let timer = null;
-    if (setupStage === 'active' && isRunning && timeLeft > 0 && !meditationActive && activeTask?.executionMode !== 'day') {
+    if (setupStage === 'active' && isRunning && !meditationActive && activeTask?.executionMode !== 'day') {
       timer = setInterval(() => {
-        setTimeLeft(prev => {
-          const nextTime = prev - 1;
-          localStorage.setItem('combat_time_left', nextTime);
+        const startTime = Number(localStorage.getItem('combat_timer_start_time') || Date.now());
+        const startVal = Number(localStorage.getItem('combat_timer_start_value') || 1500);
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const nextTime = startVal - elapsed;
 
-          // 1. Fatigue accumulator (caps work daily limits)
-          setCharacter(c => {
-            const nextMin = (c.dailyWorkMinutes || 0) + (1/60);
-            return { ...c, dailyWorkMinutes: nextMin };
-          });
+        setTimeLeft(nextTime);
+        localStorage.setItem('combat_time_left', nextTime);
 
-          // 2. Active Combat ticking system
-          setTicksWithoutStep(t => {
-            const nextTicks = t + 1;
-            if (nextTicks >= 90) {
-              playBoneCrack();
-              let died = false;
-              setCharacter(c => {
-                const nextHp = Math.max(10, c.hp - 5);
-                if (nextHp <= 10 && c.hp > 10) {
-                  died = true;
-                }
-                return { ...c, hp: nextHp };
-              });
-              triggerFlash('blood');
-              spawnFloater("-5 HP", "enemy-strike");
-              setCombatLog(log => [
-                `💥 [Враг] ${enemyName} пробивает вашу защиту и заносит удар! Вы теряете 5 HP (когнитивный ресурс).`,
-                ...log.slice(0, 5)
-              ]);
-              if (died) {
-                setIsRunning(false);
-                setSetupStage('resolution');
-                setResolutionType('death');
+        // 1. Fatigue accumulator (caps work daily limits) using accurate delta
+        const now = Date.now();
+        const deltaSec = Math.max(0, (now - lastTickTimeRef.current) / 1000);
+        lastTickTimeRef.current = now;
 
-                // Convert active tasks to corpse and increase curse level as penalty
-                setTasks(prev => prev.map(t => {
-                  if (t.status === 'active') {
-                    return {
-                      ...t,
-                      type: 'corpse',
-                      curseLevel: Math.min(5, (t.curseLevel || 0) + 1)
-                    };
-                  }
-                  return t;
-                }));
-
-                handleGenerateResolutionChronicle('death', activeTask, enemyName);
-              }
-              return 0; 
-            }
-            return nextTicks;
-          });
-
-          return nextTime;
+        setCharacter(c => {
+          const nextMin = (c.dailyWorkMinutes || 0) + (deltaSec / 60);
+          return { ...c, dailyWorkMinutes: nextMin };
         });
+
+        // 2. Overtime Damage system: Enemy deals damage only if time is expired (timeLeft <= 0)
+        if (nextTime <= 0) {
+          // If all steps are completed, win immediately
+          if (sessionSteps.length > 0 && sessionSteps.every(s => s.completed)) {
+            handleWinActiveSession(activeTask);
+            return;
+          }
+
+          // Damage interval: every 15 seconds of overtime
+          const overtimeSeconds = Math.abs(nextTime);
+          if (overtimeSeconds > 0 && overtimeSeconds % 15 === 0) {
+            playBoneCrack();
+            let died = false;
+            setCharacter(c => {
+              const nextHp = Math.max(10, c.hp - 10);
+              if (nextHp <= 10 && c.hp > 10) {
+                died = true;
+              }
+              return { ...c, hp: nextHp };
+            });
+            triggerFlash('blood');
+            spawnFloater("-10 HP!", "enemy-strike");
+
+            if (died) {
+              setIsRunning(false);
+              setSetupStage('resolution');
+              setResolutionType('death');
+
+              // Convert active tasks to corpse and increase curse level as penalty
+              setTasks(prev => prev.map(t => {
+                if (t.status === 'active') {
+                  return {
+                    ...t,
+                    type: 'corpse',
+                    curseLevel: Math.min(5, (t.curseLevel || 0) + 1)
+                  };
+                }
+                return t;
+              }));
+
+              handleGenerateResolutionChronicle('death', activeTask, enemyName);
+            }
+          }
+        }
       }, 1000);
-    } else if (timeLeft === 0 && isRunning && activeTask?.executionMode !== 'day') {
-      handleWinActiveSession(activeTask);
     }
     return () => clearInterval(timer);
-  }, [setupStage, isRunning, timeLeft, meditationActive, activeTask]);
+  }, [setupStage, isRunning, meditationActive, activeTask, sessionSteps, enemyName]);
 
   // Timed Meditation Recovery Timer Loop
   useEffect(() => {
@@ -1023,13 +1045,23 @@ export default function CarriageSession({
 
   const toggleTimer = () => {
     playClick();
-    setIsRunning(!isRunning);
+    if (isRunning) {
+      setIsRunning(false);
+      localStorage.setItem('combat_is_running', 'false');
+    } else {
+      localStorage.setItem('combat_timer_start_time', Date.now());
+      localStorage.setItem('combat_timer_start_value', timeLeft);
+      localStorage.setItem('combat_is_running', 'true');
+      setIsRunning(true);
+    }
   };
 
   const formatTime = (secs) => {
-    const m = Math.floor(secs / 60).toString().padStart(2, '0');
-    const s = (secs % 60).toString().padStart(2, '0');
-    return `${m}:${s}`;
+    const isNegative = secs < 0;
+    const absSecs = Math.abs(secs);
+    const m = Math.floor(absSecs / 60).toString().padStart(2, '0');
+    const s = (absSecs % 60).toString().padStart(2, '0');
+    return `${isNegative ? '-' : ''}${m}:${s}`;
   };
 
   const handleToggleStep = (stepId) => {
@@ -1086,7 +1118,14 @@ export default function CarriageSession({
 
   const handleExtend = () => {
     playClick();
-    setTimeLeft(prev => prev + 600);
+    setTimeLeft(prev => {
+      const nextVal = prev + 600;
+      if (isRunning) {
+        localStorage.setItem('combat_timer_start_time', Date.now());
+        localStorage.setItem('combat_timer_start_value', nextVal);
+      }
+      return nextVal;
+    });
     spawnFloater("+10 минут!", "restore-mp");
     setCombatLog(log => [
       `⌛ Вы провели заклинание Времени (+10 минут к таймеру focus-сессии).`,
@@ -1794,8 +1833,15 @@ export default function CarriageSession({
                         generateCombatEncounter(task);
                         localStorage.setItem('active_task_id', task.id);
                         localStorage.setItem('combat_time_left', initialTime);
-                        localStorage.setItem('combat_is_running', mode === 'timer' ? 'true' : 'false');
-                        setIsRunning(mode === 'timer');
+                        if (mode === 'timer') {
+                          localStorage.setItem('combat_timer_start_time', Date.now());
+                          localStorage.setItem('combat_timer_start_value', initialTime);
+                          localStorage.setItem('combat_is_running', 'true');
+                          setIsRunning(true);
+                        } else {
+                          localStorage.setItem('combat_is_running', 'false');
+                          setIsRunning(false);
+                        }
                         setAtmosphereMood(task.type === 'siege' ? 'siege' : 'hunt');
                         if (playActiveSessionTrack) playActiveSessionTrack(task.type === 'siege' ? 'siege' : 'hunt');
                       };
@@ -1924,13 +1970,68 @@ export default function CarriageSession({
               </span>
             </div>
 
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', fontSize: '0.8rem', color: 'var(--color-bone-dim)', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.8rem', marginBottom: '0.8rem' }}>
-              <span>Время: <b>{currentCard.estimatedTime || 25} мин</b></span>
-              {currentCard.toxicity && (
-                <span style={{ color: 'var(--color-blood-glow)' }}>
-                  Токсичность: <b>{currentCard.toxicity === 'scary' ? 'Страшно' : currentCard.toxicity === 'vague' ? 'Мутно' : currentCard.toxicity === 'tedious' ? 'Скучно' : 'Стандарт'}</b>
-                </span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '1rem', marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', fontSize: '0.85rem' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-bone-dim)' }}>
+                  ⏳ Время таймера:
+                  <input 
+                    type="number" 
+                    min="1" 
+                    max="180"
+                    value={currentCard.estimatedTime || 25}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value) || 25;
+                      setParsedList(prev => prev.map((item, idx) => idx === reviewIndex ? { ...item, estimatedTime: val } : item));
+                    }}
+                    style={{
+                      width: '60px',
+                      background: 'rgba(0,0,0,0.4)',
+                      border: '1px solid var(--color-iron-light)',
+                      color: '#fff',
+                      padding: '2px 5px',
+                      textAlign: 'center',
+                      fontFamily: 'monospace'
+                    }}
+                  />
+                  <span>мин</span>
+                </label>
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-bone-dim)' }}>
+                  🚨 Дедлайн квеста:
+                  <input 
+                    type="text" 
+                    placeholder="до 18:00 / среду"
+                    value={currentCard.deadline || ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setParsedList(prev => prev.map((item, idx) => idx === reviewIndex ? { ...item, deadline: val } : item));
+                    }}
+                    style={{
+                      width: '160px',
+                      background: 'rgba(0,0,0,0.4)',
+                      border: '1px solid var(--color-iron-light)',
+                      color: '#fff',
+                      padding: '2px 5px',
+                      fontFamily: 'var(--font-rpg)',
+                      fontSize: '0.8rem'
+                    }}
+                  />
+                </label>
+              </div>
+
+              {!currentCard.deadline && (
+                <div style={{ color: '#ffb813', fontSize: '0.75rem', fontFamily: 'var(--font-rpg)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  ⚠️ Бездна не нашла дедлайн в ваших мыслях. Пожалуйста, укажите его вручную выше!
+                </div>
               )}
+
+              <div style={{ display: 'flex', gap: '1rem', fontSize: '0.8rem', color: 'var(--color-bone-dim)' }}>
+                {currentCard.toxicity && (
+                  <span style={{ color: 'var(--color-blood-glow)' }}>
+                    Токсичность: <b>{currentCard.toxicity === 'scary' ? 'Страшно' : currentCard.toxicity === 'vague' ? 'Мутно' : currentCard.toxicity === 'tedious' ? 'Скучно' : 'Стандарт'}</b>
+                  </span>
+                )}
+              </div>
             </div>
 
             {/* Steps Section */}
@@ -2144,9 +2245,16 @@ export default function CarriageSession({
                 <h1 className="gothic-title" style={{ fontSize: '1.6rem', color: isBoss ? 'var(--color-blood-glow)' : '#fff' }}>
                   {activeTask.title}
                 </h1>
-                <span style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)', fontStyle: 'italic' }}>
-                  Сущность: {variation.icon} {variation.type.toUpperCase()} • Оценка: {activeTask.toxicity === 'scary' ? 'Страшная' : 'Стандарт'}
-                </span>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)', fontStyle: 'italic' }}>
+                    Сущность: {variation.icon} {variation.type.toUpperCase()} • Оценка: {activeTask.toxicity === 'scary' ? 'Страшная' : 'Стандарт'}
+                  </span>
+                  {activeTask.deadline && (
+                    <span style={{ fontSize: '0.8rem', color: 'var(--color-blood-glow)', fontFamily: 'var(--font-rpg)', borderLeft: '1px solid rgba(255,255,255,0.1)', paddingLeft: '8px' }}>
+                      🚨 ДЕДЛАЙН: {activeTask.deadline}
+                    </span>
+                  )}
+                </div>
               </div>
 
               <div style={{ textAlign: 'right' }}>
@@ -2155,7 +2263,12 @@ export default function CarriageSession({
                     🌅 СВОБОДНЫЙ ПЕРЕХОД
                   </div>
                 ) : (
-                  <div style={{ fontSize: '2.5rem', fontFamily: 'var(--font-rpg)', color: isRunning ? '#fff' : 'var(--color-bone-dim)' }}>
+                  <div style={{ 
+                    fontSize: '2.5rem', 
+                    fontFamily: 'var(--font-rpg)', 
+                    color: timeLeft < 0 ? 'var(--color-blood-glow)' : isRunning ? '#fff' : 'var(--color-bone-dim)',
+                    textShadow: timeLeft < 0 ? '0 0 10px var(--color-blood-glow)' : 'none'
+                  }}>
                     {formatTime(timeLeft)}
                   </div>
                 )}
@@ -2165,6 +2278,21 @@ export default function CarriageSession({
             {activeTask.intent && (
               <div style={{ background: 'rgba(0,0,0,0.4)', padding: '0.8rem 1.2rem', borderLeft: '3px solid var(--color-mana)', marginBottom: '1.2rem', fontSize: '0.85rem', fontStyle: 'italic', color: 'var(--color-bone)' }}>
                 <b>Намерение:</b> «{activeTask.intent}»
+              </div>
+            )}
+
+            {timeLeft < 0 && (
+              <div className="heartbeat-pulse" style={{ 
+                background: 'rgba(139, 26, 26, 0.15)', 
+                border: '1px solid var(--color-blood)', 
+                padding: '0.6rem 1rem', 
+                color: 'var(--color-blood-glow)', 
+                fontSize: '0.85rem', 
+                fontFamily: 'var(--font-rpg)', 
+                marginBottom: '1rem',
+                textAlign: 'center'
+              }}>
+                ⏳ СРОК ИСТЕК! Противник наносит урон каждые 15 сек, пока вы не завершите все шаги!
               </div>
             )}
 
