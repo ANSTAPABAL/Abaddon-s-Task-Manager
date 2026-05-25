@@ -89,6 +89,21 @@ class AudioSynthesizer {
     this.localDoublePlayer2 = new Audio(track2Url);
     this.localDoublePlayer2.loop = true;
     this.localDoublePlayer2.volume = this.volume * 0.8;
+
+    const setRandomTime = (player) => {
+      if (player.duration) {
+        player.currentTime = Math.random() * player.duration;
+      } else {
+        player.addEventListener('loadedmetadata', () => {
+          if (player.duration) {
+            player.currentTime = Math.random() * player.duration;
+          }
+        }, { once: true });
+      }
+    };
+
+    setRandomTime(this.localDoublePlayer1);
+    setRandomTime(this.localDoublePlayer2);
     
     if (!this.isMuted && !this.spotifyPlaying && this.useLocalDoublePlaylist) {
       this.localDoublePlayer1.play().catch(e => console.warn("Could not play F&H track:", e));

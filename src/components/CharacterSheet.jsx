@@ -346,6 +346,7 @@ export default function CharacterSheet({ character, setCharacter, tasks, setTask
                       width: '100%',
                       height: '100%',
                       objectFit: 'cover',
+                      objectPosition: 'center 15%',
                       opacity: 0.95,
                       filter: 'contrast(1.05) brightness(0.9) drop-shadow(0 0 10px rgba(0,0,0,0.5))'
                     }}

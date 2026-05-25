@@ -362,7 +362,7 @@ export default function App() {
       const randRace = races[Math.floor(Math.random() * races.length)];
       
       const newChar = {
-        name: prompt("Введите имя нового Изгнанника:", character.name) || "Изгнанник",
+        name: "Изгнанник",
         race: randRace,
         class: randClass,
         level: 1,
@@ -431,6 +431,76 @@ export default function App() {
       playActiveSessionTrack('quiet_focus');
     }
   }, [activeTab, tasks]);
+
+  // 3. Dynamic RPG Grim-Dark Title Evolving System
+  useEffect(() => {
+    if (!character || !character.race || !character.class) return;
+
+    const completed = character.completedTasksCount || 0;
+    const completedSieges = character.completedSiegesCount || 0;
+    const hpSacrificed = character.totalHpSacrificed || 0;
+    const meditations = character.meditationsCount || 0;
+    const potions = character.potionsDrunk || 0;
+    const level = character.level || 1;
+
+    // Calculate active cursed tasks and total curse levels
+    const activeCursedTasks = tasks.filter(t => t.status === 'active' && t.curseLevel > 1);
+    const totalCurseLevel = tasks.reduce((acc, t) => acc + (t.curseLevel || 0), 0);
+    const totalCursedTasksCount = tasks.filter(t => t.curseLevel > 0).length;
+
+    let dynamicName = "Изгнанник";
+
+    // Tier 1: Win Condition Savior / Hero-Savior
+    if (completed >= 15 && completedSieges >= 3) {
+      dynamicName = "Герой-Спаситель Абаддона";
+    }
+    // Tier 2: Heavy procrastination / Slow Prisoner
+    else if (activeCursedTasks.length >= 3 || totalCurseLevel >= 8) {
+      dynamicName = "Медлительный Узник";
+    }
+    else if (totalCursedTasksCount >= 4 && completed < 3) {
+      dynamicName = "Скованный Долгами";
+    }
+    // Tier 3: Boss destroyer
+    else if (completedSieges >= 4) {
+      dynamicName = "Разрушитель Осад";
+    }
+    // Tier 4: Indefatigable Hunter
+    else if (completed >= 8 && completedSieges === 0) {
+      dynamicName = "Неутомимый Охотник";
+    }
+    // Tier 5: Blood martyr
+    else if (hpSacrificed >= 45) {
+      dynamicName = "Багровый Мученик";
+    }
+    // Tier 6: Serene contemplator (high meditation and potion usage)
+    else if (meditations >= 6 || (meditations + potions >= 8)) {
+      dynamicName = "Безмятежный Созерцатель";
+    }
+    // Tier 7: progression liberator
+    else if (completed >= 6 && level >= 2) {
+      dynamicName = "Освободитель Рубежей";
+    }
+    // Tier 8: ghost / wanderer
+    else if (level >= 3 && completed < 4) {
+      dynamicName = "Блуждающая Тень";
+    }
+
+    if (character.name !== dynamicName) {
+      setCharacter(prev => ({
+        ...prev,
+        name: dynamicName
+      }));
+    }
+  }, [
+    character.completedTasksCount,
+    character.completedSiegesCount,
+    character.totalHpSacrificed,
+    character.meditationsCount,
+    character.potionsDrunk,
+    character.level,
+    tasks
+  ]);
 
   // --- LOCAL BACKEND JSON PERSISTENCE & LOAD ---
   

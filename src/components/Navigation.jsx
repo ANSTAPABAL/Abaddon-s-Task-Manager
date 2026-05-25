@@ -93,7 +93,8 @@ export default function Navigation({
               style={{
                 width: '100%',
                 height: '100%',
-                objectFit: 'cover'
+                objectFit: 'cover',
+                objectPosition: 'center 15%'
               }}
               onError={(e) => {
                 e.target.style.display = 'none';
