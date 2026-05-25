@@ -454,15 +454,15 @@ export default function CarriageSession({
   // 1. Persistent Character Check (Skips lore setup if alive!)
   useEffect(() => {
     if (character && character.race && character.class && character.hp > 0) {
-      const todayStr = new Date().toISOString().split('T')[0];
-      const todayTask = tasks.find(t => t.date === todayStr && t.status === 'active' && t.id === localStorage.getItem('active_task_id'));
+      const activeTaskId = localStorage.getItem('active_task_id');
+      const activeTaskInTasks = activeTaskId ? tasks.find(t => t.id === activeTaskId && t.status === 'active') : null;
       
-      if (todayTask) {
-        setActiveTask(todayTask);
-        setTimeLeft(Number(localStorage.getItem('combat_time_left') || todayTask.pomodoroTime * 60));
-        setSessionSteps(todayTask.steps || []);
+      if (activeTaskInTasks) {
+        setActiveTask(activeTaskInTasks);
+        setTimeLeft(Number(localStorage.getItem('combat_time_left') || activeTaskInTasks.pomodoroTime * 60));
+        setSessionSteps(activeTaskInTasks.steps || []);
         setSetupStage('active');
-        generateCombatEncounter(todayTask);
+        generateCombatEncounter(activeTaskInTasks);
       } else {
         setSetupStage('hub'); // Directly load Tasks Hub
       }
