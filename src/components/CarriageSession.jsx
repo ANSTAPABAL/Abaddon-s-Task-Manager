@@ -199,7 +199,8 @@ export default function CarriageSession({
   pedestals = [],
   savePedestals,
   requestTaskExecutionModeSelect,
-  communeWithSpirits
+  communeWithSpirits,
+  onStateSync
 }) {
   const { playClick, playBoneCrack, playSuccess, startHeartbeat, stopHeartbeat, setAtmosphereMood } = useAudio();
   const [messyText, setMessyText] = useState('');
