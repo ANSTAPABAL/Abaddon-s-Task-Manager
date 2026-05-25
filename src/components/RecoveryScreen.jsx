@@ -1,85 +1,120 @@
-import React, { useState } from 'react';
-import { Skull, AlertOctagon, Heart, HelpCircle, EyeOff, ShieldAlert, Sparkles, RefreshCw } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Skull, HelpCircle, Sparkles, RefreshCw, Send, ArrowLeft } from 'lucide-react';
 import { useAudio } from '../hooks/useAudio';
 
 export default function RecoveryScreen({ 
   character, 
   setCharacter, 
   tasks, 
-  setTasks, 
-  requestDeconstruction
+  setTasks 
 }) {
   const { playClick, playSuccess, playBoneCrack, setAtmosphereMood } = useAudio();
-  const [activeEmergency, setActiveEmergency] = useState(null); // fear, overwhelm, boring, lost
+  const [chatStarted, setChatStarted] = useState(false);
+  const [chatLoading, setChatLoading] = useState(false);
+  const [inputText, setInputText] = useState('');
+  const [chatLog, setChatLog] = useState([]); // elements: { role: 'oracle' | 'user', content: string }
+  const [apiMessages, setApiMessages] = useState([]); // for full history sent to DeepSeek
   
-  // Return anchor state
-  const [returnAnchorText, setReturnAnchorText] = useState(() => {
-    return localStorage.getItem('return_anchor_text') || '';
-  });
-  
-  const [savingAnchor, setSavingAnchor] = useState(false);
-  const [aiSupportOutput, setAiSupportOutput] = useState('');
-  const [aiSupportLoading, setAiSupportLoading] = useState(false);
+  const chatEndRef = useRef(null);
 
-  const handleSaveAnchor = () => {
-    playClick();
-    localStorage.setItem('return_anchor_text', returnAnchorText);
-    playSuccess();
-    alert("Якорь возврата надежно запечатан в рунах!");
-  };
-
-  // Trigger Panic Relief from AI Tunnel
-  const handlePanicRelief = async (type) => {
-    playClick();
-    setActiveEmergency(type);
-    setAiSupportLoading(true);
-    setAiSupportOutput('');
-    setAtmosphereMood('recovery');
-    
-    let prompt = '';
-    if (type === 'fear') {
-      prompt = 'Я боюсь приступать к задачам. Меня охватывает страх идеальности и прокрастинация. Дай мне три теплых RPG-совета от лица древнего мудрого наставника во вселенной Абаддона и напиши ОДИН микроскопический, нулевой физический шаг (например: открыть вкладку браузера или просто положить руки на стол), чтобы разбить Стену Страха.';
-    } else if (type === 'overwhelm') {
-      prompt = 'На меня навалилось слишком много задач, я теряюсь в панике. Дай мне краткий, суровый, но ободряющий орденский приказ, как отсечь лишний груз. Выбери из хаоса одну вещь и помоги мне мысленно похоронить остальные, снизив когнитивный шум.';
-    } else if (type === 'boring') {
-      prompt = 'Мне невыносимо скучно делать текущие задачи. Придумай для меня забавное ролевое игровое испытание на 10 минут (например, представить, что я расшифровываю древний свиток нежити), чтобы вернуть интерес.';
-    } else {
-      prompt = 'Я полностью выпал из контекста и не знаю, где нахожусь и что делать дальше. Задай мне один простой вопрос, чтобы я мог нащупать опору.';
+  // Auto-scroll chat to bottom
+  useEffect(() => {
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
+  }, [chatLog, chatLoading]);
+
+  const handleStartHelpChat = async () => {
+    playClick();
+    setChatStarted(true);
+    setChatLoading(true);
+    setChatLog([]);
+    setAtmosphereMood('recovery');
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const todayTasks = tasks.filter(t => t.date === todayStr && t.status === 'active');
+    const backlogTasks = tasks.filter(t => t.date === null && t.status === 'active');
+
+    const initialPrompt = `Ты — Оракул Бездны (Oracle of the Void), древний, таинственный и суровый наставник из темного готического мира Абаддон. К тебе пришел изгнанник по имени ${character.name} (класс: ${character.class}, уровень: ${character.level}, здоровье разума: ${character.hp}/100) в поисках направления. Он растерян, парализован или перегружен задачами.
+
+Вот список его текущих контрактов (задач) на сегодня:
+${todayTasks.length > 0 ? todayTasks.map(t => `- [${t.type}] "${t.title}" (скверна: ${t.curseLevel}/5)`).join('\n') : '(нет активных контрактов на сегодня)'}
+
+Вот список контрактов в его бэклоге (Договор с Черепом):
+${backlogTasks.length > 0 ? backlogTasks.map(t => `- [${t.type}] "${t.title}" (скверна: ${t.curseLevel}/5)`).join('\n') : '(бэклог пуст)'}
+
+Твоя цель:
+1. Поприветствуй его в готическом стиле, соответствующем его состоянию.
+2. Проанализируй его текущую нагрузку. Мрачно, но ободряюще подтолкни его к действию.
+3. Задай ровно 2-3 конкретных, прямых вопроса о его задачах, чтобы помочь ему выбрать ровно одну задачу для фокуса или помочь отсеять/перенести лишнее.
+4. Отвечай кратко, не пиши огромные простыни текста. Будь загадочным и мудрым.
+5. Говори ИСКЛЮЧИТЕЛЬНО на языке темного фэнтези и вселенной Абаддона. Не используй термины реального мира или психологии (никаких слов: СДВГ, дофамин, прокрастинация, тайм-менеджмент, синдром, терапия и т.д.). Вместо "задачи" говори "контракты" или "обеты", вместо "усталость" говори "слабость духа" или "оковы плоти".`;
+
+    const initialMessages = [{ role: 'user', content: initialPrompt }];
 
     try {
-      const messages = [{ role: 'user', content: prompt }];
-      // Query local proxy which forwards to deepseek-v4-flash
       const response = await fetch('http://localhost:3001/api/ai/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages })
+        body: JSON.stringify({ messages: initialMessages })
       });
       if (!response.ok) throw new Error("Бездна перегружена");
       const data = await response.json();
-      setAiSupportOutput(data.choices[0].message.content);
+      const text = data.choices[0].message.content;
+      
+      setChatLog([{ role: 'oracle', content: text }]);
+      setApiMessages([
+        { role: 'user', content: initialPrompt },
+        { role: 'assistant', content: text }
+      ]);
       playSuccess();
     } catch (e) {
-      setAiSupportOutput("Древние руны шепчут: «Остановись, дыши. Сделай один вдох. Ты изгнанник, но твоя воля сильнее оков. Просто налей стакан чистой воды и посиди минуту в тишине.»");
+      const fallbackText = `«Изгнанник ${character.name}, туман сгущается над твоим разумом. Твои обеты тяжелы, а оковы плоти тянут на дно. Ответь мне: какой из твоих сегодняшних контрактов страшит тебя сильнее всего? Запиши свой ответ, и мы рассеем этот мрак вместе.»`;
+      setChatLog([{ role: 'oracle', content: fallbackText }]);
+      setApiMessages([
+        { role: 'user', content: initialPrompt },
+        { role: 'assistant', content: fallbackText }
+      ]);
     } finally {
-      setAiSupportLoading(false);
+      setChatLoading(false);
     }
   };
 
-  const handleSacrificeManaForBoredom = () => {
-    if (character.mana < 15) {
-      alert("Недостаточно Ресурса для плетения руны Азарта!");
-      return;
+  const handleSendMessage = async (e) => {
+    if (e) e.preventDefault();
+    if (!inputText.trim() || chatLoading) return;
+
+    playClick();
+    const userMsgText = inputText.trim();
+    setInputText('');
+
+    const updatedChatLog = [...chatLog, { role: 'user', content: userMsgText }];
+    setChatLog(updatedChatLog);
+
+    const updatedApiMessages = [...apiMessages, { role: 'user', content: userMsgText }];
+    setApiMessages(updatedApiMessages);
+    setChatLoading(true);
+
+    try {
+      const response = await fetch('http://localhost:3001/api/ai/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: updatedApiMessages })
+      });
+      if (!response.ok) throw new Error("Бездна перегружена");
+      const data = await response.json();
+      const text = data.choices[0].message.content;
+
+      setChatLog([...updatedChatLog, { role: 'oracle', content: text }]);
+      setApiMessages([...updatedApiMessages, { role: 'assistant', content: text }]);
+      playSuccess();
+    } catch (e) {
+      const fallbackText = `«Шум Бездны глушит наши голоса. Но помни, изгнанник: твоя воля — твой единственный щит. Выбери один контракт, сделай первый шаг, и мрак отступит.»`;
+      setChatLog([...updatedChatLog, { role: 'oracle', content: fallbackText }]);
+      setApiMessages([...updatedApiMessages, { role: 'assistant', content: fallbackText }]);
+    } finally {
+      setChatLoading(false);
     }
-    playSuccess();
-    setCharacter(prev => ({
-      ...prev,
-      mana: prev.mana - 15,
-      gold: prev.gold + 20, // instant gold boost to reward salvage behavior!
-      totalManaSpent: (prev.totalManaSpent || 0) + 15,
-      totalGoldEarned: (prev.totalGoldEarned || 0) + 20
-    }));
-    alert("Вы соткали заклинание Руны Азарта! Скверна скуки временно отступила. Получено +20 Золота!");
   };
 
   const handleBuryAllBacklog = () => {
@@ -89,132 +124,177 @@ export default function RecoveryScreen({
   };
 
   return (
-    <div className="rpg-panel" style={{ border: '2px solid var(--color-blood)', animation: 'pulse-red 6s infinite' }}>
+    <div className="rpg-panel" style={{ border: '2px solid var(--color-blood)', animation: 'pulse-red 8s infinite', minHeight: '520px', display: 'flex', flexDirection: 'column' }}>
       
-      <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-        <h1 className="gothic-title" style={{ color: 'var(--color-blood-glow)', fontSize: '2rem' }}>
-          🕯 Палата Восстановления (Recovery)
-        </h1>
-        <p style={{ color: 'var(--color-bone-dim)', fontSize: '0.95rem', marginTop: '0.5rem' }}>
-          Аварийный терминал для ADHD-разума. Здесь вас никто не накажет за срыв ритма или усталость.
-        </p>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginBottom: '2rem' }}>
-        
-        {/* LEFT COLUMN: Return Anchor */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <h3 className="rpg-title" style={{ fontSize: '1.2rem', color: '#fff' }}>
-            ⚓ Руна «Якорь Возврата»
-          </h3>
-          <p style={{ fontSize: '0.85rem', color: 'var(--color-bone-dim)', lineHeight: '1.4' }}>
-            Перед тем как уйти на перерыв, запишите сюда ровно 1–2 строчки: где вы остановились, что делали и что мешало. 
-            Когда вы вернетесь в следующий раз, этот якорь спасет вас от мучительных попыток вспомнить с чего начать.
-          </p>
-
-          <textarea 
-            className="rpg-input"
-            style={{ width: '100%', minHeight: '120px', fontSize: '0.95rem', lineHeight: '1.4' }}
-            placeholder="Я остановился на... Мешало..."
-            value={returnAnchorText}
-            onChange={(e) => setReturnAnchorText(e.target.value)}
-          />
-
-          <button className="rpg-btn rpg-btn-mana" onClick={handleSaveAnchor}>
-            ЗАПЕЧАТАТЬ ЯКОРЬ В РУНАХ
-          </button>
-        </div>
-
-        {/* RIGHT COLUMN: Emergency Buttons */}
+      {/* HEADER SECTION */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid rgba(230, 223, 211, 0.08)', paddingBottom: '1rem', marginBottom: '1.5rem' }}>
         <div>
-          <h3 className="rpg-title" style={{ fontSize: '1.2rem', color: '#fff', marginBottom: '1rem' }}>
-            🚨 Аварийная помощь: Я чувствую...
-          </h3>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem' }}>
-            <button className="panic-pill" onClick={() => handlePanicRelief('fear')}>
-              😨 МНЕ СТРАШНО
-            </button>
-            <button className="panic-pill" onClick={() => handlePanicRelief('overwhelm')}>
-              🤯 СЛИШКОМ МНОГО
-            </button>
-            <button className="panic-pill" onClick={() => handlePanicRelief('boring')}>
-              🥱 МНЕ СКУЧНО
-            </button>
-            <button className="panic-pill" onClick={() => handlePanicRelief('lost')}>
-              🧭 Я ПОТЕРЯЛСЯ
-            </button>
-          </div>
-
-          <div style={{ marginTop: '1.5rem', background: '#0a090b', padding: '1rem', border: '1px dashed var(--color-iron-light)' }}>
-            <h4 style={{ fontSize: '0.85rem', color: 'var(--color-bone)', fontFamily: 'var(--font-rpg)', marginBottom: '5px' }}>
-              АЛТАРЬ ЗАХОРОНЕНИЯ БЭКЛОГА:
-            </h4>
-            <p style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginBottom: '10px' }}>
-              Тяжелый груз старых планов в бэклоге отравляет совесть? Проведите ритуал мгновенных похорон для ВСЕХ задач бэклога.
-            </p>
-            <button className="rpg-btn rpg-btn-blood" style={{ width: '100%', fontSize: '0.8rem' }} onClick={handleBuryAllBacklog}>
-              ☠ ПОХОРОНИТЬ ВЕСЬ БЭКЛОГ (Release Guilt)
-            </button>
-          </div>
+          <h1 className="gothic-title" style={{ color: 'var(--color-blood-glow)', fontSize: '1.8rem', margin: 0, display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            🕯 Палата Восстановления (Recovery)
+          </h1>
+          <p style={{ color: 'var(--color-bone-dim)', fontSize: '0.88rem', marginTop: '0.2rem', textAlign: 'left' }}>
+            Аварийный терминал для перегруженного разума. Здесь нет спешки, штрафов или чувства вины.
+          </p>
         </div>
-
+        {chatStarted && (
+          <button 
+            className="rpg-btn" 
+            style={{ fontSize: '0.75rem', padding: '5px 12px', display: 'flex', alignItems: 'center', gap: '4px' }}
+            onClick={() => { playClick(); setChatStarted(false); setChatLog([]); setApiMessages([]); }}
+          >
+            <ArrowLeft size={12} />
+            ВЫЙТИ
+          </button>
+        )}
       </div>
 
-      {/* LOWER PANEL: AI Response Output */}
-      {activeEmergency && (
-        <div style={{ 
-          background: 'radial-gradient(circle, var(--color-iron) 0%, var(--color-iron-dark) 100%)', 
-          border: '1px solid var(--color-bone-dim)', 
-          padding: '1.5rem',
-          position: 'relative'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-iron-light)', paddingBottom: '0.5rem', marginBottom: '1rem' }}>
-            <h3 className="rpg-title" style={{ color: 'var(--color-relic-glow)', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Sparkles size={16} />
-              <span>
-                {activeEmergency === 'fear' && "Шепот Древнего Алтаря от Страха"}
-                {activeEmergency === 'overwhelm' && "Военный Указ Против Перегруза"}
-                {activeEmergency === 'boring' && "Испытание на Азарт"}
-                {activeEmergency === 'lost' && "Нить Ариадны"}
-              </span>
-            </h3>
+      {/* CHAT LOG VIEW */}
+      {chatStarted ? (
+        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: '1rem' }}>
+          
+          {/* Chat Container */}
+          <div style={{ 
+            background: 'rgba(5, 4, 6, 0.65)', 
+            border: '1px solid var(--color-iron-light)', 
+            borderRadius: '6px', 
+            padding: '1.2rem', 
+            height: '350px', 
+            overflowY: 'auto', 
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: '1rem',
+            boxShadow: 'inset 0 0 15px rgba(0,0,0,0.8)'
+          }}>
+            {chatLog.map((msg, index) => {
+              const isOracle = msg.role === 'oracle';
+              return (
+                <div 
+                  key={index}
+                  style={{
+                    alignSelf: isOracle ? 'flex-start' : 'flex-end',
+                    maxWidth: '85%',
+                    background: isOracle ? 'rgba(42, 28, 52, 0.4)' : 'rgba(38, 32, 22, 0.5)',
+                    border: isOracle ? '1px solid rgba(187, 0, 255, 0.25)' : '1px solid rgba(255, 184, 19, 0.25)',
+                    borderRadius: '8px',
+                    padding: '0.8rem 1.2rem',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+                    color: isOracle ? '#e2d7e8' : '#eeddbb',
+                    fontSize: '0.9rem',
+                    lineHeight: '1.5',
+                    fontFamily: isOracle ? 'Georgia, serif' : 'var(--font-sans)',
+                    fontStyle: isOracle ? 'italic' : 'normal',
+                    borderLeftWidth: isOracle ? '4px' : '1px',
+                    borderRightWidth: isOracle ? '1px' : '4px',
+                    borderLeftColor: isOracle ? 'var(--color-mana-glow)' : 'rgba(255, 184, 19, 0.25)',
+                    borderRightColor: isOracle ? 'rgba(187, 0, 255, 0.25)' : 'var(--color-relic-glow)'
+                  }}
+                >
+                  <div style={{ fontSize: '0.75rem', color: isOracle ? 'var(--color-mana-glow)' : 'var(--color-relic-glow)', fontWeight: 'bold', marginBottom: '4px', fontFamily: 'var(--font-rpg)', fontStyle: 'normal' }}>
+                    {isOracle ? '🔮 ОРАКУЛ БЕЗДНЫ' : '🕯️ ИСПОВЕДЬ ИЗГНАННИКА'}
+                  </div>
+                  <div style={{ whiteSpace: 'pre-line' }}>{msg.content}</div>
+                </div>
+              );
+            })}
+
+            {chatLoading && (
+              <div style={{ alignSelf: 'flex-start', background: 'rgba(20, 20, 25, 0.3)', padding: '0.8rem 1.2rem', borderRadius: '8px', border: '1px dashed rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <RefreshCw size={14} className="heartbeat-pulse fast" style={{ color: 'var(--color-mana-glow)' }} />
+                <span style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)', fontStyle: 'italic' }}>
+                  Оракул всматривается в плетение ваших мыслей...
+                </span>
+              </div>
+            )}
+            
+            <div ref={chatEndRef} />
+          </div>
+
+          {/* Input form */}
+          <form onSubmit={handleSendMessage} style={{ display: 'flex', gap: '0.6rem' }}>
+            <input 
+              type="text" 
+              className="rpg-input" 
+              style={{ flex: 1, fontSize: '0.9rem', padding: '0.75rem 1rem' }} 
+              placeholder="Изложите свои сомнения или ответьте Оракулу..."
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              disabled={chatLoading}
+            />
             <button 
-              className="rpg-btn" 
-              style={{ fontSize: '0.7rem', padding: '2px 8px' }}
-              onClick={() => { playClick(); setActiveEmergency(null); setAiSupportOutput(''); }}
+              type="submit" 
+              className="rpg-btn rpg-btn-mana" 
+              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0 1.5rem' }}
+              disabled={chatLoading || !inputText.trim()}
             >
-              Скрыться в тумане
+              <Send size={14} />
+              <span>ОТПРАВИТЬ</span>
+            </button>
+          </form>
+
+        </div>
+      ) : (
+        /* LAUNCH VIEW */
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, padding: '2rem 1rem', textAlign: 'center' }}>
+          
+          <div style={{ maxWidth: '600px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.5rem' }}>
+            
+            <div style={{ fontSize: '4rem', filter: 'drop-shadow(0 0 15px rgba(187, 0, 255, 0.2))' }}>
+              🔮
+            </div>
+
+            <p style={{ fontSize: '0.95rem', lineHeight: '1.6', color: 'var(--color-bone)' }}>
+              Когда когнитивный шум заглушает голос разума, и вы не знаете, к какому обету подступиться — воззовите к Оракулу Бездны. 
+              <br />
+              Древний страж распутает клубок ваших контрактов без упреков и суеты.
+            </p>
+
+            <button 
+              className="rpg-btn rpg-btn-mana"
+              style={{ 
+                fontSize: '1.15rem', 
+                padding: '12px 36px', 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '0.6rem',
+                borderColor: 'var(--color-relic-glow)',
+                boxShadow: '0 0 15px rgba(187, 0, 255, 0.25)',
+                fontWeight: 'bold',
+                letterSpacing: '0.5px'
+              }}
+              onClick={handleStartHelpChat}
+            >
+              <Sparkles size={18} />
+              🛡️ ВЫЗОВ ПОМОЩИ
+            </button>
+
+          </div>
+
+          {/* CEMETERY OF BACKLOG PANEL */}
+          <div style={{ 
+            marginTop: '3rem', 
+            background: 'rgba(10, 8, 12, 0.5)', 
+            padding: '1.2rem 2rem', 
+            border: '1px dashed var(--color-blood)', 
+            borderRadius: '6px',
+            maxWidth: '650px',
+            width: '100%',
+            textAlign: 'left'
+          }}>
+            <h4 style={{ fontSize: '0.9rem', color: 'var(--color-blood-glow)', fontFamily: 'var(--font-rpg)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Skull size={14} /> АЛТАРЬ ЗАХОРОНЕНИЯ БЭКЛОГА
+            </h4>
+            <p style={{ fontSize: '0.78rem', color: 'var(--color-bone-dim)', marginBottom: '12px', lineHeight: '1.4' }}>
+              Если груз невыполненных обещаний в бэклоге давит тяжелым камнем и мешает сделать хоть один шаг — освободите свой разум. Проведите ритуал мгновенного захоронения для всех отложенных задач.
+            </p>
+            <button 
+              className="rpg-btn rpg-btn-blood" 
+              style={{ width: '100%', fontSize: '0.8rem', padding: '6px 12px' }} 
+              onClick={handleBuryAllBacklog}
+            >
+              ☠ ПОХОРОНИТЬ ВЕСЬ БЭКЛОГ (Очистить разум от вины)
             </button>
           </div>
 
-          {aiSupportLoading ? (
-            <div style={{ textAlign: 'center', padding: '1.5rem' }}>
-              <RefreshCw className="heartbeat-pulse fast" style={{ color: 'var(--color-mana-glow)', marginBottom: '0.5rem' }} size={24} />
-              <p style={{ fontStyle: 'italic', fontSize: '0.85rem' }}>Бездна сплетает исцеляющие слова воли...</p>
-            </div>
-          ) : (
-            <div>
-              <p style={{ 
-                fontSize: '0.95rem', 
-                color: '#fff', 
-                lineHeight: '1.6', 
-                fontFamily: 'Georgia, serif', 
-                whiteSpace: 'pre-line',
-                marginBottom: activeEmergency === 'boring' ? '1.5rem' : '0px'
-              }}>
-                {aiSupportOutput}
-              </p>
-
-              {activeEmergency === 'boring' && (
-                <div style={{ display: 'flex', justifyContent: 'center' }}>
-                  <button className="rpg-btn rpg-btn-mana" onClick={handleSacrificeManaForBoredom}>
-                    🔮 ПОТРАТИТЬ 15 MP И АКТИВИРОВАТЬ РУНУ АЗАРТА
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
         </div>
       )}
 

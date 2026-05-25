@@ -295,20 +295,19 @@ body::before {
   overflow-x: auto;
   padding-bottom: 1.5rem;
   scroll-behavior: smooth;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none;  /* IE and Edge */
+  cursor: grab;
+  user-select: none;
 }
 
 .tweek-scrollboard::-webkit-scrollbar {
-  height: 8px;
+  display: none; /* Chrome, Safari and Opera */
 }
-.tweek-scrollboard::-webkit-scrollbar-track {
-  background: var(--color-void);
-}
-.tweek-scrollboard::-webkit-scrollbar-thumb {
-  background: var(--color-iron-light);
-  border-radius: 4px;
-}
-.tweek-scrollboard::-webkit-scrollbar-thumb:hover {
-  background: var(--color-bone-dim);
+
+.tweek-scrollboard.active {
+  cursor: grabbing;
+  scroll-behavior: auto; /* smooth scrolling disabled during manual drag for instantaneous response */
 }
 
 .tweek-day-col {

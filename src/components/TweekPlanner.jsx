@@ -1,15 +1,106 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Skull, Pin, Trash2, Shield, Calendar, Sparkles, CheckSquare, Plus, ArrowRight, UserCheck, Flame, RefreshCw } from 'lucide-react';
 import { useAudio } from '../hooks/useAudio';
 
-export default function TweekPlanner({ tasks, setTasks, character, setCharacter, requestDeconstruction, communeWithSpirits }) {
+export default function TweekPlanner({ tasks, setTasks, character, setCharacter, requestDeconstruction, communeWithSpirits, triggerRuneOfReturn }) {
   const { playClick, playBoneCrack, playSuccess } = useAudio();
   const [activeKanbanDay, setActiveKanbanDay] = useState(null); // YYYY-MM-DD
   const [newTaskTitle, setNewTaskTitle] = useState('');
-  const [newTaskType, setNewTaskType] = useState('hunt'); // hunt, siege, relic, corpse
   
   // Drag-and-drop state
   const [draggedTaskId, setDraggedTaskId] = useState(null);
+
+  // --- DRAG-TO-SCROLL (MOUSE DRAG) FOR WEEKLY COLUMNS ---
+  const scrollRef = useRef(null);
+  const isDown = useRef(false);
+  const startX = useRef(0);
+  const scrollLeft = useRef(0);
+
+  const handleMouseDown = (e) => {
+    // Avoid triggering drag-scroll when clicking task cards, buttons, or inputs
+    if (e.target.closest('.task-card') || e.target.closest('button') || e.target.closest('input') || e.target.closest('select')) {
+      return;
+    }
+    isDown.current = true;
+    scrollRef.current?.classList.add('active');
+    startX.current = e.pageX - scrollRef.current.offsetLeft;
+    scrollLeft.current = scrollRef.current.scrollLeft;
+  };
+
+  const handleMouseLeave = () => {
+    isDown.current = false;
+    scrollRef.current?.classList.remove('active');
+  };
+
+  const handleMouseUp = () => {
+    isDown.current = false;
+    scrollRef.current?.classList.remove('active');
+  };
+
+  const handleMouseMove = (e) => {
+    if (!isDown.current) return;
+    e.preventDefault();
+    const x = e.pageX - scrollRef.current.offsetLeft;
+    const walk = (x - startX.current) * 1.5; // Scroll multiplier
+    if (scrollRef.current) {
+      scrollRef.current.scrollLeft = scrollLeft.current - walk;
+    }
+  };
+
+  // --- AUTOMATIC TASK TYPE CLASSIFICATION BY AI/LOCAL HEURISTICS ---
+  const classifyLocally = (title) => {
+    const t = title.toLowerCase();
+    // Siege: huge, scary, complex
+    if (t.includes('переписать') || t.includes('диплом') || t.includes('проект') || t.includes('экзамен') || t.includes('презентация') || t.includes('сложный') || t.includes('отчет') || t.includes('база данных') || t.includes('рефакторинг') || t.includes('оптимизи') || t.includes('написать')) {
+      return 'siege';
+    }
+    // Relic: creative, valuable, research, learning
+    if (t.includes('изучить') || t.includes('прочитать') || t.includes('почитать') || t.includes('курс') || t.includes('книг') || t.includes('исследов') || t.includes('найти') || t.includes('дизайн') || t.includes('нарисовать') || t.includes('творче')) {
+      return 'relic';
+    }
+    // Corpse: debts, old stuff
+    if (t.includes('долг') || t.includes('хвост') || t.includes('старое') || t.includes('прошл') || t.includes('архив') || t.includes('разобрать')) {
+      return 'corpse';
+    }
+    // Hunt: default
+    return 'hunt';
+  };
+
+  const classifyTaskWithAI = async (title) => {
+    const systemPrompt = `Ты — Бездна во вселенной Абаддона. Твоя задача — определить тип задачи в формате JSON для ролевого планировщика:
+1. "siege" — если задача сложная, крупная, пугающая, требует много времени или усилий (например, подготовиться к экзамену, написать сложный код, сдать отчет).
+2. "relic" — если задача связана с поиском ценной информации, обучением, исследованием, творчеством или чем-то редким/полезным (например, прочитать главу, изучить новую библиотеку, нарисовать эскиз).
+3. "hunt" — простая, рутинная, понятная задача на каждый день (например, помыть посуду, сходить в магазин, сделать звонок, отправить письмо).
+4. "corpse" — если задача явно связана с разбором старых долгов или хвостов.
+
+Выведи ответ строго в формате JSON:
+{"type": "hunt" | "siege" | "relic" | "corpse"}`;
+
+    try {
+      const response = await fetch('http://localhost:3001/api/ai/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: `Определи тип для задачи: "${title}"` }
+          ]
+        })
+      });
+      if (!response.ok) throw new Error();
+      const data = await response.json();
+      let text = data.choices[0].message.content.trim();
+      if (text.startsWith("```json")) text = text.slice(7);
+      if (text.endsWith("```")) text = text.slice(0, -3);
+      const parsed = JSON.parse(text.trim());
+      if (['hunt', 'siege', 'relic', 'corpse'].includes(parsed.type)) {
+        return parsed.type;
+      }
+    } catch (e) {
+      console.warn("AI classification failed, falling back to local heuristic");
+    }
+    return classifyLocally(title);
+  };
 
   // --- TASK EDITING STATE ---
   const [editingTask, setEditingTask] = useState(null);
@@ -27,6 +118,32 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
   const [guidedStep, setGuidedStep] = useState(0); // 0 = default, 1 = answering questions, 2 = done
   const [guidedQuestions, setGuidedQuestions] = useState([]);
   const [guidedAnswers, setGuidedAnswers] = useState({});
+  const [activeMapSection, setActiveMapSection] = useState('wasteland');
+
+  const renderTaskTitle = (task, fontSize = '0.9rem') => {
+    return (
+      <span style={{ fontSize, fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', flexWrap: 'wrap', gap: '4px' }}>
+        {task.title}
+        {task.runeOfReturn && (
+          <span style={{ 
+            fontSize: '0.65rem', 
+            color: 'var(--color-relic-glow)', 
+            background: 'rgba(255, 184, 19, 0.1)',
+            padding: '1px 4px',
+            borderRadius: '3px',
+            border: '1px solid rgba(255, 184, 19, 0.25)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '2px',
+            fontWeight: 'normal',
+            cursor: 'help'
+          }} title="Записана Руна возврата когнитивного следа">
+            📜 Руна
+          </span>
+        )}
+      </span>
+    );
+  };
 
   // --- SOUL CONJUNCTION RITUAL STATE ---
   const [ritualMessage, setRitualMessage] = useState('');
@@ -51,34 +168,42 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
       return;
     }
 
-    playBoneCrack();
-    
-    // Move tasks to tomorrow and increase curse level
-    const updatedTasks = tasks.map(t => {
-      if (t.date === todayDateStr && t.status === 'active') {
-        return {
-          ...t,
-          date: tomorrowDateStr,
-          curseLevel: Math.min(5, t.curseLevel + 1)
-        };
+    const performPostpone = (runeData) => {
+      playBoneCrack();
+      
+      const updatedTasks = tasks.map(t => {
+        if (t.date === todayDateStr && t.status === 'active') {
+          return {
+            ...t,
+            date: tomorrowDateStr,
+            curseLevel: Math.min(5, t.curseLevel + 1),
+            runeOfReturn: runeData
+          };
+        }
+        return t;
+      });
+      setTasks(updatedTasks);
+
+      // Deduct HP
+      setCharacter(prev => ({
+        ...prev,
+        hp: Math.max(1, prev.hp - 5),
+        totalHpSacrificed: (prev.totalHpSacrificed || 0) + 5
+      }));
+
+      setRitualMessage(`💀 Сделка совершена! ${todayActiveTasks.length} задач перенесены на завтра. Потеряно 5 HP рассудка. Скверна перенесенных задач возросла!`);
+      setTimeout(() => setRitualMessage(''), 7000);
+
+      // Automatically trigger AI Spirits Counsel
+      if (communeWithSpirits) {
+        setTimeout(() => communeWithSpirits(updatedTasks), 150);
       }
-      return t;
-    });
-    setTasks(updatedTasks);
+    };
 
-    // Deduct HP
-    setCharacter(prev => ({
-      ...prev,
-      hp: Math.max(1, prev.hp - 5),
-      totalHpSacrificed: (prev.totalHpSacrificed || 0) + 5
-    }));
-
-    setRitualMessage(`💀 Сделка совершена! ${todayActiveTasks.length} задач перенесены на завтра. Потеряно 5 HP рассудка. Скверна перенесенных задач возросла!`);
-    setTimeout(() => setRitualMessage(''), 7000);
-
-    // Automatically trigger AI Spirits Counsel
-    if (communeWithSpirits) {
-      setTimeout(() => communeWithSpirits(updatedTasks), 150);
+    if (triggerRuneOfReturn) {
+      triggerRuneOfReturn(todayActiveTasks, performPostpone);
+    } else {
+      performPostpone(null);
     }
   };
 
@@ -126,40 +251,49 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
       return;
     }
 
-    playBoneCrack();
+    const performPush = (runeData) => {
+      playBoneCrack();
 
-    const targetDate = destination === 'tomorrow' ? (() => {
-      const d = new Date();
-      d.setDate(d.getDate() + 1);
-      return d.toISOString().split('T')[0];
-    })() : null; // backlog is null
+      const targetDate = destination === 'tomorrow' ? (() => {
+        const d = new Date();
+        d.setDate(d.getDate() + 1);
+        return d.toISOString().split('T')[0];
+      })() : null; // backlog is null
 
-    const updatedTasks = tasks.map(t => {
-      if (t.id === taskId) {
-        return {
-          ...t,
-          date: targetDate,
-          curseLevel: Math.min(5, t.curseLevel + 1)
-        };
+      const updatedTasks = tasks.map(t => {
+        if (t.id === taskId) {
+          return {
+            ...t,
+            date: targetDate,
+            curseLevel: Math.min(5, t.curseLevel + 1),
+            runeOfReturn: runeData
+          };
+        }
+        return t;
+      });
+      setTasks(updatedTasks);
+
+      setCharacter(prev => ({
+        ...prev,
+        hp: Math.max(1, prev.hp - 2),
+        totalHpSacrificed: (prev.totalHpSacrificed || 0) + 2
+      }));
+
+      const destLabel = destination === 'tomorrow' ? 'на завтра' : 'в Бэклог';
+      setRitualMessage(`💀 Задача «${targetTask.title}» изгнана ${destLabel}! Потеряно 2 HP. Скверна задачи возросла.`);
+      setTimeout(() => setRitualMessage(''), 5000);
+      setTaskToPushId('');
+
+      // Automatically trigger AI Spirits Counsel
+      if (communeWithSpirits) {
+        setTimeout(() => communeWithSpirits(updatedTasks), 150);
       }
-      return t;
-    });
-    setTasks(updatedTasks);
+    };
 
-    setCharacter(prev => ({
-      ...prev,
-      hp: Math.max(1, prev.hp - 2),
-      totalHpSacrificed: (prev.totalHpSacrificed || 0) + 2
-    }));
-
-    const destLabel = destination === 'tomorrow' ? 'на завтра' : 'в Бэклог';
-    setRitualMessage(`💀 Задача «${targetTask.title}» изгнана ${destLabel}! Потеряно 2 HP. Скверна задачи возросла.`);
-    setTimeout(() => setRitualMessage(''), 5000);
-    setTaskToPushId('');
-
-    // Automatically trigger AI Spirits Counsel
-    if (communeWithSpirits) {
-      setTimeout(() => communeWithSpirits(updatedTasks), 150);
+    if (triggerRuneOfReturn) {
+      triggerRuneOfReturn(targetTask, performPush);
+    } else {
+      performPush(null);
     }
   };
 
@@ -314,17 +448,22 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
 
   // --- RITUAL STATE ACTIONS ---
 
-  const handleCreateTask = (dateStr = null) => {
+  const handleCreateTask = async (dateStr = null) => {
     if (!newTaskTitle.trim()) return;
+    const title = newTaskTitle;
     playClick();
     
+    // Instant local classification for zero lag
+    const initialType = classifyLocally(title);
+    
+    const taskId = `task-${Date.now()}`;
     const newTask = {
-      id: `task-${Date.now()}`,
-      title: newTaskTitle,
-      type: newTaskType,
+      id: taskId,
+      title: title,
+      type: initialType,
       status: 'active',
       date: dateStr, // Null for backlog
-      pomodoroTime: newTaskType === 'siege' ? 50 : 25,
+      pomodoroTime: initialType === 'siege' ? 50 : 25,
       pomodoroSpent: 0,
       toxicity: 'standard',
       barrierType: null,
@@ -336,6 +475,25 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
     setTasks(prev => [...prev, newTask]);
     setNewTaskTitle('');
     playSuccess();
+
+    // Background AI classification query
+    try {
+      const finalType = await classifyTaskWithAI(title);
+      if (finalType && finalType !== initialType) {
+        setTasks(prev => prev.map(t => {
+          if (t.id === taskId) {
+            return {
+              ...t,
+              type: finalType,
+              pomodoroTime: finalType === 'siege' ? 50 : 25
+            };
+          }
+          return t;
+        }));
+      }
+    } catch (err) {
+      console.warn("AI background classification failed", err);
+    }
   };
 
   const handleSealTask = (taskId) => {
@@ -411,22 +569,34 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
 
   const handlePostponeTask = (taskId, targetDateStr) => {
     playClick();
-    const updatedTasks = tasks.map(t => {
-      if (t.id === taskId) {
-        const nextCurse = Math.min(5, t.curseLevel + 1);
-        return { 
-          ...t, 
-          date: targetDateStr,
-          curseLevel: nextCurse
-        };
-      }
-      return t;
-    });
-    setTasks(updatedTasks);
+    const targetTask = tasks.find(t => t.id === taskId);
+    if (!targetTask) return;
 
-    // Automatically trigger AI Spirits Counsel
-    if (communeWithSpirits) {
-      setTimeout(() => communeWithSpirits(updatedTasks), 150);
+    const performPostpone = (runeData) => {
+      const updatedTasks = tasks.map(t => {
+        if (t.id === taskId) {
+          const nextCurse = Math.min(5, t.curseLevel + 1);
+          return { 
+            ...t, 
+            date: targetDateStr,
+            curseLevel: nextCurse,
+            runeOfReturn: runeData
+          };
+        }
+        return t;
+      });
+      setTasks(updatedTasks);
+
+      // Automatically trigger AI Spirits Counsel
+      if (communeWithSpirits) {
+        setTimeout(() => communeWithSpirits(updatedTasks), 150);
+      }
+    };
+
+    if (triggerRuneOfReturn) {
+      triggerRuneOfReturn(targetTask, performPostpone);
+    } else {
+      performPostpone(null);
     }
   };
 
@@ -462,25 +632,45 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
     const taskId = e.dataTransfer.getData('text/plain') || draggedTaskId;
     if (!taskId) return;
 
-    playClick();
-    let dateChanged = false;
-    const updatedTasks = tasks.map(t => {
-      if (t.id === taskId) {
-        let curse = t.curseLevel;
-        if (t.date && t.date !== targetDateStr && targetDateStr !== null) {
-          curse = Math.min(5, curse + 1);
-          dateChanged = true;
-        }
-        return { ...t, date: targetDateStr, curseLevel: curse };
-      }
-      return t;
-    });
-    setTasks(updatedTasks);
-    setDraggedTaskId(null);
+    const targetTask = tasks.find(t => t.id === taskId);
+    if (!targetTask) return;
 
-    // Automatically trigger AI Spirits Counsel if rescheduled
-    if (dateChanged && communeWithSpirits) {
-      setTimeout(() => communeWithSpirits(updatedTasks), 150);
+    playClick();
+
+    // Check if the date is actually changing (meaning a reschedule/postponement)
+    const isRescheduling = targetTask.date && targetTask.date !== targetDateStr && targetDateStr !== null;
+
+    const performDrop = (runeData) => {
+      let dateChanged = false;
+      const updatedTasks = tasks.map(t => {
+        if (t.id === taskId) {
+          let curse = t.curseLevel;
+          if (t.date && t.date !== targetDateStr && targetDateStr !== null) {
+            curse = Math.min(5, curse + 1);
+            dateChanged = true;
+          }
+          return { 
+            ...t, 
+            date: targetDateStr, 
+            curseLevel: curse,
+            runeOfReturn: runeData || t.runeOfReturn
+          };
+        }
+        return t;
+      });
+      setTasks(updatedTasks);
+      setDraggedTaskId(null);
+
+      // Automatically trigger AI Spirits Counsel if rescheduled
+      if (dateChanged && communeWithSpirits) {
+        setTimeout(() => communeWithSpirits(updatedTasks), 150);
+      }
+    };
+
+    if (isRescheduling && triggerRuneOfReturn) {
+      triggerRuneOfReturn(targetTask, performDrop);
+    } else {
+      performDrop(null);
     }
   };
 
@@ -566,25 +756,14 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
         </div>
         
         <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <select 
-            className="rpg-input" 
-            style={{ fontSize: '0.9rem' }}
-            value={newTaskType}
-            onChange={(e) => setNewTaskType(e.target.value)}
-          >
-            <option value="hunt">🏹 Простая Охота</option>
-            <option value="siege">💥 Тяжелая Осада (Босс)</option>
-            <option value="relic">💎 Редкая Реликвия</option>
-            <option value="corpse">💀 Труп прошлого</option>
-          </select>
-
           <button 
             className="rpg-btn rpg-btn-mana"
             onClick={() => handleCreateTask(new Date().toISOString().split('T')[0])}
             disabled={!newTaskTitle.trim()}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
           >
-            <Plus size={16} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />
-            ПРИБИТЬ К ДОГОВОРУ ДНЯ
+            <Plus size={16} />
+            <span>ПРИБИТЬ К ДОГОВОРУ ДНЯ</span>
           </button>
         </div>
       </div>
@@ -621,13 +800,186 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
         </div>
       )}
 
-      {/* 1.6. Altar of Soul Conjunction Panel */}
+      {/* 2. Tweek Horizontal Scrollboard - NOW AT THE TOP WITH DRAG-TO-SCROLL */}
+      <div 
+        className="tweek-scrollboard"
+        ref={scrollRef}
+        onMouseDown={handleMouseDown}
+        onMouseLeave={handleMouseLeave}
+        onMouseUp={handleMouseUp}
+        onMouseMove={handleMouseMove}
+      >
+        {weekDays.map(day => {
+          const dayTasks = tasks.filter(t => t.date === day.dateStr && t.status !== 'buried');
+
+          return (
+            <div 
+              key={day.dateStr} 
+              className={`tweek-day-col ${day.isToday ? 'today' : ''}`}
+              onDragOver={handleDragOver}
+              onDrop={(e) => handleDrop(e, day.dateStr)}
+            >
+              <div 
+                className="tweek-day-header"
+                onClick={() => { playClick(); setActiveKanbanDay(day.dateStr); }}
+                style={{ cursor: 'pointer' }}
+              >
+                <div className="tweek-day-title">
+                  <span style={{ color: day.isToday ? '#fff' : 'var(--color-bone)' }}>
+                    {day.name}
+                  </span>
+                  <span className="tweek-day-date">
+                    {day.dayNum} {day.monthStr}
+                  </span>
+                </div>
+                <div style={{ fontSize: '0.65rem', color: 'var(--color-mana-glow)', textTransform: 'uppercase', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '2px' }}>
+                  <Calendar size={10} /> Кликни для Канбана
+                </div>
+              </div>
+
+              {/* Day Tasks List */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1, overflowY: 'auto' }}>
+                {dayTasks.map(task => (
+                  <div 
+                    key={task.id}
+                    className={`task-card ${task.type} ${task.status === 'completed' ? 'completed' : ''} ${task.curseLevel > 2 ? 'cursed' : ''}`}
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, task.id)}
+                    onDoubleClick={() => handleOpenEdit(task)}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      {renderTaskTitle(task, '0.9rem')}
+                      {task.curseLevel > 0 && (
+                        <span style={{ fontSize: '0.65rem', color: 'var(--color-curse-glow)' }}>
+                          ☠ {task.curseLevel}
+                        </span>
+                      )}
+                    </div>
+                    {renderTaskNatureBadge(task)}
+                    
+                    {/* Small action bars */}
+                    <div style={{ display: 'flex', gap: '0.3rem', marginTop: '0.5rem', justifyContent: 'flex-end' }}>
+                      {task.status !== 'completed' && (
+                        <>
+                          <button 
+                            className="rpg-btn" 
+                            style={{ fontSize: '0.65rem', padding: '2px 5px' }}
+                            onClick={() => handleSealTask(task.id)}
+                          >
+                            Запечатать
+                          </button>
+                          <button 
+                            className="rpg-btn rpg-btn-blood" 
+                            style={{ fontSize: '0.65rem', padding: '2px 5px' }}
+                            onClick={() => handleBuryTask(task.id)}
+                          >
+                            Похоронить
+                          </button>
+                        </>
+                      )}
+                      {task.status === 'completed' && (
+                        <span style={{ fontSize: '0.7rem', color: 'var(--color-bone-dim)' }}>✓ Запечатан</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* 3. Bottom Row: Backlog Skull Contract & Cemetery list */}
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.5rem', marginTop: '1rem' }}>
+        
+        {/* Parchment Backlog Pact */}
+        <div 
+          className="parchment-contract"
+          onDragOver={handleDragOver}
+          onDrop={(e) => handleDrop(e, null)}
+        >
+          <div className="dagger-pin" />
+          <h3 className="gothic-title" style={{ fontSize: '1.1rem', marginBottom: '1rem', color: '#c5b59f' }}>
+            ⚔ Договор с Черепом (Бэклог)
+          </h3>
+
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', maxHeight: '180px', overflowY: 'auto' }}>
+            {tasks.filter(t => t.date === null && t.status !== 'buried').map(task => (
+              <div
+                key={task.id}
+                className={`task-card ${task.type} ${task.curseLevel > 2 ? 'cursed' : ''}`}
+                style={{ flex: '0 0 200px', margin: 0 }}
+                draggable
+                onDragStart={(e) => handleDragStart(e, task.id)}
+                onDoubleClick={() => handleOpenEdit(task)}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>
+                  {renderTaskTitle(task, '0.85rem')}
+                </div>
+                {renderTaskNatureBadge(task)}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '5px' }}>
+                  <span style={{ fontSize: '0.65rem', color: 'var(--color-bone-dim)' }}>
+                    {task.type === 'siege' ? 'Осада' : 'Охота'}
+                  </span>
+                  <button 
+                    className="rpg-btn" 
+                    style={{ fontSize: '0.6rem', padding: '1px 4px' }}
+                    onClick={() => handleSealTask(task.id)}
+                  >
+                    Да
+                  </button>
+                </div>
+              </div>
+            ))}
+            {tasks.filter(t => t.date === null && t.status !== 'buried').length === 0 && (
+              <div style={{ fontSize: '0.85rem', color: '#8c7d6b', fontStyle: 'italic', padding: '1rem' }}>
+                Пакт чист. Утащите сюда любые задачи для отложенного созревания...
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Cemetery/Buried Tasks (ADHD Guilt-free Archive) */}
+        <div className="rpg-panel" style={{ background: '#0a090b', borderColor: '#332c38' }}>
+          <h3 className="gothic-title" style={{ fontSize: '1rem', color: 'var(--color-bone-dim)', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+            <Skull size={14} /> Кладбище Долгов
+          </h3>
+          <p style={{ fontSize: '0.7rem', color: 'var(--color-bone-dim)', marginBottom: '0.8rem', lineHeight: '1.3' }}>
+            Забытые или неактуальные задачи, от которых вы сознательно отказались, чтобы разгрузить совесть.
+          </p>
+
+          <div style={{ maxHeight: '120px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+            {tasks.filter(t => t.status === 'buried').map(task => (
+              <div key={task.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem', background: '#121014', padding: '5px', borderLeft: '2px solid var(--color-iron-light)' }}>
+                <span style={{ textDecoration: 'line-through', opacity: 0.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '120px' }}>
+                  {task.title}
+                </span>
+                <button 
+                  className="rpg-btn" 
+                  style={{ fontSize: '0.6rem', padding: '1px 5px' }}
+                  onClick={() => handleResurrectTask(task.id)}
+                >
+                  Воскресить
+                </button>
+              </div>
+            ))}
+            {tasks.filter(t => t.status === 'buried').length === 0 && (
+              <div style={{ fontSize: '0.75rem', color: 'var(--color-iron-light)', fontStyle: 'italic', textAlign: 'center', paddingTop: '10px' }}>
+                Здесь пусто и тихо.
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* 1.6. Altar of Soul Conjunction Panel - NOW AT THE VERY BOTTOM */}
       <div className="rpg-panel" style={{
         background: 'radial-gradient(circle, #100a0e 0%, #030104 100%)',
         border: '1px solid var(--color-blood-glow)',
         boxShadow: '0 0 20px rgba(122, 18, 18, 0.15)',
         padding: '1.2rem',
-        marginTop: '-0.2rem'
+        marginTop: '0.5rem'
       }}>
         <div style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.5rem', marginBottom: '1rem' }}>
           <h3 className="gothic-title" style={{ fontSize: '1.2rem', color: 'var(--color-blood-glow)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -719,170 +1071,8 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
           </div>
         </div>
       </div>
-
-      {/* 2. Tweek Horizontal Scrollboard */}
-      <div className="tweek-scrollboard">
-        {weekDays.map(day => {
-          const dayTasks = tasks.filter(t => t.date === day.dateStr && t.status !== 'buried');
-
-          return (
-            <div 
-              key={day.dateStr} 
-              className={`tweek-day-col ${day.isToday ? 'today' : ''}`}
-              onDragOver={handleDragOver}
-              onDrop={(e) => handleDrop(e, day.dateStr)}
-            >
-              <div 
-                className="tweek-day-header"
-                onClick={() => { playClick(); setActiveKanbanDay(day.dateStr); }}
-                style={{ cursor: 'pointer' }}
-              >
-                <div className="tweek-day-title">
-                  <span style={{ color: day.isToday ? '#fff' : 'var(--color-bone)' }}>
-                    {day.name}
-                  </span>
-                  <span className="tweek-day-date">
-                    {day.dayNum} {day.monthStr}
-                  </span>
-                </div>
-                <div style={{ fontSize: '0.65rem', color: 'var(--color-mana-glow)', textTransform: 'uppercase', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '2px' }}>
-                  <Calendar size={10} /> Кликни для Канбана
-                </div>
-              </div>
-
-              {/* Day Tasks List */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1, overflowY: 'auto' }}>
-                {dayTasks.map(task => (
-                  <div 
-                    key={task.id}
-                    className={`task-card ${task.type} ${task.status === 'completed' ? 'completed' : ''} ${task.curseLevel > 2 ? 'cursed' : ''}`}
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, task.id)}
-                    onDoubleClick={() => handleOpenEdit(task)}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <span style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>{task.title}</span>
-                      {task.curseLevel > 0 && (
-                        <span style={{ fontSize: '0.65rem', color: 'var(--color-curse-glow)' }}>
-                          ☠ {task.curseLevel}
-                        </span>
-                      )}
-                    </div>
-                    {renderTaskNatureBadge(task)}
-                    
-                    {/* Small action bars */}
-                    <div style={{ display: 'flex', gap: '0.3rem', marginTop: '0.5rem', justifyContent: 'flex-end' }}>
-                      {task.status !== 'completed' && (
-                        <>
-                          <button 
-                            className="rpg-btn" 
-                            style={{ fontSize: '0.65rem', padding: '2px 5px' }}
-                            onClick={() => handleSealTask(task.id)}
-                          >
-                            Запечатать
-                          </button>
-                          <button 
-                            className="rpg-btn rpg-btn-blood" 
-                            style={{ fontSize: '0.65rem', padding: '2px 5px' }}
-                            onClick={() => handleBuryTask(task.id)}
-                          >
-                            Похоронить
-                          </button>
-                        </>
-                      )}
-                      {task.status === 'completed' && (
-                        <span style={{ fontSize: '0.7rem', color: 'var(--color-bone-dim)' }}>✓ Запечатан</span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* 3. Bottom Row: Backlog Skull Contract & Cemetery list */}
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.5rem', marginTop: 'auto' }}>
         
-        {/* Parchment Backlog Pact */}
-        <div 
-          className="parchment-contract"
-          onDragOver={handleDragOver}
-          onDrop={(e) => handleDrop(e, null)}
-        >
-          <div className="dagger-pin" />
-          <h3 className="gothic-title" style={{ fontSize: '1.1rem', marginBottom: '1rem', color: '#c5b59f' }}>
-            ⚔ Договор с Черепом (Бэклог)
-          </h3>
 
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', maxHeight: '180px', overflowY: 'auto' }}>
-            {tasks.filter(t => t.date === null && t.status !== 'buried').map(task => (
-              <div
-                key={task.id}
-                className={`task-card ${task.type} ${task.curseLevel > 2 ? 'cursed' : ''}`}
-                style={{ flex: '0 0 200px', margin: 0 }}
-                draggable
-                onDragStart={(e) => handleDragStart(e, task.id)}
-                onDoubleClick={() => handleOpenEdit(task)}
-              >
-                <div style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>{task.title}</div>
-                {renderTaskNatureBadge(task)}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '5px' }}>
-                  <span style={{ fontSize: '0.65rem', color: 'var(--color-bone-dim)' }}>
-                    {task.type === 'siege' ? 'Осада' : 'Охота'}
-                  </span>
-                  <button 
-                    className="rpg-btn" 
-                    style={{ fontSize: '0.6rem', padding: '1px 4px' }}
-                    onClick={() => handleSealTask(task.id)}
-                  >
-                    Да
-                  </button>
-                </div>
-              </div>
-            ))}
-            {tasks.filter(t => t.date === null && t.status !== 'buried').length === 0 && (
-              <div style={{ fontSize: '0.85rem', color: '#8c7d6b', fontStyle: 'italic', padding: '1rem' }}>
-                Пакт чист. Утащите сюда любые задачи для отложенного созревания...
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Cemetery/Buried Tasks (ADHD Guilt-free Archive) */}
-        <div className="rpg-panel" style={{ background: '#0a090b', borderColor: '#332c38' }}>
-          <h3 className="gothic-title" style={{ fontSize: '1rem', color: 'var(--color-bone-dim)', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-            <Skull size={14} /> Кладбище Долгов
-          </h3>
-          <p style={{ fontSize: '0.7rem', color: 'var(--color-bone-dim)', marginBottom: '0.8rem', lineHeight: '1.3' }}>
-            Забытые или неактуальные задачи, от которых вы сознательно отказались, чтобы разгрузить совесть.
-          </p>
-
-          <div style={{ maxHeight: '120px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-            {tasks.filter(t => t.status === 'buried').map(task => (
-              <div key={task.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem', background: '#121014', padding: '5px', borderLeft: '2px solid var(--color-iron-light)' }}>
-                <span style={{ textDecoration: 'line-through', opacity: 0.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '120px' }}>
-                  {task.title}
-                </span>
-                <button 
-                  className="rpg-btn" 
-                  style={{ fontSize: '0.6rem', padding: '1px 5px' }}
-                  onClick={() => handleResurrectTask(task.id)}
-                >
-                  Воскресить
-                </button>
-              </div>
-            ))}
-            {tasks.filter(t => t.status === 'buried').length === 0 && (
-              <div style={{ fontSize: '0.75rem', color: 'var(--color-iron-light)', fontStyle: 'italic', textAlign: 'center', paddingTop: '10px' }}>
-                Здесь пусто и тихо.
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
 
       {/* NESTED KANBAN DAY BOARD MODAL */}
       {activeKanbanDay && (
@@ -926,7 +1116,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
                       onDoubleClick={() => { playClick(); handleOpenEdit(task); }}
                       style={{ cursor: 'pointer' }}
                     >
-                      <div style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>{task.title}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>{renderTaskTitle(task, '0.85rem')}</div>
                       {renderTaskNatureBadge(task)}
                       <div style={{ display: 'flex', gap: '0.3rem', marginTop: '5px', justifyContent: 'flex-end' }}>
                         <button className="rpg-btn" style={{ fontSize: '0.6rem', padding: '2px' }} onClick={() => handleSealTask(task.id)}>Да</button>
@@ -947,7 +1137,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
                       style={{ borderLeftColor: 'var(--color-mana)', cursor: 'pointer' }}
                       onDoubleClick={() => { playClick(); handleOpenEdit(task); }}
                     >
-                      <div style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>{task.title}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>{renderTaskTitle(task, '0.85rem')}</div>
                       {renderTaskNatureBadge(task)}
                       <div style={{ fontSize: '0.7rem', color: 'var(--color-bone-dim)', marginTop: '2px' }}>
                         Шагов сделано: {task.steps.filter(s => s.completed).length}/{task.steps.length}
@@ -971,7 +1161,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
                       onDoubleClick={() => { playClick(); handleOpenEdit(task); }}
                       style={{ cursor: 'pointer' }}
                     >
-                      <div style={{ fontSize: '0.85rem' }}>{task.title}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>{renderTaskTitle(task, '0.85rem')}</div>
                       {renderTaskNatureBadge(task)}
                       <span style={{ fontSize: '0.7rem', color: 'var(--color-bone-dim)' }}>✓ Ритуал проведен</span>
                     </div>
@@ -1021,6 +1211,35 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
                 Отмена
               </button>
             </div>
+
+            {/* Past Advice from Rune of Return */}
+            {editingTask.runeOfReturn && (
+              <div style={{
+                background: 'radial-gradient(circle, #2a2013 0%, #151006 100%)',
+                border: '1px solid var(--color-relic-glow)',
+                padding: '1rem 1.2rem',
+                marginBottom: '1.2rem',
+                boxShadow: '0 4px 15px rgba(0,0,0,0.6), inset 0 0 10px rgba(255,255,255,0.01)',
+                color: '#e6dfd3',
+                fontSize: '0.85rem',
+                lineHeight: '1.4',
+                fontFamily: 'Georgia, serif',
+                fontStyle: 'italic',
+                borderLeftWidth: '4px'
+              }}>
+                <h4 className="gothic-title" style={{ fontSize: '0.8rem', color: 'var(--color-relic-glow)', display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '0.6rem', fontStyle: 'normal' }}>
+                  📜 Напутствие из прошлого (Руна возврата)
+                </h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.8rem' }}>
+                  <div><strong>1. Где остановился:</strong> {editingTask.runeOfReturn.whereFinished}</div>
+                  <div><strong>2. Причина переноса:</strong> {editingTask.runeOfReturn.whyDeferred}</div>
+                  <div><strong>3. Почему начал/не начал:</strong> {editingTask.runeOfReturn.whyStartedOrNot}</div>
+                  <div style={{ marginTop: '0.3rem', paddingLeft: '8px', borderLeft: '2px solid var(--color-relic-glow)', color: 'var(--color-relic-glow)', fontWeight: 'bold' }}>
+                    <strong>Совет самому себе:</strong> "{editingTask.runeOfReturn.futureAdvice}"
+                  </div>
+                </div>
+              </div>
+            )}
 
             {editDeconstructLoading && guidedStep === 0 && (
               <div style={{ textAlign: 'center', padding: '3rem' }}>

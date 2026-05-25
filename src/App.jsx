@@ -5,6 +5,7 @@ import CharacterSheet from './components/CharacterSheet';
 import TweekPlanner from './components/TweekPlanner';
 import SpotifyPlayer from './components/SpotifyPlayer';
 import RecoveryScreen from './components/RecoveryScreen';
+import RuneOfReturnModal from './components/RuneOfReturnModal';
 import { useAudio } from './hooks/useAudio';
 import { Settings as SettingsIcon, Volume2, VolumeX, Sliders } from 'lucide-react';
 
@@ -93,6 +94,17 @@ export default function App() {
 
   // Character Sidebar Drawer state
   const [characterDrawerOpen, setCharacterDrawerOpen] = useState(false);
+
+  // Rune of Return states
+  const [runeModalOpen, setRuneModalOpen] = useState(false);
+  const [runeTargetTask, setRuneTargetTask] = useState(null);
+  const [runeOnConfirm, setRuneOnConfirm] = useState(null);
+
+  const triggerRuneOfReturn = (taskOrTasks, onConfirm) => {
+    setRuneTargetTask(taskOrTasks);
+    setRuneOnConfirm(() => onConfirm);
+    setRuneModalOpen(true);
+  };
 
   // Daily Judgment states
   const [judgmentOpen, setJudgmentOpen] = useState(false);
@@ -634,7 +646,7 @@ export default function App() {
         style={{
           position: 'fixed',
           top: '12px',
-          right: '15px',
+          right: characterDrawerOpen ? '555px' : '15px',
           zIndex: 1100,
           padding: '8px',
           borderRadius: '50%',
@@ -644,7 +656,8 @@ export default function App() {
           background: 'rgba(20, 15, 25, 0.85)',
           border: '1px solid var(--color-iron-light)',
           boxShadow: '0 0 10px rgba(0,0,0,0.5)',
-          cursor: 'pointer'
+          cursor: 'pointer',
+          transition: 'right 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)'
         }}
         title="Настройки Бездны"
       >
@@ -776,73 +789,75 @@ export default function App() {
         </div>
       )}
 
-      {/* Main HUD Stats */}
-      <Navigation 
-        activeTab={activeTab} 
-        setActiveTab={handleTabChange} 
-        character={character}
-        spotifyConnected={!!spotifyToken}
-        characterDrawerOpen={characterDrawerOpen}
-        setCharacterDrawerOpen={setCharacterDrawerOpen}
-      />
-
-      {/* Main Tab Controller Grid */}
-      <main style={{ flex: 1, paddingBottom: '3rem' }}>
-        {activeTab === 'escape' && (
-          <CarriageSession 
-            character={character}
-            setCharacter={setCharacter}
-            tasks={tasks}
-            setTasks={setTasks}
-            parseMessyTasks={parseMessyTasks}
-            playActiveSessionTrack={playActiveSessionTrack}
-            generateRedemptionEulogy={generateRedemptionEulogy}
-            pedestals={pedestals}
-            savePedestals={savePedestals}
-            requestTaskExecutionModeSelect={requestTaskExecutionModeSelect}
-            communeWithSpirits={handleCommuneWithSpirits}
-          />
-        )}
-
-        {activeTab === 'planner' && (
-          <TweekPlanner 
-            tasks={tasks}
-            setTasks={setTasks}
-            character={character}
-            setCharacter={setCharacter}
-            requestDeconstruction={requestDeconstruction}
-            communeWithSpirits={handleCommuneWithSpirits}
-          />
-        )}
-
-        {activeTab === 'recovery' && (
-          <RecoveryScreen 
-            character={character}
-            setCharacter={setCharacter}
-            tasks={tasks}
-            setTasks={setTasks}
-            requestDeconstruction={requestDeconstruction}
-          />
-        )}
-      </main>
-
-      {/* Spotify Integration Deck at Footer */}
-      <footer style={{ marginTop: 'auto' }}>
-        <div className="rpg-panel" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', padding: '0.8rem 1.5rem', marginBottom: '0.5rem' }}>
-          <span style={{ fontSize: '0.75rem', color: 'var(--color-iron-light)' }}>
-            Abaddon Task Vessel v1.0.0
-          </span>
-        </div>
-        
-        <SpotifyPlayer 
+      {/* Sliding Main Content Wrapper */}
+      <div style={{
+        transition: 'margin-right 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), width 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)',
+        marginRight: characterDrawerOpen ? '540px' : '0px',
+        width: characterDrawerOpen ? 'calc(100% - 540px)' : '100%',
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column'
+      }}>
+        {/* Main HUD Stats */}
+        <Navigation 
+          activeTab={activeTab} 
+          setActiveTab={handleTabChange} 
           character={character}
-          spotifyToken={spotifyToken}
-          setSpotifyToken={setSpotifyToken}
-          currentTrack={currentTrack}
-          setCurrentTrack={setCurrentTrack}
-          activeSessionType={activeSessionType}
         />
-      </footer>
+
+        {/* Main Tab Controller Grid */}
+        <main style={{ flex: 1, paddingBottom: '3rem' }}>
+          {activeTab === 'escape' && (
+            <CarriageSession 
+              character={character}
+              setCharacter={setCharacter}
+              tasks={tasks}
+              setTasks={setTasks}
+              parseMessyTasks={parseMessyTasks}
+              playActiveSessionTrack={playActiveSessionTrack}
+              generateRedemptionEulogy={generateRedemptionEulogy}
+              pedestals={pedestals}
+              savePedestals={savePedestals}
+              requestTaskExecutionModeSelect={requestTaskExecutionModeSelect}
+              communeWithSpirits={handleCommuneWithSpirits}
+            />
+          )}
+
+          {activeTab === 'planner' && (
+            <TweekPlanner 
+              tasks={tasks}
+              setTasks={setTasks}
+              character={character}
+              setCharacter={setCharacter}
+              requestDeconstruction={requestDeconstruction}
+              communeWithSpirits={handleCommuneWithSpirits}
+              triggerRuneOfReturn={triggerRuneOfReturn}
+            />
+          )}
+
+          {activeTab === 'recovery' && (
+            <RecoveryScreen 
+              character={character}
+              setCharacter={setCharacter}
+              tasks={tasks}
+              setTasks={setTasks}
+              requestDeconstruction={requestDeconstruction}
+            />
+          )}
+        </main>
+
+        {/* Spotify Integration Deck at Footer */}
+        <footer style={{ marginTop: 'auto' }}>
+          <SpotifyPlayer 
+            character={character}
+            spotifyToken={spotifyToken}
+            setSpotifyToken={setSpotifyToken}
+            currentTrack={currentTrack}
+            setCurrentTrack={setCurrentTrack}
+            activeSessionType={activeSessionType}
+          />
+        </footer>
+      </div>
 
       {/* КАРТА СУДЬБЫ: ВЫБОР РЕЖИМА ВЫПОЛНЕНИЯ (Tarot/Card Game Style Overlay) */}
       {taskPendingModeSelect && (
@@ -1044,58 +1059,79 @@ export default function App() {
         </div>
       )}
 
-      {/* Character Sheet Sidebar Drawer */}
-      {characterDrawerOpen && (
-        <div className="character-drawer-overlay" style={{
+      {/* Character Sheet Sidebar Toggle (Fixed circle right on the browser edge) */}
+      <button 
+        onClick={() => { playClick(); setCharacterDrawerOpen(!characterDrawerOpen); }}
+        className="rpg-btn" 
+        style={{
           position: 'fixed',
-          top: 0,
-          right: 0,
-          bottom: 0,
-          left: 0,
-          background: 'rgba(0,0,0,0.5)',
-          zIndex: 1000,
+          top: '50%',
+          right: characterDrawerOpen ? '480px' : '0px',
+          transform: 'translate(50%, -50%)',
+          zIndex: 1100,
+          width: '42px',
+          height: '42px',
+          borderRadius: '50%',
           display: 'flex',
-          justifyContent: 'flex-end',
-        }} onClick={() => setCharacterDrawerOpen(false)}>
-          <div className="character-drawer-content" style={{
-            width: '480px',
-            maxWidth: '100%',
-            height: '100%',
-            background: 'linear-gradient(180deg, #151119 0%, #0c090e 100%)',
-            borderLeft: '2px solid var(--color-iron-light)',
-            boxShadow: '-5px 0 25px rgba(0,0,0,0.8)',
-            padding: '1.5rem',
-            overflowY: 'auto',
-            position: 'relative',
-            display: 'flex',
-            flexDirection: 'column'
-          }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-iron-light)', paddingBottom: '0.8rem', marginBottom: '1rem' }}>
-              <h3 className="gothic-title" style={{ fontSize: '1.25rem', color: 'var(--color-relic-glow)', margin: 0 }}>
-                👤 Лист Персонажа
-              </h3>
-              <button 
-                className="rpg-btn" 
-                style={{ padding: '2px 8px', fontSize: '0.8rem' }}
-                onClick={() => setCharacterDrawerOpen(false)}
-              >
-                Закрыть
-              </button>
-            </div>
-            <div style={{ flex: 1 }}>
-              <CharacterSheet 
-                character={character}
-                setCharacter={setCharacter}
-                tasks={tasks}
-                setTasks={setTasks}
-                requestDeconstruction={requestDeconstruction}
-                pedestals={pedestals}
-                savePedestals={savePedestals}
-              />
-            </div>
-          </div>
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'linear-gradient(135deg, var(--color-relic), var(--color-iron-dark))',
+          border: '2px solid var(--color-relic-glow)',
+          boxShadow: '0 0 15px rgba(255, 184, 19, 0.3)',
+          cursor: 'pointer',
+          transition: 'right 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)'
+        }}
+        title={characterDrawerOpen ? "Закрыть Лист Персонажа" : "Открыть Лист Персонажа"}
+      >
+        <span style={{ fontSize: '1.25rem', color: 'var(--color-relic-glow)', display: 'block', pointerEvents: 'none' }}>
+          {characterDrawerOpen ? '▶' : '◀'}
+        </span>
+      </button>
+
+      {/* Character Sheet Sidebar Drawer */}
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        right: 0,
+        bottom: 0,
+        width: '540px',
+        maxWidth: '100%',
+        height: '100%',
+        background: 'linear-gradient(180deg, #151119 0%, #0c090e 100%)',
+        borderLeft: '2px solid var(--color-iron-light)',
+        boxShadow: '-5px 0 25px rgba(0,0,0,0.8)',
+        padding: '1.5rem',
+        overflowY: 'auto',
+        zIndex: 1000,
+        display: 'flex',
+        flexDirection: 'column',
+        transform: characterDrawerOpen ? 'translateX(0)' : 'translateX(100%)',
+        transition: 'transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-iron-light)', paddingBottom: '0.8rem', marginBottom: '1rem' }}>
+          <h3 className="gothic-title" style={{ fontSize: '1.25rem', color: 'var(--color-relic-glow)', margin: 0 }}>
+            👤 Лист Персонажа
+          </h3>
+          <button 
+            className="rpg-btn" 
+            style={{ padding: '2px 8px', fontSize: '0.8rem' }}
+            onClick={() => { playClick(); setCharacterDrawerOpen(false); }}
+          >
+            Закрыть
+          </button>
         </div>
-      )}
+        <div style={{ flex: 1, zoom: '0.80', transformOrigin: 'top center' }}>
+          <CharacterSheet 
+            character={character}
+            setCharacter={setCharacter}
+            tasks={tasks}
+            setTasks={setTasks}
+            requestDeconstruction={requestDeconstruction}
+            pedestals={pedestals}
+            savePedestals={savePedestals}
+          />
+        </div>
+      </div>
 
       {/* СУДНЫЙ ДЕНЬ: ДНЕВНОЙ СУД НАД ПРОСРОЧЕННЫМИ КОНТРАКТАМИ */}
       {judgmentOpen && judgmentTasks.length > 0 && judgmentIndex < judgmentTasks.length && (
@@ -1212,16 +1248,18 @@ export default function App() {
                     onClick={() => {
                       playClick();
                       const task = judgmentTasks[judgmentIndex];
-                      const todayStr = new Date().toISOString().split('T')[0];
-                      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, date: todayStr, curseLevel: Math.min(5, (t.curseLevel || 0) + 1) } : t));
-                      
-                      // Move next
-                      setJudgmentShowReschedule(false);
-                      if (judgmentIndex + 1 < judgmentTasks.length) {
-                        setJudgmentIndex(prev => prev + 1);
-                      } else {
-                        setJudgmentOpen(false);
-                      }
+                      triggerRuneOfReturn(task, (runeData) => {
+                        const todayStr = new Date().toISOString().split('T')[0];
+                        setTasks(prev => prev.map(t => t.id === task.id ? { ...t, date: todayStr, curseLevel: Math.min(5, (t.curseLevel || 0) + 1), runeOfReturn: runeData } : t));
+                        
+                        // Move next
+                        setJudgmentShowReschedule(false);
+                        if (judgmentIndex + 1 < judgmentTasks.length) {
+                          setJudgmentIndex(prev => prev + 1);
+                        } else {
+                          setJudgmentOpen(false);
+                        }
+                      });
                     }}
                   >
                     📅 Перенести на СЕГОДНЯ
@@ -1232,18 +1270,20 @@ export default function App() {
                     onClick={() => {
                       playClick();
                       const task = judgmentTasks[judgmentIndex];
-                      const tomorrow = new Date();
-                      tomorrow.setDate(tomorrow.getDate() + 1);
-                      const tomorrowStr = tomorrow.toISOString().split('T')[0];
-                      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, date: tomorrowStr, curseLevel: Math.min(5, (t.curseLevel || 0) + 1) } : t));
+                      triggerRuneOfReturn(task, (runeData) => {
+                        const tomorrow = new Date();
+                        tomorrow.setDate(tomorrow.getDate() + 1);
+                        const tomorrowStr = tomorrow.toISOString().split('T')[0];
+                        setTasks(prev => prev.map(t => t.id === task.id ? { ...t, date: tomorrowStr, curseLevel: Math.min(5, (t.curseLevel || 0) + 1), runeOfReturn: runeData } : t));
 
-                      // Move next
-                      setJudgmentShowReschedule(false);
-                      if (judgmentIndex + 1 < judgmentTasks.length) {
-                        setJudgmentIndex(prev => prev + 1);
-                      } else {
-                        setJudgmentOpen(false);
-                      }
+                        // Move next
+                        setJudgmentShowReschedule(false);
+                        if (judgmentIndex + 1 < judgmentTasks.length) {
+                          setJudgmentIndex(prev => prev + 1);
+                        } else {
+                          setJudgmentOpen(false);
+                        }
+                      });
                     }}
                   >
                     ⏳ Отложить на ЗАВТРА
@@ -1254,15 +1294,17 @@ export default function App() {
                     onClick={() => {
                       playClick();
                       const task = judgmentTasks[judgmentIndex];
-                      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, date: null, curseLevel: Math.min(5, (t.curseLevel || 0) + 1) } : t));
+                      triggerRuneOfReturn(task, (runeData) => {
+                        setTasks(prev => prev.map(t => t.id === task.id ? { ...t, date: null, curseLevel: Math.min(5, (t.curseLevel || 0) + 1), runeOfReturn: runeData } : t));
 
-                      // Move next
-                      setJudgmentShowReschedule(false);
-                      if (judgmentIndex + 1 < judgmentTasks.length) {
-                        setJudgmentIndex(prev => prev + 1);
-                      } else {
-                        setJudgmentOpen(false);
-                      }
+                        // Move next
+                        setJudgmentShowReschedule(false);
+                        if (judgmentIndex + 1 < judgmentTasks.length) {
+                          setJudgmentIndex(prev => prev + 1);
+                        } else {
+                          setJudgmentOpen(false);
+                        }
+                      });
                     }}
                   >
                     💀 Сбросить в БЭКЛОГ (Долг)
@@ -1276,7 +1318,7 @@ export default function App() {
 
       {/* ARPG Status Globes */}
       <div className="arpg-globes-container" style={{ pointerEvents: 'none' }}>
-        {/* Left: Mana Globe */}
+        {/* Left: Mana & Stamina Globe */}
         <div style={{
           position: 'fixed',
           bottom: '25px',
@@ -1290,7 +1332,7 @@ export default function App() {
           overflow: 'hidden',
           zIndex: 900,
           pointerEvents: 'auto'
-        }} title={`Ресурс (Мана): ${Math.round(character.mana)}/${character.maxMana}`}>
+        }} title={`Ресурс и Выносливость: ${Math.round(character.mana)}/${character.maxMana} RP • Усталость: ${Math.floor(character.dailyWorkMinutes || 0)}/300 мин`}>
           {/* Liquid Fill */}
           <div style={{
             position: 'absolute',
@@ -1321,14 +1363,16 @@ export default function App() {
             transform: 'translate(-50%, -50%)',
             color: '#fff',
             fontFamily: 'var(--font-rpg)',
-            fontSize: '0.78rem',
+            fontSize: '0.75rem',
             textShadow: '2px 2px 4px #000',
             fontWeight: 'bold',
             textAlign: 'center',
-            pointerEvents: 'none'
+            pointerEvents: 'none',
+            lineHeight: '1.2'
           }}>
             <div>{Math.round(character.mana)}</div>
-            <div style={{ fontSize: '0.55rem', opacity: 0.8 }}>RP</div>
+            <div style={{ fontSize: '0.55rem', opacity: 0.8 }}>RP (⚡)</div>
+            <div style={{ fontSize: '0.55rem', color: '#ffb813' }}>{Math.floor(character.dailyWorkMinutes || 0)}м</div>
           </div>
         </div>
 
@@ -1336,7 +1380,7 @@ export default function App() {
         <div style={{
           position: 'fixed',
           bottom: '25px',
-          right: '25px',
+          right: characterDrawerOpen ? '505px' : '25px',
           width: '100px',
           height: '100px',
           borderRadius: '50%',
@@ -1345,7 +1389,8 @@ export default function App() {
           boxShadow: '0 0 20px rgba(0,0,0,0.8), inset 0 0 15px rgba(255,255,255,0.05)',
           overflow: 'hidden',
           zIndex: 900,
-          pointerEvents: 'auto'
+          pointerEvents: 'auto',
+          transition: 'right 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)'
         }} title={`Здоровье (HP): ${Math.round(character.hp)}/${character.maxHp}`}>
           {/* Liquid Fill */}
           <div style={{
@@ -1388,6 +1433,26 @@ export default function App() {
           </div>
         </div>
       </div>
+
+      {/* Rune of Return Modal Overlay */}
+      {runeModalOpen && (
+        <RuneOfReturnModal 
+          task={runeTargetTask}
+          onConfirm={(runeData) => {
+            if (runeOnConfirm) {
+              runeOnConfirm(runeData);
+            }
+            setRuneModalOpen(false);
+            setRuneTargetTask(null);
+            setRuneOnConfirm(null);
+          }}
+          onCancel={() => {
+            setRuneModalOpen(false);
+            setRuneTargetTask(null);
+            setRuneOnConfirm(null);
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Music, RefreshCw, Key, Power, Play, Pause, SkipForward, Radio } from 'lucide-react';
 import { useAudio } from '../hooks/useAudio';
 
@@ -17,6 +17,7 @@ export default function SpotifyPlayer({
   const [isPlayerActive, setIsPlayerActive] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [sdkLoaded, setSdkLoaded] = useState(false);
+  const exchangeInProgress = useRef(false);
 
   // Sync isPlaying to synth drone muting
   useEffect(() => {
@@ -83,7 +84,7 @@ export default function SpotifyPlayer({
     const codeChallenge = base64urlencode(hashed);
 
     const redirectUri = window.location.origin;
-    const scope = 'user-modify-playback-state user-read-playback-state streaming user-read-currently-playing';
+    const scope = 'user-modify-playback-state user-read-playback-state streaming user-read-currently-playing user-read-email user-read-private';
 
     const authUrl = new URL("https://accounts.spotify.com/authorize");
     const params = {
@@ -105,7 +106,8 @@ export default function SpotifyPlayer({
     const verifier = window.sessionStorage.getItem('spotify_code_verifier');
     const savedClientId = localStorage.getItem('spotify_client_id');
 
-    if (code && verifier && savedClientId) {
+    if (code && verifier && savedClientId && !exchangeInProgress.current) {
+      exchangeInProgress.current = true;
       const exchangeCodeForToken = async () => {
         try {
           const response = await fetch('https://accounts.spotify.com/api/token', {
@@ -128,6 +130,8 @@ export default function SpotifyPlayer({
           window.history.replaceState({}, document.title, window.location.origin);
         } catch (e) {
           console.error("Spotify OAuth Token Exchange Error:", e);
+        } finally {
+          exchangeInProgress.current = false;
         }
       };
       exchangeCodeForToken();
@@ -201,6 +205,12 @@ export default function SpotifyPlayer({
       localStorage.removeItem('spotify_token_created_at');
     });
 
+    newPlayer.addListener('account_error', ({ message }) => {
+      console.error('Spotify SDK Account Error (Premium Required):', message);
+      setSpotifyError("Для работы плеера требуется подписка Spotify Premium. Автоматический запуск треков приостановлен.");
+      setDisableAutoPlay(true);
+    });
+
     newPlayer.addListener('initialization_error', ({ message }) => {
       console.error('Spotify SDK Initialization Error:', message);
     });
@@ -212,6 +222,7 @@ export default function SpotifyPlayer({
       newPlayer.removeListener('ready');
       newPlayer.removeListener('player_state_changed');
       newPlayer.removeListener('authentication_error');
+      newPlayer.removeListener('account_error');
       newPlayer.removeListener('initialization_error');
       newPlayer.disconnect();
       setPlayer(null);
@@ -219,6 +230,7 @@ export default function SpotifyPlayer({
   }, [sdkLoaded, spotifyToken]);
 
   const [spotifyError, setSpotifyError] = useState('');
+  const [disableAutoPlay, setDisableAutoPlay] = useState(false);
 
   // --- SYNC AUDIO PLAYBACK WITH STATE COGNITION ---
   const handlePlayAtmosphere = async (mood) => {
@@ -267,8 +279,9 @@ export default function SpotifyPlayer({
       if (status === 401 || msg.includes("token expired") || msg.includes("401")) {
         userFriendlyError = "Срок действия токена Spotify истек. Пожалуйста, переподключите аккаунт!";
         setSpotifyToken(''); // Clear the expired token so user can connect again
-      } else if (status === 403 || msg.includes("premium") || msg.includes("403")) {
-        userFriendlyError = "Для работы плеера требуется подписка Spotify Premium. Проверьте ваш аккаунт!";
+      } else if (status === 403 || msg.includes("premium") || msg.includes("403") || msg.includes("restriction")) {
+        userFriendlyError = "Для работы плеера требуется подписка Spotify Premium. Автоматический запуск треков приостановлен.";
+        setDisableAutoPlay(true);
       } else if (status === 404 || msg.includes("device") || msg.includes("404")) {
         userFriendlyError = "Устройство Focus Vessel не найдено или не готово. Убедитесь, что Spotify Premium запущен на ПК или телефоне!";
       } else if (e.message) {
@@ -281,10 +294,10 @@ export default function SpotifyPlayer({
   };
 
   useEffect(() => {
-    if (activeSessionType && deviceId && spotifyToken) {
+    if (activeSessionType && deviceId && spotifyToken && !disableAutoPlay) {
       handlePlayAtmosphere(activeSessionType);
     }
-  }, [activeSessionType, deviceId, spotifyToken]);
+  }, [activeSessionType, deviceId, spotifyToken, disableAutoPlay]);
 
   const handleTogglePlayback = () => {
     if (player) {
