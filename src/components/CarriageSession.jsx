@@ -1620,7 +1620,7 @@ export default function CarriageSession({
     const potionCount = character.inventory?.filter(i => i.id === 'item_potion').length || 0;
 
     return (
-      <div className="rpg-panel" style={{ maxWidth: '850px', margin: '1rem auto', padding: '2rem' }}>
+      <div className="rpg-panel" style={{ maxWidth: '1280px', margin: '1rem auto', padding: '2rem' }}>
         {/* Hub Header: Hero card summary */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid var(--color-iron-light)', paddingBottom: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
@@ -1655,12 +1655,7 @@ export default function CarriageSession({
           ⚔️ Активные Боевые Контракты на Сегодня:
         </h3>
         
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-          gap: '1.5rem',
-          marginBottom: '2rem'
-        }}>
+        <div className="combat-contracts-grid">
           {todayTasks.length > 0 ? (
             todayTasks.map(task => {
               // Procedural profile generation for preview
@@ -1686,7 +1681,7 @@ export default function CarriageSession({
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'space-between',
-                    minHeight: '280px',
+                    minHeight: '430px',
                     position: 'relative',
                     transition: 'all 0.25s ease'
                   }}
@@ -1736,16 +1731,58 @@ export default function CarriageSession({
                       <div>Токсичность: <b>{task.toxicity === 'scary' ? 'Страшная' : task.toxicity === 'tedious' ? 'Скучная' : task.toxicity === 'vague' ? 'Мутная' : 'Обычная'}</b></div>
                     </div>
 
+                    {/* Intent / Description */}
                     {task.intent && (
-                      <p style={{ fontSize: '0.7rem', fontStyle: 'italic', color: '#8c7d6b', textAlign: 'center', margin: '0 0 0.6rem 0', lineHeight: '1.25' }}>
-                        «{task.intent}»
-                      </p>
+                      <div style={{ 
+                        background: 'rgba(140, 125, 107, 0.08)', 
+                        borderLeft: '2px solid var(--color-relic)', 
+                        padding: '0.4rem 0.6rem', 
+                        fontSize: '0.75rem', 
+                        fontStyle: 'italic', 
+                        color: 'var(--color-bone-dim)', 
+                        margin: '0.6rem 0',
+                        lineHeight: '1.3'
+                      }}>
+                        <b>Намерение:</b> «{task.intent}»
+                      </div>
+                    )}
+
+                    {/* Task Steps */}
+                    {task.steps && task.steps.length > 0 && (
+                      <div style={{ marginTop: '0.6rem', borderTop: '1px dashed rgba(255,255,255,0.08)', paddingTop: '0.6rem' }}>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', textTransform: 'uppercase', fontFamily: 'var(--font-rpg)', display: 'block', marginBottom: '4px' }}>
+                          🎯 Шаги прорыва ({task.steps.filter(s => s.completed).length}/{task.steps.length}):
+                        </span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', maxHeight: '90px', overflowY: 'auto', paddingRight: '4px' }} className="rpg-scrollbar">
+                          {task.steps.map(step => (
+                            <div 
+                              key={step.id} 
+                              style={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '5px', 
+                                fontSize: '0.75rem', 
+                                color: step.completed ? 'var(--color-bone-dim)' : '#fff',
+                                textDecoration: step.completed ? 'line-through' : 'none',
+                                opacity: step.completed ? 0.6 : 1
+                              }}
+                            >
+                              <span style={{ color: step.completed ? 'var(--color-relic-glow)' : 'var(--color-blood-glow)' }}>
+                                {step.completed ? '☑' : '☐'}
+                              </span>
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={step.title}>
+                                {step.title}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     )}
                   </div>
 
                   <button 
                     className="rpg-btn rpg-btn-blood"
-                    style={{ width: '100%', padding: '0.4rem 0', fontSize: '0.85rem', marginTop: 'auto' }}
+                    style={{ width: '100%', padding: '0.4rem 0', fontSize: '0.85rem', marginTop: '1rem' }}
                     onClick={() => {
                       playClick();
                       const runStart = (mode) => {
