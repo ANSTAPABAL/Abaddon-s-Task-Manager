@@ -270,17 +270,23 @@ export default function SpotifyPlayer({
       setIsPlaying(true);
       setSpotifyError('');
     } catch (e) {
-      console.error(e);
-      let userFriendlyError = "Не удалось запустить трек. Запустите Spotify Premium на ПК/телефоне и попробуйте снова!";
-      
       const status = e.status;
       const msg = e.message ? e.message.toLowerCase() : "";
+      
+      // Log expected Premium / Dev access restrictions as a warning rather than a red console error
+      if (status === 403 || msg.includes("restriction") || msg.includes("premium")) {
+        console.warn("Spotify Playback blocked (Premium restriction or Dev access missing):", e.message);
+      } else {
+        console.error("Spotify Playback Error:", e);
+      }
+      
+      let userFriendlyError = "Не удалось запустить трек. Запустите Spotify Premium на ПК/телефоне и попробуйте снова!";
       
       if (status === 401 || msg.includes("token expired") || msg.includes("401")) {
         userFriendlyError = "Срок действия токена Spotify истек. Пожалуйста, переподключите аккаунт!";
         setSpotifyToken(''); // Clear the expired token so user can connect again
       } else if (status === 403 || msg.includes("premium") || msg.includes("403") || msg.includes("restriction")) {
-        userFriendlyError = "Для работы плеера требуется подписка Spotify Premium. Автоматический запуск треков приостановлен.";
+        userFriendlyError = "Ошибка 403 (Ограничение): Требуется подписка Spotify Premium ИЛИ ваш аккаунт должен быть добавлен в список 'Users and Access' в настройках вашего приложения на Spotify Developer Dashboard. Автоматический запуск треков отключен.";
         setDisableAutoPlay(true);
       } else if (status === 404 || msg.includes("device") || msg.includes("404")) {
         userFriendlyError = "Устройство Focus Vessel не найдено или не готово. Убедитесь, что Spotify Premium запущен на ПК или телефоне!";
