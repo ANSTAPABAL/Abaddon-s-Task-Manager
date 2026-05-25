@@ -213,6 +213,25 @@ app.post('/api/ai/complete', async (req, res) => {
   }
 });
 
+// Serve local atmospheric MP3 files
+app.get('/tracks/fear_and_hunger.mp3', (req, res) => {
+  const filePath = path.join(__dirname, 'The Perfect Being｜Fear and Hunger Atmospheric Playlist.mp3');
+  if (fs.existsSync(filePath)) {
+    res.sendFile(filePath);
+  } else {
+    res.status(404).send('Fear and Hunger track not found in root directory');
+  }
+});
+
+app.get('/tracks/brown_noise.mp3', (req, res) => {
+  const filePath = path.join(__dirname, 'Sonic_Wellness_Journey__Super_Deep_Brown_Noise_Spectrum_For_Focus.mp3');
+  if (fs.existsSync(filePath)) {
+    res.sendFile(filePath);
+  } else {
+    res.status(404).send('Brown Noise track not found in root directory');
+  }
+});
+
 // Serve frontend build static files in production
 const DIST_DIR = path.join(__dirname, 'dist');
 if (fs.existsSync(DIST_DIR)) {

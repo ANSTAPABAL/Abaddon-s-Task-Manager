@@ -10,7 +10,7 @@ import { useAudio } from './hooks/useAudio';
 import { Settings as SettingsIcon, Volume2, VolumeX, Sliders } from 'lucide-react';
 
 export default function App() {
-  const { initAudio, setAtmosphereMood, playClick, setMuted, setVolume } = useAudio();
+  const { initAudio, setAtmosphereMood, playClick, playSuccess, setMuted, setVolume, setUseLocalDoublePlaylist, synthInstance } = useAudio();
   
   // App States
   const [activeTab, setActiveTab] = useState('escape'); // escape, character, planner, recovery
@@ -228,8 +228,15 @@ export default function App() {
   const [inputPort, setInputPort] = useState(3001);
 
   // Audio State
-  const [audioMuted, setAudioMuted] = useState(false);
-  const [audioVolume, setAudioVolume] = useState(0.5);
+  const [audioMuted, setAudioMuted] = useState(() => localStorage.getItem('default_muted') === 'true');
+  const [audioVolume, setAudioVolume] = useState(() => localStorage.getItem('default_volume') !== null ? Number(localStorage.getItem('default_volume')) : 0.5);
+  const [useLocalDoublePlaylist, setUseLocalDoublePlaylistState] = useState(() => localStorage.getItem('use_local_double_playlist') === 'true');
+
+  const handleToggleLocalDoublePlaylist = (val) => {
+    playClick();
+    setUseLocalDoublePlaylistState(val);
+    setUseLocalDoublePlaylist(val);
+  };
 
   // Spotify integration states
   const [spotifyToken, setSpotifyToken] = useState(() => localStorage.getItem('spotify_token') || '');
@@ -646,7 +653,7 @@ export default function App() {
         style={{
           position: 'fixed',
           top: '12px',
-          right: characterDrawerOpen ? '555px' : '15px',
+          right: characterDrawerOpen ? '695px' : '15px',
           zIndex: 1100,
           padding: '8px',
           borderRadius: '50%',
@@ -713,6 +720,38 @@ export default function App() {
                   style={{ flex: 1, accentColor: 'var(--color-blood)' }}
                 />
                 <span style={{ fontSize: '0.8rem', minWidth: '35px', textAlign: 'right' }}>{Math.round(audioVolume * 100)}%</span>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', marginTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-bone-dim)', marginBottom: '6px' }}>
+                    🎵 Фоновый Эмбиент:
+                  </label>
+                  <select 
+                    className="rpg-input"
+                    style={{ width: '100%', fontSize: '0.85rem', padding: '6px' }}
+                    value={useLocalDoublePlaylist ? 'double_mp3' : 'synth_drone'}
+                    onChange={(e) => handleToggleLocalDoublePlaylist(e.target.value === 'double_mp3')}
+                  >
+                    <option value="synth_drone">🔮 Процедурный синтезатор дрона Бездны</option>
+                    <option value="double_mp3">🎻 Fear & Hunger + Бурый Шум (Двойной Локальный Плейлист)</option>
+                  </select>
+                </div>
+
+                <button 
+                  className="rpg-btn rpg-btn-mana"
+                  style={{ width: '100%', fontSize: '0.8rem', padding: '6px 10px', marginTop: '4px', borderColor: 'var(--color-relic-glow)', color: 'var(--color-relic-glow)' }}
+                  onClick={() => {
+                    playSuccess();
+                    localStorage.setItem('default_muted', audioMuted ? 'true' : 'false');
+                    localStorage.setItem('default_volume', String(audioVolume));
+                    localStorage.setItem('default_ambience', synthInstance?.currentMood || 'quiet_focus');
+                    localStorage.setItem('use_local_double_playlist', useLocalDoublePlaylist ? 'true' : 'false');
+                    alert("Текущие настройки звука и выбранный эмбиент успешно сохранены как настройки по умолчанию!");
+                  }}
+                >
+                  💾 Сохранить звук как по умолчанию
+                </button>
               </div>
             </div>
 
@@ -792,8 +831,8 @@ export default function App() {
       {/* Sliding Main Content Wrapper */}
       <div style={{
         transition: 'margin-right 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), width 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)',
-        marginRight: characterDrawerOpen ? '540px' : '0px',
-        width: characterDrawerOpen ? 'calc(100% - 540px)' : '100%',
+        marginRight: characterDrawerOpen ? '680px' : '0px',
+        width: characterDrawerOpen ? 'calc(100% - 680px)' : '100%',
         minHeight: '100vh',
         display: 'flex',
         flexDirection: 'column'
@@ -1066,7 +1105,7 @@ export default function App() {
         style={{
           position: 'fixed',
           top: '50%',
-          right: characterDrawerOpen ? '480px' : '0px',
+          right: characterDrawerOpen ? '680px' : '0px',
           transform: 'translate(50%, -50%)',
           zIndex: 1100,
           width: '42px',
@@ -1094,7 +1133,7 @@ export default function App() {
         top: 0,
         right: 0,
         bottom: 0,
-        width: '540px',
+        width: '680px',
         maxWidth: '100%',
         height: '100%',
         background: 'linear-gradient(180deg, #151119 0%, #0c090e 100%)',
@@ -1380,7 +1419,7 @@ export default function App() {
         <div style={{
           position: 'fixed',
           bottom: '25px',
-          right: characterDrawerOpen ? '505px' : '25px',
+          right: characterDrawerOpen ? '705px' : '25px',
           width: '100px',
           height: '100px',
           borderRadius: '50%',

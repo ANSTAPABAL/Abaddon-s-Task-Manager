@@ -10,6 +10,36 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
   // Drag-and-drop state
   const [draggedTaskId, setDraggedTaskId] = useState(null);
 
+  // Sound, Date & Long Journey task bar states
+  const [taskDateOption, setTaskDateOption] = useState(new Date().toISOString().split('T')[0]);
+  const [customDateValue, setCustomDateValue] = useState('');
+  const [isLongJourney, setIsLongJourney] = useState(false);
+
+  const getTaskDateOptions = () => {
+    const options = [];
+    const today = new Date();
+    const weekdaysShortRU = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
+      const dateStr = d.toISOString().split('T')[0];
+      const dayNum = String(d.getDate()).padStart(2, '0');
+      const monthNum = String(d.getMonth() + 1).padStart(2, '0');
+      const formattedDate = `${dayNum}-${monthNum}`;
+      let label = '';
+      if (i === 0) label = `Сегодня (${formattedDate})`;
+      else if (i === 1) label = `Завтра (${formattedDate})`;
+      else {
+        const dayName = weekdaysShortRU[d.getDay()];
+        label = `${dayName} (${formattedDate})`;
+      }
+      options.push({ value: dateStr, label });
+    }
+    options.push({ value: 'backlog', label: 'В бэклог' });
+    options.push({ value: 'custom', label: 'Вписать свою дату...' });
+    return options;
+  };
+
   // --- DRAG-TO-SCROLL (MOUSE DRAG) FOR WEEKLY COLUMNS ---
   const scrollRef = useRef(null);
   const isDown = useRef(false);
@@ -469,12 +499,46 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
       barrierType: null,
       curseLevel: 0,
       steps: [],
-      intent: ''
+      intent: '',
+      isLongJourney: isLongJourney
     };
 
     setTasks(prev => [...prev, newTask]);
     setNewTaskTitle('');
+    const wasLong = isLongJourney;
+    setIsLongJourney(false); // reset
     playSuccess();
+
+    if (wasLong) {
+      // Immediately open edit modal
+      setEditingTask(newTask);
+      setEditTitle(title);
+      setEditType(initialType);
+      setEditTime(initialType === 'siege' ? 50 : 25);
+      setEditIntent('');
+      setEditSteps([]);
+      setNewStepText('');
+      setEditNature('external');
+      setEditExecutionMode('ask_later');
+
+      // Trigger Guided questions immediately
+      setGuidedStep(0);
+      setGuidedAnswers({});
+      setEditDeconstructLoading(true);
+      try {
+        const response = await requestDeconstruction({ title }, 'guided_questions');
+        setGuidedQuestions(response.questions || [
+          "Какая самая скучная деталь в этой задаче?",
+          "С чего физически проще всего начать?",
+          "Что именно вызывает у вас страх или ступор?"
+        ]);
+        setGuidedStep(1);
+      } catch (e) {
+        console.error("AI deconstruct failed:", e);
+      } finally {
+        setEditDeconstructLoading(false);
+      }
+    }
 
     // Background AI classification query
     try {
@@ -482,11 +546,16 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
       if (finalType && finalType !== initialType) {
         setTasks(prev => prev.map(t => {
           if (t.id === taskId) {
-            return {
+            const updated = {
               ...t,
               type: finalType,
               pomodoroTime: finalType === 'siege' ? 50 : 25
             };
+            if (wasLong) {
+              setEditType(finalType);
+              setEditTime(finalType === 'siege' ? 50 : 25);
+            }
+            return updated;
           }
           return t;
         }));
@@ -741,39 +810,85 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', minHeight: '80vh' }}>
       
-      {/* 1. Add Task Bar at Root */}
-      <div className="rpg-panel" style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center' }}>
-        <div style={{ flex: '1', minWidth: '250px' }}>
-          <input 
-            type="text" 
-            className="rpg-input" 
-            style={{ width: '100%', fontSize: '1rem' }} 
-            placeholder="Вбейте контракт (задачу)..." 
-            value={newTaskTitle}
-            onChange={(e) => setNewTaskTitle(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleCreateTask(new Date().toISOString().split('T')[0])}
-          />
-        </div>
-        
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <button 
-            className="rpg-btn rpg-btn-mana"
-            onClick={() => handleCreateTask(new Date().toISOString().split('T')[0])}
-            disabled={!newTaskTitle.trim()}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-          >
-            <Plus size={16} />
-            <span>ПРИБИТЬ К ДОГОВОРУ ДНЯ</span>
-          </button>
-        </div>
-      </div>
-
-      <div style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', paddingLeft: '0.5rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-        💡 <i>Дважды кликните по любой задаче, чтобы изменить её поля, намерение или переразбить ИИ.</i>
-      </div>
-
       {/* Exile's Journey Map Roadmap */}
       {renderJourneyMap()}
+
+      {/* 1. Add Task Bar now situated below Journey Map */}
+      <div className="rpg-panel" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', background: '#09080a', borderColor: '#3a2d21' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center' }}>
+          <div style={{ flex: '2', minWidth: '250px' }}>
+            <input 
+              type="text" 
+              className="rpg-input" 
+              style={{ width: '100%', fontSize: '1.1rem' }} 
+              placeholder="Вбейте задачу..." 
+              value={newTaskTitle}
+              onChange={(e) => setNewTaskTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  const targetDate = taskDateOption === 'backlog' ? null : (taskDateOption === 'custom' ? customDateValue.trim() || null : taskDateOption);
+                  handleCreateTask(targetDate);
+                }
+              }}
+            />
+          </div>
+
+          <div style={{ flex: '1', minWidth: '180px', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <select 
+              className="rpg-input"
+              style={{ width: '100%', fontSize: '0.9rem', cursor: 'pointer', height: '40px', padding: '0 8px' }}
+              value={taskDateOption}
+              onChange={(e) => setTaskDateOption(e.target.value)}
+            >
+              {getTaskDateOptions().map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+            
+            {taskDateOption === 'custom' && (
+              <input 
+                type="text" 
+                className="rpg-input animate-fade-in" 
+                style={{ width: '115px', fontSize: '0.85rem', height: '40px' }} 
+                placeholder="ГГГГ-ММ-ДД" 
+                value={customDateValue}
+                onChange={(e) => setCustomDateValue(e.target.value)}
+              />
+            )}
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.9rem', color: 'var(--color-bone-dim)' }}>
+              <input 
+                type="checkbox" 
+                checked={isLongJourney} 
+                onChange={(e) => setIsLongJourney(e.target.checked)} 
+                style={{ width: '18px', height: '18px', accentColor: 'var(--color-blood)', cursor: 'pointer' }} 
+              />
+              <span>Длительное путешествие</span>
+            </label>
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.5rem', marginLeft: 'auto' }}>
+            <button 
+              className="rpg-btn rpg-btn-mana"
+              onClick={() => {
+                const targetDate = taskDateOption === 'backlog' ? null : (taskDateOption === 'custom' ? customDateValue.trim() || null : taskDateOption);
+                handleCreateTask(targetDate);
+              }}
+              disabled={!newTaskTitle.trim()}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', height: '40px', padding: '0 15px' }}
+            >
+              <Plus size={16} />
+              <span>ПРИБИТЬ К ДОГОВОРУ ДНЯ</span>
+            </button>
+          </div>
+        </div>
+
+        <div style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', paddingLeft: '0.5rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+          💡 <i>Дважды кликните по любой задаче, чтобы изменить её поля, намерение или переразбить ИИ.</i>
+        </div>
+      </div>
 
       {/* 1.5. Ritual Alert Notification */}
       {ritualMessage && (

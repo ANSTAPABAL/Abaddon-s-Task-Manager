@@ -180,6 +180,7 @@ export default function CarriageSession({
   // Exile/Setup Phase Stage: 'lore' -> 'hub' -> 'input' -> 'review' -> 'crash' -> 'active'
   const [setupStage, setSetupStage] = useState('lore'); 
   const [parsedList, setParsedList] = useState([]);
+  const [reviewIndex, setReviewIndex] = useState(0);
   
   // "Write to Survive" States
   const [survivalInput, setSurvivalInput] = useState('');
@@ -218,8 +219,8 @@ export default function CarriageSession({
   const [meditationPhase, setMeditationPhase] = useState('inhale'); // inhale (4s), hold-in (4s), exhale (4s), hold-out (4s)
   const [meditationPulseCounter, setMeditationPulseCounter] = useState(0);
   const [meditationSelectOpen, setMeditationSelectOpen] = useState(false);
-  const [selectedMeditationType, setSelectedMeditationType] = useState('breathing');
-  const [meditationType, setMeditationType] = useState('breathing');
+  const [selectedMeditationType, setSelectedMeditationType] = useState('stretch');
+  const [meditationType, setMeditationType] = useState('stretch');
 
   // Система Перерывов и НПС-Встреч (Break Events)
   const sessionElapsedRef = useRef(0);
@@ -619,10 +620,49 @@ export default function CarriageSession({
     playClick();
     try {
       const result = await parseMessyTasks(messyText);
-      setParsedList(result);
+      // Initialize with isLongJourney defaults
+      const mapped = result.map(t => ({ ...t, isLongJourney: false }));
+      setParsedList(mapped);
+      setReviewIndex(0);
       setSetupStage('review');
     } catch (e) {
       alert("Не удалось связаться с Бездной (AI Tunnel): " + e.message);
+    } finally {
+      setLoadingAI(false);
+    }
+  };
+
+  const handleDetailedDeconstruction = async () => {
+    if (!parsedList[reviewIndex]) return;
+    const currentCard = parsedList[reviewIndex];
+    setLoadingAI(true);
+    playClick();
+    try {
+      const prompt = `Ты — Бездна во вселенной Абаддона. Разложи задачу «${currentCard.title}» на 5-8 максимально мелких, понятных физических микро-шагов, чтобы человек с СДВГ мог приступить к ней без паники и ступора. Текущие шаги: ${currentCard.steps ? currentCard.steps.join(', ') : 'нет'}. Выведи ответ строго в формате JSON: { "steps": ["микро-шаг 1", "микро-шаг 2", ...] }`;
+      
+      const response = await fetch('http://localhost:3001/api/ai/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: [{ role: 'user', content: prompt }] })
+      });
+      if (!response.ok) throw new Error('AI Tunnel offline');
+      const data = await response.json();
+      let cleanedText = data.choices[0].message.content.trim();
+      if (cleanedText.startsWith("```json")) cleanedText = cleanedText.slice(7);
+      if (cleanedText.endsWith("```")) cleanedText = cleanedText.slice(0, -3);
+      const parsed = JSON.parse(cleanedText.trim());
+      
+      if (parsed.steps) {
+        setParsedList(prev => prev.map((item, idx) => {
+          if (idx === reviewIndex) {
+            return { ...item, steps: parsed.steps };
+          }
+          return item;
+        }));
+        playSuccess();
+      }
+    } catch (e) {
+      alert("Не удалось детализировать шаги: " + e.message);
     } finally {
       setLoadingAI(false);
     }
@@ -653,6 +693,7 @@ export default function CarriageSession({
         toxicity: t.toxicity || 'standard',
         barrierType: null,
         curseLevel: 0,
+        isLongJourney: t.isLongJourney || false,
         steps: t.steps ? t.steps.map((s, sIdx) => ({ id: `step-${sIdx}-${Date.now()}`, title: s, completed: false })) : [],
         intent: t.intent || '',
         combatLore: {
@@ -1119,7 +1160,7 @@ export default function CarriageSession({
   const renderMeditationSelect = () => {
     if (!meditationSelectOpen) return null;
     return (
-      <div className="break-event-overlay animate-fade-in" style={{ zIndex: 3000 }}>
+      <div className="break-event-overlay animate-fade-in" style={{ zIndex: 9999 }}>
         <div className="break-event-card" style={{ borderColor: 'var(--color-relic-glow)', maxWidth: '550px', padding: '2rem' }}>
           <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
             <span style={{ fontSize: '3rem' }}>🎪</span>
@@ -1133,11 +1174,14 @@ export default function CarriageSession({
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', marginBottom: '1.5rem' }}>
             {[
-              { id: 'breathing', label: '💨 Дыхательное упражнение (4-7-8)', desc: 'Синхронизация вдохов и задержек дыхания для насыщения мозга кислородом.' },
-              { id: 'mental', label: '🧘 Медитация Бездны', desc: 'Сидение в абсолютной тишине, созерцание мыслей без вовлечения.' },
-              { id: 'walk', label: '🚶 Вылазка по комнате', desc: 'Встаньте, сходите за водой, разомнитесь, посмотрите в окно.' },
-              { id: 'stretch', label: '🤸 Разминка и растяжка', desc: 'Снятие мышечного тонуса: повращайте шеей, плечами, потянитесь.' },
-              { id: 'expander', label: '✊ Пожамкать эспандер / мячик', desc: 'Сброс моторной ADHD-энергии через физическое сжатие.' }
+              { id: 'stretch', label: '🤸 Разминка суставов', desc: 'Снятие оков застоя и потягивания. Повращайте плечами, наклоните голову, потянитесь.' },
+              { id: 'walk', label: '🚶 Походить по комнате', desc: 'Вылазка из-за стола, смена обстановки. Сделайте круг по комнате, переключите внимание.' },
+              { id: 'mental', label: '🧘 Медитация Бездны', desc: 'Созерцание тишины и мыслей со стороны. Отпустите все думы, слушая дыхание.' },
+              { id: 'expander', label: '✊ Пожамкать эспандер', desc: 'Высвобождение хаотичной моторной энергии. Сжимайте эспандер или антистресс-игрушку.' },
+              { id: 'breathing', label: '🌬️ Подышать глубоко', desc: 'Очищение разума кислородом. Дыхательный ритуал Бездны (вдох, задержка, выдох 4-7-8).' },
+              { id: 'look_around', label: '👀 Посмотреть в стороны', desc: 'Гимнастика для глаз. Отведите взгляд от экрана, сфокусируйтесь на дальних объектах.' },
+              { id: 'wash_face', label: '🧊 Умыться холодной водой', desc: 'Обряд ледяного пробуждения чувств. Верните фокус и бодрость холодной струей.' },
+              { id: 'drink_water', label: '💧 Попить свежей воды', desc: 'Глоток кристальной влаги для ясности ума. Напитайте разум живительной влагой.' }
             ].map(act => (
               <div 
                 key={act.id} 
@@ -1471,22 +1515,31 @@ export default function CarriageSession({
           /* Alternate physical activities guide */
           <div style={{ margin: '2rem auto', textAlign: 'center' }}>
             <div className="heartbeat-pulse" style={{ fontSize: '5rem', marginBottom: '1rem', filter: 'drop-shadow(0 0 15px var(--color-relic-glow))' }}>
-              {meditationType === 'mental' && "🧘"}
-              {meditationType === 'walk' && "🚶"}
               {meditationType === 'stretch' && "🤸"}
+              {meditationType === 'walk' && "🚶"}
+              {meditationType === 'mental' && "🧘"}
               {meditationType === 'expander' && "✊"}
+              {meditationType === 'look_around' && "👀"}
+              {meditationType === 'wash_face' && "🧊"}
+              {meditationType === 'drink_water' && "💧"}
             </div>
             <h3 style={{ fontSize: '1.25rem', color: '#fff', marginBottom: '0.5rem', fontFamily: 'var(--font-rpg)' }}>
-              {meditationType === 'mental' && "Медитация Бездны: созерцание тишины"}
-              {meditationType === 'walk' && "Вылазка по комнате: разомните ноги, посмотрите в окно"}
               {meditationType === 'stretch' && "Разминка суставов: расправьте плечи и потянитесь"}
+              {meditationType === 'walk' && "Вылазка по комнате: разомните ноги, посмотрите в окно"}
+              {meditationType === 'mental' && "Медитация Бездны: созерцание тишины"}
               {meditationType === 'expander' && "Эспандер: пожамкайте антистресс-мяч или эспандер"}
+              {meditationType === 'look_around' && "Посмотреть в стороны: гимнастика для глаз"}
+              {meditationType === 'wash_face' && "Умыться: обряд ледяного пробуждения чувств"}
+              {meditationType === 'drink_water' && "Попить воды: глоток живительной ясности разума"}
             </h3>
             <p style={{ color: 'var(--color-bone-dim)', fontSize: '0.85rem', maxWidth: '400px', margin: '0 auto', lineHeight: '1.4' }}>
-              {meditationType === 'mental' && "Отпустите все мысли, как плывущие облака. Не концентрируйтесь на них, просто слушайте тишину Бездны."}
-              {meditationType === 'walk' && "Встаньте со стула, сделайте круг по комнате, посмотрите вдаль в окно. Налейте стакан прохладной воды."}
               {meditationType === 'stretch' && "Сделайте глубокие круговые движения плечами, наклоните голову, потяните руки вверх. Снимите зажимы."}
+              {meditationType === 'walk' && "Встаньте со стула, сделайте круг по комнате, посмотрите вдаль в окно. Налейте стакан прохладной воды."}
+              {meditationType === 'mental' && "Отпустите все мысли, как плывущие облака. Не концентрируйтесь на них, просто слушайте тишину Бездны."}
               {meditationType === 'expander' && "Сжимайте эспандер или антистресс-игрушку. Выпустите физическое напряжение и накопившийся стресс."}
+              {meditationType === 'look_around' && "Отведите взор от свитка. Посмотрите влево, вправо, вверх, вниз, а затем сфокусируйтесь на дальнем объекте."}
+              {meditationType === 'wash_face' && "Сделайте паузу, омойте лицо холодной влагой. Ледяное прикосновение мгновенно развеет сонные чары Бездны."}
+              {meditationType === 'drink_water' && "Выпейте стакан чистой прохладной воды медленными глотками. Вода вернет тонус вашему телу и уму."}
             </p>
           </div>
         )}
@@ -1572,11 +1625,11 @@ export default function CarriageSession({
               🎪 Войти в Лагерь (Медитация)
             </button>
             <button 
-              className="rpg-btn rpg-btn-blood" 
+              className="rpg-btn" 
               style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}
               onClick={() => setSetupStage('input')}
             >
-              🔮 Сплести хаос (AI Текстовый дамп)
+              🔮 Сплести хаос
             </button>
           </div>
         </div>
@@ -1736,9 +1789,8 @@ export default function CarriageSession({
             К ВОЕННОМУ ШТАБУ
           </button>
         </div>
-        <p style={{ fontSize: '0.9rem', color: 'var(--color-bone-dim)', marginBottom: '1.5rem' }}>
-          Вывалите сюда абсолютно все дела, которые вертятся в голове комом. Бессвязно, хаотично, эмоционально. 
-          DeepSeek v4 Flash структурирует этот хаос, оценит «токсичность» каждой задачи и распределит их по типам (Охота, Осады, Реликвии).
+        <p style={{ fontSize: '0.95rem', color: 'var(--color-bone-dim)', marginBottom: '1.5rem', fontFamily: 'Georgia, serif', lineHeight: '1.5', fontStyle: 'italic' }}>
+          «Ввергните в этот омут все помыслы и заботы, что терзают ваш разум черным комом. Бессвязно, хаотично, со всей яростью и отчаянием. Бездна Абаддона внемлет этому шепоту, взвесит скверну каждого деяния и разделит их по законам Пути (Охота, Осады, Реликвии).»
         </p>
 
         <textarea
@@ -1771,63 +1823,139 @@ export default function CarriageSession({
   }
 
   if (setupStage === 'review') {
+    if (!parsedList || parsedList.length === 0) {
+      return (
+        <div className="rpg-panel" style={{ maxWidth: '800px', margin: '1rem auto', textAlign: 'center', padding: '3rem' }}>
+          <p style={{ color: 'var(--color-bone-dim)' }}>В омуте хаоса ничего не найдено...</p>
+          <button className="rpg-btn" onClick={() => setSetupStage('input')}>Назад</button>
+        </div>
+      );
+    }
+
+    const currentCard = parsedList[reviewIndex];
+    const isLastCard = reviewIndex >= parsedList.length - 1;
+
     return (
-      <div className="rpg-panel" style={{ maxWidth: '800px', margin: '1rem auto' }}>
-        <h2 className="gothic-title" style={{ fontSize: '1.5rem', marginBottom: '0.5rem', color: 'var(--color-bone)' }}>
-          Одобрить Пакт Задач
+      <div className="rpg-panel" style={{ maxWidth: '650px', margin: '1rem auto', padding: '2rem' }}>
+        <h2 className="gothic-title" style={{ fontSize: '1.4rem', marginBottom: '0.3rem', color: 'var(--color-bone)', textAlign: 'center' }}>
+          Одобрить Пакт Задач ({reviewIndex + 1} из {parsedList.length})
         </h2>
-        <p style={{ fontSize: '0.85rem', color: 'var(--color-bone-dim)', marginBottom: '1.5rem' }}>
-          AI разложил ваш хаос по сущностям вселенной Абаддона. Проверьте их перед стартом аварийного побега.
+        <p style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)', marginBottom: '1.5rem', textAlign: 'center' }}>
+          Проверьте контракт перед вступлением в бой. Настройте детальность и определите глубину пути.
         </p>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
-          {parsedList.map((t, idx) => (
-            <div key={idx} style={{
-              background: 'rgba(0,0,0,0.3)',
-              border: `1px solid var(--color-iron-light)`,
-              borderLeft: `4px solid ${t.type === 'siege' ? 'var(--color-blood)' : t.type === 'relic' ? 'var(--color-relic)' : 'var(--color-bone)'}`,
-              padding: '1rem'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
-                <b style={{ color: '#fff', fontSize: '1.05rem' }}>{t.title}</b>
-                <span style={{ 
-                  fontSize: '0.75rem', 
-                  padding: '2px 8px', 
-                  background: t.type === 'siege' ? 'rgba(139,26,26,0.2)' : 'rgba(255,255,255,0.05)',
-                  color: t.type === 'siege' ? 'var(--color-blood-glow)' : 'var(--color-bone-dim)',
-                  border: `1px solid ${t.type === 'siege' ? 'var(--color-blood)' : 'var(--color-iron-light)'}`
-                }}>
-                  {t.type === 'siege' ? '💥 ОСАДА (БОСС)' : t.type === 'relic' ? '💎 РЕЛИКВИЯ' : t.type === 'corpse' ? '💀 ТРУП ПРОШЛОГО' : '🏹 ОХОТА'}
+        {loadingAI ? (
+          <div style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid var(--color-iron-light)', padding: '3rem', textAlign: 'center' }}>
+            <RefreshCw className="heartbeat-pulse fast" style={{ color: 'var(--color-mana-glow)', marginBottom: '1rem' }} size={32} />
+            <p style={{ fontFamily: 'var(--font-rpg)' }}>Бездна шепчет заклинания... Идет разделение шагов...</p>
+          </div>
+        ) : (
+          <div style={{
+            background: 'radial-gradient(circle, rgba(25, 20, 30, 0.85) 0%, rgba(12, 10, 15, 0.95) 100%)',
+            border: `2px solid ${currentCard.type === 'siege' ? 'var(--color-blood-glow)' : 'var(--color-iron-light)'}`,
+            padding: '1.5rem',
+            boxShadow: currentCard.type === 'siege' ? '0 0 15px rgba(139, 26, 26, 0.3)' : '0 5px 15px rgba(0,0,0,0.5)',
+            marginBottom: '1.5rem',
+            position: 'relative'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.8rem' }}>
+              <b style={{ color: '#fff', fontSize: '1.15rem' }}>{currentCard.title}</b>
+              <span style={{ 
+                fontSize: '0.72rem', 
+                padding: '2px 8px', 
+                background: currentCard.type === 'siege' ? 'rgba(139,26,26,0.2)' : 'rgba(255,255,255,0.05)',
+                color: currentCard.type === 'siege' ? 'var(--color-blood-glow)' : 'var(--color-bone-dim)',
+                border: `1px solid ${currentCard.type === 'siege' ? 'var(--color-blood)' : 'var(--color-iron-light)'}`
+              }}>
+                {currentCard.type === 'siege' ? '💥 ОСАДА' : currentCard.type === 'relic' ? '💎 РЕЛИКВИЯ' : currentCard.type === 'corpse' ? '💀 ДОЛГ' : '🏹 ОХОТА'}
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', fontSize: '0.8rem', color: 'var(--color-bone-dim)', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.8rem', marginBottom: '0.8rem' }}>
+              <span>Время: <b>{currentCard.estimatedTime || 25} мин</b></span>
+              {currentCard.toxicity && (
+                <span style={{ color: 'var(--color-blood-glow)' }}>
+                  Токсичность: <b>{currentCard.toxicity === 'scary' ? 'Страшно' : currentCard.toxicity === 'vague' ? 'Мутно' : currentCard.toxicity === 'tedious' ? 'Скучно' : 'Стандарт'}</b>
                 </span>
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', fontSize: '0.8rem', color: 'var(--color-bone-dim)' }}>
-                <span>Время: <b>{t.estimatedTime || 25} мин</b></span>
-                {t.toxicity && (
-                  <span style={{ color: 'var(--color-blood-glow)' }}>
-                    Токсичность: <b>{t.toxicity === 'scary' ? 'Страшно' : t.toxicity === 'vague' ? 'Мутно' : t.toxicity === 'tedious' ? 'Скучно' : 'Стандарт'}</b>
-                  </span>
-                )}
-              </div>
-              {t.steps && t.steps.length > 0 && (
-                <div style={{ marginTop: '0.5rem', paddingLeft: '1rem', borderLeft: '1px dashed var(--color-iron-light)' }}>
-                  {t.steps.map((s, sIdx) => (
-                    <div key={sIdx} style={{ fontSize: '0.85rem', color: 'var(--color-bone-dim)', marginTop: '2px' }}>
-                      • {s}
-                    </div>
-                  ))}
-                </div>
               )}
             </div>
-          ))}
-        </div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            {/* Steps Section */}
+            <h4 style={{ fontSize: '0.85rem', color: 'var(--color-bone)', marginBottom: '6px', fontFamily: 'var(--font-rpg)' }}>Шаги прорыва:</h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '1.2rem', paddingLeft: '0.5rem', borderLeft: '1px dashed var(--color-iron-light)' }}>
+              {currentCard.steps && currentCard.steps.map((s, sIdx) => (
+                <div key={sIdx} style={{ fontSize: '0.85rem', color: 'var(--color-bone-dim)' }}>
+                  • {s}
+                </div>
+              ))}
+              {(!currentCard.steps || currentCard.steps.length === 0) && (
+                <div style={{ fontStyle: 'italic', color: 'var(--color-iron-light)', fontSize: '0.8rem' }}>Нет шагов. Нажмите кнопку ниже для авто-расширения.</div>
+              )}
+            </div>
+
+            {/* Interactive Options inside single card */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem', alignItems: 'center', justifyContent: 'space-between' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.85rem', color: 'var(--color-bone-dim)' }}>
+                <input 
+                  type="checkbox" 
+                  checked={currentCard.isLongJourney || false} 
+                  onChange={(e) => {
+                    const isChecked = e.target.checked;
+                    setParsedList(prev => prev.map((item, idx) => idx === reviewIndex ? { ...item, isLongJourney: isChecked } : item));
+                  }} 
+                  style={{ width: '16px', height: '16px', accentColor: 'var(--color-blood)', cursor: 'pointer' }} 
+                />
+                <span>Длительное путешествие</span>
+              </label>
+
+              <button 
+                className="rpg-btn" 
+                style={{ fontSize: '0.75rem', padding: '3px 8px', borderColor: 'var(--color-mana-glow)' }}
+                onClick={handleDetailedDeconstruction}
+                disabled={loadingAI}
+              >
+                🔮 Нужны более подробные шаги
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', marginTop: '1.5rem' }}>
           <button className="rpg-btn" onClick={() => setSetupStage('input')}>
             ВЕРНУТЬСЯ
           </button>
-          <button className="rpg-btn rpg-btn-blood" style={{ padding: '0.75rem 2.5rem' }} onClick={handleStartCrashSequence}>
-            НАЧАТЬ ПУТЕШЕСТВИЕ
-          </button>
+          
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button 
+              className="rpg-btn rpg-btn-blood"
+              style={{ fontSize: '0.8rem', padding: '4px 10px' }}
+              onClick={() => {
+                playClick();
+                const updated = parsedList.filter((_, idx) => idx !== reviewIndex);
+                setParsedList(updated);
+                if (reviewIndex >= updated.length && reviewIndex > 0) {
+                  setReviewIndex(reviewIndex - 1);
+                }
+              }}
+            >
+              Отклонить карту
+            </button>
+
+            <button 
+              className="rpg-btn rpg-btn-mana" 
+              style={{ padding: '0.75rem 2rem', fontWeight: 'bold' }} 
+              onClick={() => {
+                if (isLastCard) {
+                  handleStartCrashSequence();
+                } else {
+                  playClick();
+                  setReviewIndex(reviewIndex + 1);
+                }
+              }}
+            >
+              {isLastCard ? "НАЧАТЬ ПУТЕШЕСТВИЕ" : "ОДОБРИТЬ КОНТРАКТ"}
+            </button>
+          </div>
         </div>
       </div>
     );
