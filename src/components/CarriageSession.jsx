@@ -174,7 +174,9 @@ export default function CarriageSession({
   playActiveSessionTrack,
   generateRedemptionEulogy,
   pedestals = [],
-  savePedestals
+  savePedestals,
+  requestTaskExecutionModeSelect,
+  communeWithSpirits
 }) {
   const { playClick, playBoneCrack, playSuccess, startHeartbeat, stopHeartbeat, setAtmosphereMood } = useAudio();
   const [messyText, setMessyText] = useState('');
@@ -270,6 +272,57 @@ export default function CarriageSession({
     } finally {
       setResolutionLoading(false);
     }
+  };
+
+  // Track running state in localStorage
+  useEffect(() => {
+    localStorage.setItem('combat_is_running', isRunning ? 'true' : 'false');
+  }, [isRunning]);
+
+  // Unmount cleanup: Save time and release indicators
+  useEffect(() => {
+    return () => {
+      if (setupStage === 'active' && activeTask) {
+        const storedTime = localStorage.getItem('combat_time_left');
+        const finalTime = storedTime !== null ? Number(storedTime) : timeLeft;
+        setTasks(prev => prev.map(t => t.id === activeTask.id ? { ...t, timeLeft: finalTime } : t));
+        localStorage.removeItem('active_task_id');
+        localStorage.removeItem('combat_time_left');
+        localStorage.setItem('combat_is_running', 'false');
+      }
+    };
+  }, [setupStage, activeTask, timeLeft, setTasks]);
+
+  // Visibility tab auto-pause
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        setIsRunning(false);
+        localStorage.setItem('combat_is_running', 'false');
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
+
+  const handleRetreatToHub = () => {
+    playClick();
+    if (activeTask && activeTask.executionMode === 'timer') {
+      if (!window.confirm("Вы собираетесь временно отступить в штаб. Оставшееся время таймера будет сохранено. Продолжить?")) {
+        return;
+      }
+    }
+    setIsRunning(false);
+    localStorage.setItem('combat_is_running', 'false');
+
+    if (activeTask) {
+      setTasks(prev => prev.map(t => t.id === activeTask.id ? { ...t, timeLeft: timeLeft } : t));
+    }
+
+    localStorage.removeItem('active_task_id');
+    localStorage.removeItem('combat_time_left');
+    setActiveTask(null);
+    setSetupStage('hub');
   };
 
   // --- LEGACY LEGEND & WIN CONDITION FUNCTIONS ---
@@ -494,6 +547,9 @@ export default function CarriageSession({
       "Маг огня и камня (Мультикласс)", "Маг молнии и земли (Мультикласс)",
       "Некромант", "Рунный маг", "Маг света", "Маг тьмы", "Маг бездны",
       "Дикий Рыцарь", "Наемник Военной Банды", "Бывший Рыцарь", "Рыцарь-Убийца",
+      "Рыцарь Чумной Стали", "Отреченный Паладин",
+      "Мятежник Изгоев (Бандит)", "Головорез Чумных Земель (Бандит)",
+      "Каратель Багрового Ордена", "Храмовник Пепла",
       "Маг меток (Сфрагист) [РЕДКОЕ]",
       "Химомансер (Маг крови) [РЕДКОЕ]",
       "Ментальный Суверен (Телекинетик) [УЛЬТРА-РЕДКОЕ]",
@@ -516,6 +572,12 @@ export default function CarriageSession({
       "Наемник Военной Банды": ["Круговой замах", "Боевой клич"],
       "Бывший Рыцарь": ["Забытая присяга", "Парирование клинком"],
       "Рыцарь-Убийца": ["Смертельный выпад", "Яд на лезвии"],
+      "Рыцарь Чумной Стали": ["Ржавый замах", "Сгнивший барьер"],
+      "Отреченный Паладин": ["Оскверненная клятва", "Слепое неистовство"],
+      "Мятежник Изгоев (Бандит)": ["Нож в спину", "Коварная уловка"],
+      "Головорез Чумных Земель (Бандит)": ["Чумной клинок", "Грабёж допамина"],
+      "Каратель Багрового Ордена": ["Багровый допрос", "Священная плеть"],
+      "Храмовник Пепла": ["Карающий пепел", "Завеса пепла"],
       "Маг меток (Сфрагист) [РЕДКОЕ]": ["Метка слабости", "Печать отсечения"],
       "Химомансер (Маг крови) [РЕДКОЕ]": ["Жертва крови (HP -> Мгновенный шаг)", "Сгущение скверны"],
       "Ментальный Суверен (Телекинетик) [УЛЬТРА-РЕДКОЕ]": ["Телекинетический щит", "Подчинение воли", "Голос принуждения"],
@@ -655,7 +717,7 @@ export default function CarriageSession({
   // Active Session Focus Timer & Fatigue accumulation & Ticking Combat Damage
   useEffect(() => {
     let timer = null;
-    if (setupStage === 'active' && isRunning && timeLeft > 0 && !meditationActive) {
+    if (setupStage === 'active' && isRunning && timeLeft > 0 && !meditationActive && activeTask?.executionMode !== 'day') {
       timer = setInterval(() => {
         setTimeLeft(prev => {
           const nextTime = prev - 1;
@@ -700,11 +762,11 @@ export default function CarriageSession({
           return nextTime;
         });
       }, 1000);
-    } else if (timeLeft === 0 && isRunning) {
+    } else if (timeLeft === 0 && isRunning && activeTask?.executionMode !== 'day') {
       handleWinActiveSession(activeTask);
     }
     return () => clearInterval(timer);
-  }, [setupStage, isRunning, timeLeft, meditationActive]);
+  }, [setupStage, isRunning, timeLeft, meditationActive, activeTask]);
 
   // Timed Meditation Recovery Timer Loop
   useEffect(() => {
@@ -1377,6 +1439,13 @@ export default function CarriageSession({
               🎪 Войти в Лагерь (Медитация)
             </button>
             <button 
+              className="rpg-btn rpg-btn-mana" 
+              style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px', boxShadow: '0 0 8px rgba(0, 191, 255, 0.3)' }}
+              onClick={communeWithSpirits}
+            >
+              🧿 Обратиться к духам (Совет ИИ)
+            </button>
+            <button 
               className="rpg-btn rpg-btn-blood" 
               style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}
               onClick={() => setSetupStage('input')}
@@ -1442,9 +1511,33 @@ export default function CarriageSession({
                   }}
                 >
                   <div style={{ flex: 1, minWidth: '220px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                       <span style={{ fontSize: '1.25rem' }}>{variation.icon}</span>
-                      <h4 style={{ fontSize: '1.1rem', color: '#fff', fontWeight: 'bold' }}>{task.title}</h4>
+                      <h4 style={{ fontSize: '1.1rem', color: '#fff', fontWeight: 'bold', margin: 0 }}>{task.title}</h4>
+                      
+                      <span style={{ 
+                        fontSize: '0.65rem', 
+                        color: task.nature === 'internal' ? '#4fc3f7' : '#ff8a80', 
+                        background: 'rgba(0,0,0,0.4)', 
+                        padding: '1px 5px', 
+                        borderRadius: '3px',
+                        border: `1px solid ${task.nature === 'internal' ? 'rgba(79, 195, 247, 0.25)' : 'rgba(255, 138, 128, 0.25)'}` 
+                      }}>
+                        {task.nature === 'internal' ? '🧿 Внутренний Обет' : '⚔️ Внешняя Схватка'}
+                        {task.combatLore?.visualType ? ` (${task.combatLore.visualType})` : ''}
+                      </span>
+                      {task.executionMode && task.executionMode !== 'ask_later' && (
+                        <span style={{
+                          fontSize: '0.65rem',
+                          color: 'var(--color-bone-dim)',
+                          background: 'rgba(0,0,0,0.4)',
+                          padding: '1px 5px',
+                          borderRadius: '3px',
+                          border: '1px solid rgba(255, 255, 255, 0.1)'
+                        }}>
+                          {task.executionMode === 'timer' ? '⏳ Таймер' : '🌅 В течение дня'}
+                        </span>
+                      )}
                     </div>
                     
                     <div style={{ fontSize: '0.78rem', color: 'var(--color-bone-dim)', marginTop: '4px' }}>
@@ -1463,18 +1556,31 @@ export default function CarriageSession({
                     style={{ padding: '0.6rem 1.8rem', fontSize: '0.9rem' }}
                     onClick={() => {
                       playClick();
-                      setActiveTask(task);
-                      setTimeLeft(task.pomodoroTime * 60);
-                      setSessionSteps(task.steps || []);
-                      setSetupStage('active');
-                      generateCombatEncounter(task);
-                      localStorage.setItem('active_task_id', task.id);
-                      localStorage.setItem('combat_time_left', task.pomodoroTime * 60);
-                      setAtmosphereMood(task.type === 'siege' ? 'siege' : 'hunt');
-                      if (playActiveSessionTrack) playActiveSessionTrack(task.type === 'siege' ? 'siege' : 'hunt');
+                      const runStart = (mode) => {
+                        setActiveTask(task);
+                        const initialTime = task.timeLeft !== undefined ? task.timeLeft : task.pomodoroTime * 60;
+                        setTimeLeft(initialTime);
+                        setSessionSteps(task.steps || []);
+                        setSetupStage('active');
+                        generateCombatEncounter(task);
+                        localStorage.setItem('active_task_id', task.id);
+                        localStorage.setItem('combat_time_left', initialTime);
+                        localStorage.setItem('combat_is_running', mode === 'timer' ? 'true' : 'false');
+                        setIsRunning(mode === 'timer');
+                        setAtmosphereMood(task.type === 'siege' ? 'siege' : 'hunt');
+                        if (playActiveSessionTrack) playActiveSessionTrack(task.type === 'siege' ? 'siege' : 'hunt');
+                      };
+
+                      if (!task.executionMode || task.executionMode === 'ask_later') {
+                        requestTaskExecutionModeSelect(task, (chosenMode) => {
+                          runStart(chosenMode);
+                        });
+                      } else {
+                        runStart(task.executionMode);
+                      }
                     }}
                   >
-                    ⚔️ ВСТУПИТЬ В БОЙ
+                    {task.timeLeft !== undefined ? `⚔️ ВОЗОБНОВИТЬ БОЙ (${Math.ceil(task.timeLeft / 60)} мин)` : '⚔️ ВСТУПИТЬ В БОЙ'}
                   </button>
                 </div>
               );
@@ -1739,9 +1845,15 @@ export default function CarriageSession({
               </div>
 
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '2.5rem', fontFamily: 'var(--font-rpg)', color: isRunning ? '#fff' : 'var(--color-bone-dim)' }}>
-                  {formatTime(timeLeft)}
-                </div>
+                {activeTask.executionMode === 'day' ? (
+                  <div style={{ fontSize: '1.1rem', fontFamily: 'var(--font-rpg)', color: '#1db954', border: '1px solid rgba(29,185,84,0.3)', padding: '4px 10px', background: 'rgba(0,0,0,0.3)', borderRadius: '4px' }}>
+                    🌅 СВОБОДНЫЙ ПЕРЕХОД
+                  </div>
+                ) : (
+                  <div style={{ fontSize: '2.5rem', fontFamily: 'var(--font-rpg)', color: isRunning ? '#fff' : 'var(--color-bone-dim)' }}>
+                    {formatTime(timeLeft)}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1787,13 +1899,37 @@ export default function CarriageSession({
             </div>
 
             {/* Controls */}
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {activeTask.executionMode === 'day' ? (
+                <div style={{
+                  padding: '0.75rem',
+                  background: 'rgba(29, 185, 84, 0.1)',
+                  border: '1px dashed #1db954',
+                  textAlign: 'center',
+                  fontFamily: 'var(--font-rpg)',
+                  color: '#1db954',
+                  fontSize: '0.85rem',
+                  borderRadius: '4px',
+                  lineHeight: '1.4'
+                }}>
+                  🌅 Свободный Переход (без урона и таймера). Нажимайте на фазы ниже по мере их завершения!
+                </div>
+              ) : (
+                <button 
+                  className={`rpg-btn ${isRunning ? 'rpg-btn-blood' : 'rpg-btn-mana'}`} 
+                  style={{ flex: 1, fontSize: '1.1rem', padding: '0.75rem' }} 
+                  onClick={toggleTimer}
+                >
+                  {isRunning ? "⏸ ПРИОСТАНОВИТЬ БИТВУ" : "⚔ НАЧАТЬ СХВАТКУ"}
+                </button>
+              )}
+
               <button 
-                className={`rpg-btn ${isRunning ? 'rpg-btn-blood' : 'rpg-btn-mana'}`} 
-                style={{ flex: 1, fontSize: '1.1rem', padding: '0.75rem' }} 
-                onClick={toggleTimer}
+                className="rpg-btn" 
+                style={{ flex: 1, fontSize: '1rem', padding: '0.6rem', borderColor: 'var(--color-iron-light)', marginTop: '0.25rem' }} 
+                onClick={handleRetreatToHub}
               >
-                {isRunning ? "⏸ ПРИОСТАНОВИТЬ БИТВУ" : "⚔ НАЧАТЬ СХВАТКУ"}
+                🛡️ ОТСТУПИТЬ В ШТАБ (ПАУЗА)
               </button>
             </div>
           </div>
@@ -2104,6 +2240,85 @@ export default function CarriageSession({
                       <button className="skill-btn" style={{ borderColor: '#228b22' }} onClick={() => castClassSkill("Яд на лезвии", "mana", 8, 20, "stone")}>
                         <span>🧪 Яд на лезвии</span>
                         <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>8 MP • 20 Урона</span>
+                      </button>
+                    </>
+                  )}
+
+                  {/* New Grim-Dark Subclass Skills */}
+                  {character.class.includes("Мятежник Изгоев (Бандит)") && (
+                    <>
+                      <button className="skill-btn special" onClick={() => castClassSkill("Нож в спину", "mana", 8, 24, "shiver")}>
+                        <span>🗡️ Нож в спину</span>
+                        <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>8 MP • 24 Урона</span>
+                      </button>
+                      <button className="skill-btn" onClick={() => castClassSkill("Коварная уловка", "mana", 6, 16, "stone")}>
+                        <span>🎭 Коварная уловка</span>
+                        <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>6 MP • 16 Урона</span>
+                      </button>
+                    </>
+                  )}
+
+                  {character.class.includes("Головорез Чумных Земель (Бандит)") && (
+                    <>
+                      <button className="skill-btn special" style={{ borderColor: '#228b22' }} onClick={() => castClassSkill("Чумной клинок", "mana", 10, 28, "stone")}>
+                        <span>🤢 Чумной клинок</span>
+                        <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>10 MP • 28 Урона</span>
+                      </button>
+                      <button className="skill-btn" onClick={() => castClassSkill("Грабёж допамина", "mana", 8, 20, "fire")}>
+                        <span>💰 Грабёж допамина</span>
+                        <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>8 MP • 20 Урона</span>
+                      </button>
+                    </>
+                  )}
+
+                  {character.class.includes("Каратель Багрового Ордена") && (
+                    <>
+                      <button className="skill-btn blood" onClick={() => castClassSkill("Багровый допрос", "hp", 12, 36, "blood")}>
+                        <span>🩸 Багровый допрос</span>
+                        <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>12 HP • 36 Урона</span>
+                      </button>
+                      <button className="skill-btn special" onClick={() => castClassSkill("Священная плеть", "mana", 10, 26, "fire")}>
+                        <span>📿 Священная плеть</span>
+                        <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>10 MP • 26 Урона</span>
+                      </button>
+                    </>
+                  )}
+
+                  {character.class.includes("Храмовник Пепла") && (
+                    <>
+                      <button className="skill-btn special" style={{ borderColor: '#8c7d6b' }} onClick={() => castClassSkill("Карающий пепел", "mana", 10, 28, "fire")}>
+                        <span>💨 Карающий пепел</span>
+                        <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>10 MP • 28 Урона</span>
+                      </button>
+                      <button className="skill-btn" onClick={() => castClassSkill("Завеса пепла", "mana", 8, 22, "stone")}>
+                        <span>🌫️ Завеса пепла</span>
+                        <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>8 MP • 22 Урона</span>
+                      </button>
+                    </>
+                  )}
+
+                  {character.class.includes("Рыцарь Чумной Стали") && (
+                    <>
+                      <button className="skill-btn special" style={{ borderColor: '#556b2f' }} onClick={() => castClassSkill("Ржавый замах", "mana", 12, 30, "stone")}>
+                        <span>🛡️ Ржавый замах</span>
+                        <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>12 MP • 30 Урона</span>
+                      </button>
+                      <button className="skill-btn" onClick={() => castClassSkill("Сгнивший барьер", "mana", 8, 20, "stone")}>
+                        <span>🏚️ Сгнивший барьер</span>
+                        <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>8 MP • 20 Урона</span>
+                      </button>
+                    </>
+                  )}
+
+                  {character.class.includes("Отреченный Паладин") && (
+                    <>
+                      <button className="skill-btn blood" onClick={() => castClassSkill("Оскверненная клятва", "hp", 10, 32, "blood")}>
+                        <span>🩸 Оскверненная клятва</span>
+                        <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>10 HP • 32 Урона</span>
+                      </button>
+                      <button className="skill-btn special" onClick={() => castClassSkill("Слепое неистовство", "mana", 12, 32, "fire")}>
+                        <span>🔥 Слепое неистовство</span>
+                        <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>12 MP • 32 Урона</span>
                       </button>
                     </>
                   )}

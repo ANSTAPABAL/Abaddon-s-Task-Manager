@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Music, RefreshCw, Key, Power, Play, Pause, SkipForward, Radio } from 'lucide-react';
+import { useAudio } from '../hooks/useAudio';
 
 export default function SpotifyPlayer({ 
   character, 
@@ -9,6 +10,7 @@ export default function SpotifyPlayer({
   setCurrentTrack,
   activeSessionType
 }) {
+  const { setSpotifyPlaying } = useAudio();
   const [clientId, setClientId] = useState(() => localStorage.getItem('spotify_client_id') || '');
   const [deviceId, setDeviceId] = useState(null);
   const [player, setPlayer] = useState(null);
@@ -16,13 +18,18 @@ export default function SpotifyPlayer({
   const [isPlaying, setIsPlaying] = useState(false);
   const [sdkLoaded, setSdkLoaded] = useState(false);
 
+  // Sync isPlaying to synth drone muting
+  useEffect(() => {
+    setSpotifyPlaying(isPlaying);
+  }, [isPlaying, setSpotifyPlaying]);
+
   // Focus playlists custom state (user can paste their own Spotify URI links!)
   const [playlists, setPlaylists] = useState({
-    escape: 'spotify:playlist:37i9dQZF1DX1s9knjP51xh', // Dark Ambient
-    hunt: 'spotify:playlist:37i9dQZF1DX8Uebcx2HSLI', // Focus Instrumental
-    siege: 'spotify:playlist:37i9dQZF1DX8TZZiO5Fr7i', // Heavy Cinematic Battle
-    deconstruct: 'spotify:playlist:37i9dQZF1DWZeNd5j9JGE2', // Gothic/Eerie Background
-    recovery: 'spotify:playlist:37i9dQZF1DX8NTLI297vKT', // Soft Medieval Lute / Ambient focus
+    escape: 'spotify:playlist:4lGv8NnJpX8v7CqL8JpDgu', // Atrium Carceri & Swans Dark Ambient Mix
+    hunt: 'spotify:playlist:37i9dQZF1E8O7qZfQ4x14d', // Marcel Gidote's Holy Crab Radio & Cozy Psych-Jazz
+    siege: 'spotify:playlist:0P6hI9y2dshZ3zP52G0i1G', // Swans & Atrium Carceri Heavy Intense Focus
+    deconstruct: 'spotify:playlist:37i9dQZF1DX8TZZiO5Fr7i', // Cozy Psychedelic Rock / Radio
+    recovery: 'spotify:playlist:37i9dQZF1DX8NTLI297vKT', // Soft Medieval Lutes & Cozy Chill
     quiet_focus: 'spotify:playlist:37i9dQZF1DWZFIeFvl6H5v' // Quiet focus, low drones
   });
 
@@ -358,22 +365,22 @@ export default function SpotifyPlayer({
             </h4>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
               <button className="rpg-btn" style={{ fontSize: '0.7rem', padding: '3px 8px' }} onClick={() => handlePlayAtmosphere('escape')}>
-                ⛓ Повозка смерти (Dark Ambient)
+                ⛓ Повозка смерти (Atrium Carceri & Swans)
               </button>
               <button className="rpg-btn" style={{ fontSize: '0.7rem', padding: '3px 8px' }} onClick={() => handlePlayAtmosphere('hunt')}>
-                🏹 Охота (Focus Instrumental)
+                🏹 Спокойные дела (Marcel Gidote's Holy Crab)
               </button>
               <button className="rpg-btn" style={{ fontSize: '0.7rem', padding: '3px 8px' }} onClick={() => handlePlayAtmosphere('siege')}>
-                💥 Осада Босса (Cinematic Battle)
+                💥 Осада Босса (Scary Swans / Atrium Carceri)
               </button>
               <button className="rpg-btn" style={{ fontSize: '0.7rem', padding: '3px 8px' }} onClick={() => handlePlayAtmosphere('deconstruct')}>
-                🔮 Разбор у алтаря (Gothic background)
+                🔮 Разбор у алтаря (Cozy Psych-Rock)
               </button>
               <button className="rpg-btn" style={{ fontSize: '0.7rem', padding: '3px 8px' }} onClick={() => handlePlayAtmosphere('recovery')}>
-                🕯 Восстановление (Medieval lutes)
+                🕯 Восстановление (Cozy Focus / Chill)
               </button>
               <button className="rpg-btn" style={{ fontSize: '0.7rem', padding: '3px 8px' }} onClick={() => handlePlayAtmosphere('quiet_focus')}>
-                🌫 Полная тишина (Low Drones)
+                🌫 Полная тишина (Drones)
               </button>
             </div>
           </div>

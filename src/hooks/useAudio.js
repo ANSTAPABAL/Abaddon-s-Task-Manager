@@ -11,6 +11,7 @@ class AudioSynthesizer {
     this.isMuted = false;
     this.volume = 0.5;
     this.currentMood = 'quiet_focus'; // escape, hunt, siege, deconstruct, recovery, quiet_focus
+    this.spotifyPlaying = false;
   }
 
   init() {
@@ -25,9 +26,7 @@ class AudioSynthesizer {
 
   setMuted(muted) {
     this.isMuted = muted;
-    if (this.droneGain) {
-      this.droneGain.gain.value = muted ? 0 : this.getDroneVolumeForMood(this.currentMood) * this.volume;
-    }
+    this.updateDroneVolume();
     if (muted) {
       this.stopHeartbeat();
     }
@@ -35,9 +34,19 @@ class AudioSynthesizer {
 
   setVolume(vol) {
     this.volume = Math.max(0, Math.min(1, vol));
-    if (this.droneGain && !this.isMuted) {
-      this.droneGain.gain.value = this.getDroneVolumeForMood(this.currentMood) * this.volume;
-    }
+    this.updateDroneVolume();
+  }
+
+  updateDroneVolume() {
+    if (!this.droneGain || !this.ctx) return;
+    const t = this.ctx.currentTime;
+    const targetVol = (this.isMuted || this.spotifyPlaying) ? 0 : this.getDroneVolumeForMood(this.currentMood) * this.volume;
+    this.droneGain.gain.setTargetAtTime(targetVol, t, 1.0);
+  }
+
+  setSpotifyPlaying(isPlaying) {
+    this.spotifyPlaying = isPlaying;
+    this.updateDroneVolume();
   }
 
   // --- AUTOMATIC DUAL FILE-OR-SYNTH CONNECTOR ---
@@ -113,8 +122,7 @@ class AudioSynthesizer {
     if (this.isMuted || !this.droneGain || !this.droneOsc1 || !this.droneOsc2) return;
 
     const t = this.ctx.currentTime;
-    const targetVol = this.getDroneVolumeForMood(mood) * this.volume;
-    this.droneGain.gain.setTargetAtTime(targetVol, t, 1.5);
+    this.updateDroneVolume();
 
     if (mood === 'siege') {
       this.droneOsc1.frequency.setTargetAtTime(48.99, t, 2.0); // G1
@@ -301,6 +309,7 @@ export function useAudio() {
   const setAtmosphereMood = (mood) => synth.setMood(mood);
   const startHeartbeat = (bpm) => synth.startHeartbeat(bpm);
   const stopHeartbeat = () => synth.stopHeartbeat();
+  const setSpotifyPlaying = (isPlaying) => synth.setSpotifyPlaying(isPlaying);
 
   return {
     initAudio,
@@ -312,6 +321,7 @@ export function useAudio() {
     setAtmosphereMood,
     startHeartbeat,
     stopHeartbeat,
+    setSpotifyPlaying,
     synthInstance: synth
   };
 }

@@ -219,6 +219,9 @@ export default function CharacterSheet({ character, setCharacter, tasks, setTask
   const getClassIcon = () => {
     if (character.class.includes("Некромант")) return "💀";
     if (character.class.includes("Рыцарь")) return "⚔";
+    if (character.class.includes("Бандит") || character.class.includes("Изгоев") || character.class.includes("Головорез")) return "🗡️";
+    if (character.class.includes("Каратель") || character.class.includes("Храмовник")) return "🕯️";
+    if (character.class.includes("Паладин")) return "🛡️";
     if (character.class.includes("огня")) return "🔥";
     if (character.class.includes("крови")) return "🩸";
     if (character.class.includes("Плазма")) return "⚡";

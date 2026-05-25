@@ -121,6 +121,60 @@ app.post('/api/pedestals', (req, res) => {
   }
 });
 
+// 2.7. Env Configuration API Endpoints
+app.get('/api/env-config', (req, res) => {
+  try {
+    const API_KEY = process.env.AI_TUNNEL_KEY;
+    const hasKey = !!API_KEY && API_KEY.trim() !== '' && API_KEY !== 'placeholder_key_here';
+    res.json({
+      configured: hasKey,
+      key: hasKey ? `${API_KEY.slice(0, 6)}...` : '',
+      port: process.env.PORT || 3001
+    });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to read env status" });
+  }
+});
+
+app.post('/api/env-config', (req, res) => {
+  try {
+    const { apiKey, port } = req.body;
+    const envPath = path.join(__dirname, '.env');
+    let envContent = '';
+    
+    if (fs.existsSync(envPath)) {
+      envContent = fs.readFileSync(envPath, 'utf8');
+    } else {
+      envContent = '# Abaddon Focus Vessel Local Configuration\n';
+    }
+
+    // Set/replace AI_TUNNEL_KEY
+    if (apiKey !== undefined) {
+      if (envContent.includes('AI_TUNNEL_KEY=')) {
+        envContent = envContent.replace(/AI_TUNNEL_KEY=[^\r\n]*/, `AI_TUNNEL_KEY=${apiKey.trim()}`);
+      } else {
+        envContent += `\nAI_TUNNEL_KEY=${apiKey.trim()}\n`;
+      }
+      process.env.AI_TUNNEL_KEY = apiKey.trim();
+    }
+
+    // Set/replace PORT
+    if (port !== undefined) {
+      if (envContent.includes('PORT=')) {
+        envContent = envContent.replace(/PORT=[^\r\n]*/, `PORT=${port}`);
+      } else {
+        envContent += `\nPORT=${port}\n`;
+      }
+      process.env.PORT = port;
+    }
+
+    fs.writeFileSync(envPath, envContent, 'utf8');
+    res.json({ success: true, message: "Environment configuration saved and applied." });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to write env configuration: " + error.message });
+  }
+});
+
 // 3. AI Proxy Endpoint
 app.post('/api/ai/complete', async (req, res) => {
   const { messages } = req.body;

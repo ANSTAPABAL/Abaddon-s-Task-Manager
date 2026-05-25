@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Skull, Pin, Trash2, Shield, Calendar, Sparkles, CheckSquare, Plus, ArrowRight, UserCheck, Flame, RefreshCw } from 'lucide-react';
 import { useAudio } from '../hooks/useAudio';
 
-export default function TweekPlanner({ tasks, setTasks, character, setCharacter, requestDeconstruction }) {
+export default function TweekPlanner({ tasks, setTasks, character, setCharacter, requestDeconstruction, communeWithSpirits }) {
   const { playClick, playBoneCrack, playSuccess } = useAudio();
   const [activeKanbanDay, setActiveKanbanDay] = useState(null); // YYYY-MM-DD
   const [newTaskTitle, setNewTaskTitle] = useState('');
@@ -19,12 +19,137 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
   const [editIntent, setEditIntent] = useState('');
   const [editSteps, setEditSteps] = useState([]);
   const [newStepText, setNewStepText] = useState('');
+  const [editNature, setEditNature] = useState('external');
+  const [editExecutionMode, setEditExecutionMode] = useState('ask_later');
 
   // AI Inside Editor States
   const [editDeconstructLoading, setEditDeconstructLoading] = useState(false);
   const [guidedStep, setGuidedStep] = useState(0); // 0 = default, 1 = answering questions, 2 = done
   const [guidedQuestions, setGuidedQuestions] = useState([]);
   const [guidedAnswers, setGuidedAnswers] = useState({});
+
+  // --- SOUL CONJUNCTION RITUAL STATE ---
+  const [ritualMessage, setRitualMessage] = useState('');
+  const [taskToPullId, setTaskToPullId] = useState('');
+  const [taskToPushId, setTaskToPushId] = useState('');
+  const [pushDestination, setPushDestination] = useState('backlog'); // backlog, tomorrow
+
+  const handlePostponeAllToday = () => {
+    const todayDateStr = new Date().toISOString().split('T')[0];
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowDateStr = tomorrow.toISOString().split('T')[0];
+
+    const todayActiveTasks = tasks.filter(t => t.date === todayDateStr && t.status === 'active');
+    if (todayActiveTasks.length === 0) {
+      alert("Сегодня нет активных задач для переноса!");
+      return;
+    }
+
+    if (character.hp <= 15) {
+      alert("Ваш разум слишком слаб для этой жертвы! Восстановите HP (выпейте зелье или отдохните у костра).");
+      return;
+    }
+
+    playBoneCrack();
+    
+    // Move tasks to tomorrow and increase curse level
+    setTasks(prev => prev.map(t => {
+      if (t.date === todayDateStr && t.status === 'active') {
+        return {
+          ...t,
+          date: tomorrowDateStr,
+          curseLevel: Math.min(5, t.curseLevel + 1)
+        };
+      }
+      return t;
+    }));
+
+    // Deduct HP
+    setCharacter(prev => ({
+      ...prev,
+      hp: Math.max(1, prev.hp - 15),
+      totalHpSacrificed: (prev.totalHpSacrificed || 0) + 15
+    }));
+
+    setRitualMessage(`💀 Сделка совершена! ${todayActiveTasks.length} задач перенесены на завтра. Потеряно 15 HP рассудка. Скверна перенесенных задач возросла!`);
+    setTimeout(() => setRitualMessage(''), 7000);
+  };
+
+  const handlePullTaskToToday = (taskId) => {
+    if (!taskId) return;
+    const targetTask = tasks.find(t => t.id === taskId);
+    if (!targetTask) return;
+
+    if (character.mana < 5) {
+      alert("Недостаточно маны для этого сопряжения разума! Требуется 5 MP.");
+      return;
+    }
+
+    playSuccess();
+
+    const todayDateStr = new Date().toISOString().split('T')[0];
+    setTasks(prev => prev.map(t => {
+      if (t.id === taskId) {
+        return {
+          ...t,
+          date: todayDateStr
+        };
+      }
+      return t;
+    }));
+
+    setCharacter(prev => ({
+      ...prev,
+      mana: Math.max(0, prev.mana - 5),
+      totalManaSpent: (prev.totalManaSpent || 0) + 5
+    }));
+
+    setRitualMessage(`🔮 Контракт «${targetTask.title}» притянут на сегодня! Потрачено 5 MP маны.`);
+    setTimeout(() => setRitualMessage(''), 5000);
+    setTaskToPullId('');
+  };
+
+  const handlePushTask = (taskId, destination) => {
+    if (!taskId || !destination) return;
+    const targetTask = tasks.find(t => t.id === taskId);
+    if (!targetTask) return;
+
+    if (character.hp <= 10) {
+      alert("Ваш разум слишком слаб для этой жертвы! Требуется 10 HP.");
+      return;
+    }
+
+    playBoneCrack();
+
+    const targetDate = destination === 'tomorrow' ? (() => {
+      const d = new Date();
+      d.setDate(d.getDate() + 1);
+      return d.toISOString().split('T')[0];
+    })() : null; // backlog is null
+
+    setTasks(prev => prev.map(t => {
+      if (t.id === taskId) {
+        return {
+          ...t,
+          date: targetDate,
+          curseLevel: Math.min(5, t.curseLevel + 1)
+        };
+      }
+      return t;
+    }));
+
+    setCharacter(prev => ({
+      ...prev,
+      hp: Math.max(1, prev.hp - 10),
+      totalHpSacrificed: (prev.totalHpSacrificed || 0) + 10
+    }));
+
+    const destLabel = destination === 'tomorrow' ? 'на завтра' : 'в Бэклог';
+    setRitualMessage(`💀 Задача «${targetTask.title}» изгнана ${destLabel}! Потеряно 10 HP. Скверна задачи возросла.`);
+    setTimeout(() => setRitualMessage(''), 5000);
+    setTaskToPushId('');
+  };
 
   const handleOpenEdit = (task) => {
     setEditingTask(task);
@@ -36,6 +161,8 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
     setGuidedStep(0);
     setGuidedAnswers({});
     setNewStepText('');
+    setEditNature(task.nature || 'external');
+    setEditExecutionMode(task.executionMode || 'ask_later');
   };
 
   // --- EDIT MODAL AI DECONSTRUCTORS ---
@@ -115,7 +242,9 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
       type: editType,
       pomodoroTime: Number(editTime),
       intent: editIntent,
-      steps: editSteps
+      steps: editSteps,
+      nature: editNature,
+      executionMode: editExecutionMode
     } : t));
     setEditingTask(null);
   };
@@ -235,6 +364,37 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
         totalGoldEarned: (prev.totalGoldEarned || 0) + totalEarned
       };
     });
+  };
+
+  const renderTaskNatureBadge = (task) => {
+    const isInternal = task.nature === 'internal';
+    const synonym = task.combatLore?.visualType || task.visualType;
+    return (
+      <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
+        <span style={{ 
+          fontSize: '0.62rem', 
+          color: isInternal ? '#4fc3f7' : '#ff8a80',
+          background: 'rgba(0,0,0,0.5)',
+          padding: '1px 4px',
+          borderRadius: '3px',
+          border: `1px solid ${isInternal ? 'rgba(79, 195, 247, 0.25)' : 'rgba(255, 138, 128, 0.25)'}`
+        }}>
+          {isInternal ? '🧿' : '⚔️'} {synonym || (isInternal ? 'ритуал' : 'схватка')}
+        </span>
+        {task.executionMode && task.executionMode !== 'ask_later' && (
+          <span style={{
+            fontSize: '0.62rem',
+            color: 'var(--color-bone-dim)',
+            background: 'rgba(0,0,0,0.5)',
+            padding: '1px 4px',
+            borderRadius: '3px',
+            border: '1px solid rgba(255, 255, 255, 0.1)'
+          }}>
+            {task.executionMode === 'timer' ? '⏳' : '🌅'} {task.executionMode === 'timer' ? 'Таймер' : 'День'}
+          </span>
+        )}
+      </div>
+    );
   };
 
   const handlePostponeTask = (taskId, targetDateStr) => {
@@ -358,6 +518,10 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
     );
   };
 
+  const todayDateStr = new Date().toISOString().split('T')[0];
+  const pullableTasks = tasks.filter(t => t.status === 'active' && t.date !== todayDateStr);
+  const pushableTasks = tasks.filter(t => t.status === 'active' && t.date === todayDateStr);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', minHeight: '80vh' }}>
       
@@ -396,6 +560,14 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
             <Plus size={16} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />
             ПРИБИТЬ К ДОГОВОРУ ДНЯ
           </button>
+
+          <button 
+            className="rpg-btn"
+            style={{ fontSize: '0.9rem', borderColor: 'rgba(0, 191, 255, 0.4)', color: '#4fc3f7', background: 'rgba(0,0,0,0.3)', boxShadow: '0 0 5px rgba(0,191,255,0.1)' }}
+            onClick={communeWithSpirits}
+          >
+            🧿 Взывать к духам
+          </button>
         </div>
       </div>
 
@@ -405,6 +577,130 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
 
       {/* Exile's Journey Map Roadmap */}
       {renderJourneyMap()}
+
+      {/* 1.5. Ritual Alert Notification */}
+      {ritualMessage && (
+        <div style={{
+          background: 'rgba(74, 18, 18, 0.95)',
+          border: '1px solid var(--color-blood-glow)',
+          boxShadow: '0 0 15px rgba(122, 18, 18, 0.4)',
+          color: '#fff',
+          padding: '0.8rem 1.2rem',
+          fontFamily: 'var(--font-rpg)',
+          fontSize: '0.9rem',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          animation: 'screen-shiver 0.3s 1'
+        }}>
+          <span>{ritualMessage}</span>
+          <button 
+            onClick={() => setRitualMessage('')}
+            style={{ background: 'none', border: 'none', color: 'var(--color-bone-dim)', cursor: 'pointer', fontSize: '1rem', fontWeight: 'bold' }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* 1.6. Altar of Soul Conjunction Panel */}
+      <div className="rpg-panel" style={{
+        background: 'radial-gradient(circle, #100a0e 0%, #030104 100%)',
+        border: '1px solid var(--color-blood-glow)',
+        boxShadow: '0 0 20px rgba(122, 18, 18, 0.15)',
+        padding: '1.2rem',
+        marginTop: '-0.2rem'
+      }}>
+        <div style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.5rem', marginBottom: '1rem' }}>
+          <h3 className="gothic-title" style={{ fontSize: '1.2rem', color: 'var(--color-blood-glow)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span>⚖️</span>
+            <span>Алтарь Слияния Душ (Перераспределение Времени)</span>
+          </h3>
+          <p style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)', fontStyle: 'italic', margin: '4px 0 0 0' }}>
+            «Когда разум слаб или задачи навалились непосильным грузом, вы можете обменять крупицы жизненных сил и маны на перетасовку судьбы...»
+          </p>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem' }}>
+          {/* Postpone all */}
+          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', background: 'rgba(0,0,0,0.3)', padding: '0.8rem', border: '1px solid rgba(255,255,255,0.03)' }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', textTransform: 'uppercase', marginBottom: '8px' }}>Временная Отсрочка (Все задачи)</span>
+            <button 
+              className="rpg-btn rpg-btn-blood" 
+              style={{ padding: '8px 12px', fontSize: '0.8rem', fontWeight: 'bold' }}
+              onClick={handlePostponeAllToday}
+              disabled={tasks.filter(t => t.date === new Date().toISOString().split('T')[0] && t.status === 'active').length === 0}
+            >
+              Отложить всё на завтра (Цена: 15 HP)
+            </button>
+          </div>
+
+          {/* Pull to today */}
+          <div style={{ display: 'flex', flexDirection: 'column', background: 'rgba(0,0,0,0.3)', padding: '0.8rem', border: '1px solid rgba(255,255,255,0.03)' }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', textTransform: 'uppercase', marginBottom: '8px' }}>Призвать контракт на сегодня</span>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <select 
+                className="rpg-input" 
+                style={{ flex: 1, fontSize: '0.8rem' }}
+                value={taskToPullId}
+                onChange={(e) => setTaskToPullId(e.target.value)}
+              >
+                <option value="">-- Выберите контракт --</option>
+                {pullableTasks.map(t => (
+                  <option key={t.id} value={t.id}>
+                    {t.title} ({t.date ? `на ${t.date}` : 'Бэклог'})
+                  </option>
+                ))}
+              </select>
+              <button 
+                className="rpg-btn rpg-btn-mana" 
+                style={{ fontSize: '0.8rem', padding: '4px 10px' }}
+                onClick={() => handlePullTaskToToday(taskToPullId)}
+                disabled={!taskToPullId}
+              >
+                Призвать (5 MP)
+              </button>
+            </div>
+          </div>
+
+          {/* Push from today */}
+          <div style={{ display: 'flex', flexDirection: 'column', background: 'rgba(0,0,0,0.3)', padding: '0.8rem', border: '1px solid rgba(255,255,255,0.03)' }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', textTransform: 'uppercase', marginBottom: '8px' }}>Изгнать контракт из сегодняшнего дня</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              <select 
+                className="rpg-input" 
+                style={{ fontSize: '0.8rem' }}
+                value={taskToPushId}
+                onChange={(e) => setTaskToPushId(e.target.value)}
+              >
+                <option value="">-- Выберите задачу --</option>
+                {pushableTasks.map(t => (
+                  <option key={t.id} value={t.id}>{t.title}</option>
+                ))}
+              </select>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <select 
+                  className="rpg-input" 
+                  style={{ flex: 1, fontSize: '0.8rem' }}
+                  value={pushDestination}
+                  onChange={(e) => setPushDestination(e.target.value)}
+                >
+                  <option value="backlog">В Бэклог (Без даты)</option>
+                  <option value="tomorrow">На завтра</option>
+                </select>
+                <button 
+                  className="rpg-btn" 
+                  style={{ fontSize: '0.8rem', borderColor: 'var(--color-blood)', padding: '4px 10px' }}
+                  onClick={() => handlePushTask(taskToPushId, pushDestination)}
+                  disabled={!taskToPushId}
+                >
+                  Изгнать (10 HP)
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* 2. Tweek Horizontal Scrollboard */}
       <div className="tweek-scrollboard">
@@ -455,6 +751,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
                         </span>
                       )}
                     </div>
+                    {renderTaskNatureBadge(task)}
                     
                     {/* Small action bars */}
                     <div style={{ display: 'flex', gap: '0.3rem', marginTop: '0.5rem', justifyContent: 'flex-end' }}>
@@ -513,6 +810,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
                 onDoubleClick={() => handleOpenEdit(task)}
               >
                 <div style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>{task.title}</div>
+                {renderTaskNatureBadge(task)}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '5px' }}>
                   <span style={{ fontSize: '0.65rem', color: 'var(--color-bone-dim)' }}>
                     {task.type === 'siege' ? 'Осада' : 'Охота'}
@@ -611,6 +909,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
                       style={{ cursor: 'pointer' }}
                     >
                       <div style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>{task.title}</div>
+                      {renderTaskNatureBadge(task)}
                       <div style={{ display: 'flex', gap: '0.3rem', marginTop: '5px', justifyContent: 'flex-end' }}>
                         <button className="rpg-btn" style={{ fontSize: '0.6rem', padding: '2px' }} onClick={() => handleSealTask(task.id)}>Да</button>
                       </div>
@@ -631,6 +930,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
                       onDoubleClick={() => { playClick(); handleOpenEdit(task); }}
                     >
                       <div style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>{task.title}</div>
+                      {renderTaskNatureBadge(task)}
                       <div style={{ fontSize: '0.7rem', color: 'var(--color-bone-dim)', marginTop: '2px' }}>
                         Шагов сделано: {task.steps.filter(s => s.completed).length}/{task.steps.length}
                       </div>
@@ -654,6 +954,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
                       style={{ cursor: 'pointer' }}
                     >
                       <div style={{ fontSize: '0.85rem' }}>{task.title}</div>
+                      {renderTaskNatureBadge(task)}
                       <span style={{ fontSize: '0.7rem', color: 'var(--color-bone-dim)' }}>✓ Ритуал проведен</span>
                     </div>
                   ))}
@@ -780,6 +1081,35 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
                       value={editTime}
                       onChange={(e) => setEditTime(e.target.value)}
                     />
+                  </div>
+                </div>
+
+                {/* Nature and Execution Mode selectors */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginBottom: '4px' }}>ПРИРОДА ЗАДАЧИ</label>
+                    <select 
+                      className="rpg-input" 
+                      style={{ width: '100%', fontSize: '0.9rem' }}
+                      value={editNature}
+                      onChange={(e) => setEditNature(e.target.value)}
+                    >
+                      <option value="internal">🧿 Внутренний Обет (для себя)</option>
+                      <option value="external">⚔️ Внешняя Схватка (для мира)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginBottom: '4px' }}>РЕЖИМ ВЫПОЛНЕНИЯ</label>
+                    <select 
+                      className="rpg-input" 
+                      style={{ width: '100%', fontSize: '0.9rem' }}
+                      value={editExecutionMode}
+                      onChange={(e) => setEditExecutionMode(e.target.value)}
+                    >
+                      <option value="timer">⏳ Таймер (Печать Времени)</option>
+                      <option value="day">🌅 В течение дня (Свободный Переход)</option>
+                      <option value="ask_later">❓ Спросить позже (Шепот Сомнений)</option>
+                    </select>
                   </div>
                 </div>
 
