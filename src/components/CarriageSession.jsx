@@ -200,6 +200,7 @@ export default function CarriageSession({
   const [combatLog, setCombatLog] = useState(['⚔️ Свиток боя развернут. Ожидание атаки...']);
   const [combatVignette, setCombatVignette] = useState('Тьма сгущается над вашим разумом...');
   const [ticksWithoutStep, setTicksWithoutStep] = useState(0); 
+  const [deadlineDmgApplied, setDeadlineDmgApplied] = useState(false);
 
   // WOW-эффекты: Всплывающий урон и Вспышки экрана
   const [damageFloats, setDamageFloats] = useState([]);
@@ -482,6 +483,7 @@ export default function CarriageSession({
         localStorage.setItem('combat_timer_start_time', Date.now());
         localStorage.setItem('combat_timer_start_value', storedTime);
         localStorage.setItem('combat_is_running', 'true');
+        setDeadlineDmgApplied(storedTime <= 0);
         setIsRunning(true);
       } else {
         setSetupStage('hub'); // Directly load Tasks Hub
@@ -544,7 +546,16 @@ export default function CarriageSession({
     }
 
     setEnemyName(lore.enemyName);
-    setEnemyHp(100);
+    // Calculate initial enemy HP based on already completed steps to support resuming tasks correctly
+    if (task.steps && task.steps.length > 0) {
+      const totalSteps = task.steps.length;
+      const completedSteps = task.steps.filter(s => s.completed).length;
+      const dmgPerStep = Math.ceil(100 / totalSteps);
+      const remainingHp = Math.max(0, 100 - completedSteps * dmgPerStep);
+      setEnemyHp(remainingHp);
+    } else {
+      setEnemyHp(100);
+    }
     setCombatVignette(`💥 Режим схватки: [${lore.visualType.toUpperCase()}]. ${lore.loreDescription}`);
     setCombatLog([
       `⚔️ Начинается бой! Противник: ${lore.enemyName}.`,
@@ -743,6 +754,7 @@ export default function CarriageSession({
       localStorage.setItem('combat_timer_start_time', Date.now());
       localStorage.setItem('combat_timer_start_value', initialTime);
       localStorage.setItem('combat_is_running', 'true');
+      setDeadlineDmgApplied(false);
       setIsRunning(true);
       setAtmosphereMood(target?.type === 'siege' ? 'siege' : 'hunt');
       if (playActiveSessionTrack) playActiveSessionTrack(target?.type === 'siege' ? 'siege' : 'hunt');
@@ -792,6 +804,7 @@ export default function CarriageSession({
     localStorage.setItem('combat_timer_start_time', Date.now());
     localStorage.setItem('combat_timer_start_value', initialTime);
     localStorage.setItem('combat_is_running', 'true');
+    setDeadlineDmgApplied(false);
     setIsRunning(true);
 
     setAtmosphereMood(activeTask?.type === 'siege' ? 'siege' : 'hunt');
@@ -829,20 +842,23 @@ export default function CarriageSession({
             return;
           }
 
-          // Damage interval: every 15 seconds of overtime
-          const overtimeSeconds = Math.abs(nextTime);
-          if (overtimeSeconds > 0 && overtimeSeconds % 15 === 0) {
+          if (!deadlineDmgApplied) {
+            setDeadlineDmgApplied(true);
             playBoneCrack();
             let died = false;
             setCharacter(c => {
-              const nextHp = Math.max(10, c.hp - 10);
+              const nextHp = Math.max(10, c.hp - 15);
               if (nextHp <= 10 && c.hp > 10) {
                 died = true;
               }
               return { ...c, hp: nextHp };
             });
             triggerFlash('blood');
-            spawnFloater("-10 HP!", "enemy-strike");
+            spawnFloater("-15 HP!", "enemy-strike");
+            setCombatLog(log => [
+              `💥 [Дедлайн] Время истекло! Противник ${enemyName} наносит вам сокрушительный удар на 15 HP за опоздание!`,
+              ...log.slice(0, 5)
+            ]);
 
             if (died) {
               setIsRunning(false);
@@ -868,7 +884,7 @@ export default function CarriageSession({
       }, 1000);
     }
     return () => clearInterval(timer);
-  }, [setupStage, isRunning, meditationActive, activeTask, sessionSteps, enemyName]);
+  }, [setupStage, isRunning, meditationActive, activeTask, sessionSteps, enemyName, deadlineDmgApplied]);
 
   // Timed Meditation Recovery Timer Loop
   useEffect(() => {
@@ -1833,6 +1849,7 @@ export default function CarriageSession({
                         generateCombatEncounter(task);
                         localStorage.setItem('active_task_id', task.id);
                         localStorage.setItem('combat_time_left', initialTime);
+                        setDeadlineDmgApplied(false);
                         if (mode === 'timer') {
                           localStorage.setItem('combat_timer_start_time', Date.now());
                           localStorage.setItem('combat_timer_start_value', initialTime);
@@ -2292,7 +2309,7 @@ export default function CarriageSession({
                 marginBottom: '1rem',
                 textAlign: 'center'
               }}>
-                ⏳ СРОК ИСТЕК! Противник наносит урон каждые 15 сек, пока вы не завершите все шаги!
+                ⏳ СРОК ИСТЕК! Вы получили разовый штрафной удар. Завершите все шаги, чтобы одолеть врага!
               </div>
             )}
 
