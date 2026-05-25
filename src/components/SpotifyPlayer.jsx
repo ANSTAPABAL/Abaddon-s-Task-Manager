@@ -286,7 +286,7 @@ export default function SpotifyPlayer({
         userFriendlyError = "Срок действия токена Spotify истек. Пожалуйста, переподключите аккаунт!";
         setSpotifyToken(''); // Clear the expired token so user can connect again
       } else if (status === 403 || msg.includes("premium") || msg.includes("403") || msg.includes("restriction")) {
-        userFriendlyError = "Ошибка 403 (Ограничение): Требуется подписка Spotify Premium ИЛИ ваш аккаунт должен быть добавлен в список 'Users and Access' в настройках вашего приложения на Spotify Developer Dashboard. Автоматический запуск треков отключен.";
+        userFriendlyError = `Ошибка 403 (Ограничение): Требуется подписка Spotify Premium ИЛИ ваш аккаунт должен быть добавлен в список 'Users and Access' в настройках вашего приложения на Spotify Developer Dashboard. (Детали от Spotify: "${e.message}"). Автоматический запуск треков отключен.`;
         setDisableAutoPlay(true);
       } else if (status === 404 || msg.includes("device") || msg.includes("404")) {
         userFriendlyError = "Устройство Focus Vessel не найдено или не готово. Убедитесь, что Spotify Premium запущен на ПК или телефоне!";
