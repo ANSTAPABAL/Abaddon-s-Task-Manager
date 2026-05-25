@@ -154,6 +154,50 @@ export default function App() {
     }
   };
 
+  const generateRedemptionEulogy = async (char) => {
+    try {
+      const systemPrompt = `Ты — Летописец Бездны во вселенной Абаддона. Твоя задача — составить торжественную, мрачно-триумфальную и поэтичную летопись-эпитафию о подвиге Изгнанника, который искупил свои грехи и прошел Абаддон.
+Тебе предоставлена игровая статистика героя (класс, уровень, количество побежденных боссов, потраченное здоровье, выпитые зелья, восстановленная мана и т.д.).
+Используй эти данные для глубокого психологического анализа и воспевания его пути:
+- Если он часто жертвовал HP (высокое значение totalHpSacrificed), воспой его безумную, стальную готовность пробивать когнитивный ступор ценой собственной крови.
+- Если он часто медитировал или пил зелья (meditationsCount, potionsDrunk), восхвали его мудрость баланса и умение вовремя беречь свой разум.
+- Если он потратил много маны (totalManaSpent), упомяни его невероятную силу фокуса и магический расход энергии.
+- Обязательно упомяни класс героя, его имя и уровень, а также количество запечатанных контрактов.
+
+Напиши летопись на русском языке в атмосферном, готическом, возвышенном стиле древних фолиантов. Раздели на красивые абзацы. Сделай текст глубоко личным и вдохновляющим для человека с СДВГ.`;
+
+      const userMessage = `Статистика Изгнанника:
+Имя: ${char.name}
+Класс: ${char.class}
+Уровень: ${char.level}
+Запечатано контрактов всего: ${char.completedTasksCount}
+Осаждено Боссов: ${char.completedSiegesCount}
+Заработано золота всего: ${char.totalGoldEarned}
+Потрачено маны всего: ${char.totalManaSpent}
+Пожертвовано HP всего: ${char.totalHpSacrificed}
+Выпито зелий: ${char.potionsDrunk}
+Проведено медитаций: ${char.meditationsCount}
+`;
+
+      const response = await fetch('http://localhost:3001/api/ai/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userMessage }
+          ]
+        })
+      });
+
+      if (!response.ok) throw new Error("Connection failed");
+      const data = await response.json();
+      return data.choices[0].message.content.trim();
+    } catch (e) {
+      return `«Его воля сокрушила прокрастинацию и навеки разогнала Скверну Абаддона...»\n\n(Не удалось соединиться с сервером AI для составления индивидуальной летописи, но духи помнят твой подвиг!)`;
+    }
+  };
+
   // Settings & Env Configuration State
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [envConfig, setEnvConfig] = useState({ configured: false, key: '', port: 3001 });
