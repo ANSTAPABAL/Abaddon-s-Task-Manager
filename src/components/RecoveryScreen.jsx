@@ -14,7 +14,7 @@ export default function RecoveryScreen({
   
   // Return anchor state
   const [returnAnchorText, setReturnAnchorText] = useState(() => {
-    return localStorage.getItem('return_anchor_text') || 'Вы остановились на редактировании кода. Предыдущий микро-шаг: открыть index.css. Мешало: громкий шум на улице.';
+    return localStorage.getItem('return_anchor_text') || '';
   });
   
   const [savingAnchor, setSavingAnchor] = useState(false);
@@ -68,7 +68,7 @@ export default function RecoveryScreen({
 
   const handleSacrificeManaForBoredom = () => {
     if (character.mana < 15) {
-      alert("Недостаточно Маны для плетения руны Азарта!");
+      alert("Недостаточно Ресурса для плетения руны Азарта!");
       return;
     }
     playSuccess();
@@ -148,7 +148,7 @@ export default function RecoveryScreen({
 
           <div style={{ marginTop: '1.5rem', background: '#0a090b', padding: '1rem', border: '1px dashed var(--color-iron-light)' }}>
             <h4 style={{ fontSize: '0.85rem', color: 'var(--color-bone)', fontFamily: 'var(--font-rpg)', marginBottom: '5px' }}>
-              КНОПКА МИЛОСЕРДИЯ:
+              АЛТАРЬ ЗАХОРОНЕНИЯ БЭКЛОГА:
             </h4>
             <p style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginBottom: '10px' }}>
               Тяжелый груз старых планов в бэклоге отравляет совесть? Проведите ритуал мгновенных похорон для ВСЕХ задач бэклога.

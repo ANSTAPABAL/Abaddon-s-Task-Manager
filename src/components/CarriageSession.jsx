@@ -218,10 +218,13 @@ export default function CarriageSession({
 
   // Лагерь Отдыха и Медитация
   const [meditationActive, setMeditationActive] = useState(false);
-  const [meditationDuration, setMeditationDuration] = useState(60); 
-  const [meditationTimeLeft, setMeditationTimeLeft] = useState(60);
+  const [meditationDuration, setMeditationDuration] = useState(180); // Default to 3m
+  const [meditationTimeLeft, setMeditationTimeLeft] = useState(180);
   const [meditationPhase, setMeditationPhase] = useState('inhale'); // inhale (4s), hold-in (4s), exhale (4s), hold-out (4s)
   const [meditationPulseCounter, setMeditationPulseCounter] = useState(0);
+  const [meditationSelectOpen, setMeditationSelectOpen] = useState(false);
+  const [selectedMeditationType, setSelectedMeditationType] = useState('breathing');
+  const [meditationType, setMeditationType] = useState('breathing');
 
   // Система Перерывов и НПС-Встреч (Break Events)
   const sessionElapsedRef = useRef(0);
@@ -406,6 +409,18 @@ export default function CarriageSession({
       meditationsCount: character.meditationsCount || 0,
       pedestalEulogy: redemptionEulogyText || "Его воля спасла Бездну..."
     };
+
+    // Convert active tasks to "corpse" (Труп прошлого / Debt) for the new character
+    setTasks(prev => prev.map(t => {
+      if (t.status === 'active') {
+        return {
+          ...t,
+          type: 'corpse',
+          curseLevel: Math.min(5, (t.curseLevel || 0) + 1)
+        };
+      }
+      return t;
+    }));
 
     const updatedPedestals = [...pedestals, newLegend];
     savePedestals(updatedPedestals);
@@ -752,6 +767,19 @@ export default function CarriageSession({
                 setIsRunning(false);
                 setSetupStage('resolution');
                 setResolutionType('death');
+
+                // Convert active tasks to corpse and increase curse level as penalty
+                setTasks(prev => prev.map(t => {
+                  if (t.status === 'active') {
+                    return {
+                      ...t,
+                      type: 'corpse',
+                      curseLevel: Math.min(5, (t.curseLevel || 0) + 1)
+                    };
+                  }
+                  return t;
+                }));
+
                 handleGenerateResolutionChronicle('death', activeTask, enemyName);
               }
               return 0; 
@@ -1082,14 +1110,100 @@ export default function CarriageSession({
   };
 
   // Timed Rest Meditations Camp initialization
-  const startTimedMeditation = (durationSec) => {
+  const startTimedMeditation = (durationSec, type = 'breathing') => {
     playClick();
     setMeditationDuration(durationSec);
     setMeditationTimeLeft(durationSec);
+    setMeditationType(type);
     setMeditationActive(true);
     setMeditationPulseCounter(0);
     setMeditationPhase('inhale');
     setAtmosphereMood('recovery');
+  };
+
+  const renderMeditationSelect = () => {
+    if (!meditationSelectOpen) return null;
+    return (
+      <div className="break-event-overlay animate-fade-in" style={{ zIndex: 3000 }}>
+        <div className="break-event-card" style={{ borderColor: 'var(--color-relic-glow)', maxWidth: '550px', padding: '2rem' }}>
+          <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+            <span style={{ fontSize: '3rem' }}>🎪</span>
+            <h1 className="gothic-title" style={{ fontSize: '1.8rem', color: 'var(--color-relic-glow)', marginTop: '0.5rem' }}>
+              Разбить Лагерь Восстановления
+            </h1>
+            <p style={{ fontSize: '0.85rem', color: 'var(--color-bone-dim)', fontStyle: 'italic', marginTop: '0.3rem' }}>
+              Выберите когнитивную или физическую активность для отдыха
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', marginBottom: '1.5rem' }}>
+            {[
+              { id: 'breathing', label: '💨 Дыхательное упражнение (4-7-8)', desc: 'Синхронизация вдохов и задержек дыхания для насыщения мозга кислородом.' },
+              { id: 'mental', label: '🧘 Медитация Бездны', desc: 'Сидение в абсолютной тишине, созерцание мыслей без вовлечения.' },
+              { id: 'walk', label: '🚶 Вылазка по комнате', desc: 'Встаньте, сходите за водой, разомнитесь, посмотрите в окно.' },
+              { id: 'stretch', label: '🤸 Разминка и растяжка', desc: 'Снятие мышечного тонуса: повращайте шеей, плечами, потянитесь.' },
+              { id: 'expander', label: '✊ Пожамкать эспандер / мячик', desc: 'Сброс моторной ADHD-энергии через физическое сжатие.' }
+            ].map(act => (
+              <div 
+                key={act.id} 
+                onClick={() => { playClick(); setSelectedMeditationType(act.id); }}
+                style={{
+                  background: selectedMeditationType === act.id ? 'rgba(212, 175, 55, 0.1)' : 'rgba(0,0,0,0.3)',
+                  border: `1px solid ${selectedMeditationType === act.id ? 'var(--color-relic-glow)' : 'var(--color-iron-light)'}`,
+                  padding: '0.8rem',
+                  cursor: 'pointer',
+                  borderRadius: '4px',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <h4 style={{ color: selectedMeditationType === act.id ? '#ffb813' : '#fff', fontSize: '0.95rem', margin: 0 }}>
+                  {act.label}
+                </h4>
+                <p style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', margin: '4px 0 0 0', lineHeight: '1.3' }}>
+                  {act.desc}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)' }}>Время привала:</span>
+            <div style={{ display: 'flex', gap: '0.4rem', flex: 1 }}>
+              {[60, 180, 300].map(dur => (
+                <button 
+                  key={dur} 
+                  className="rpg-btn" 
+                  style={{ flex: 1, padding: '4px 8px', fontSize: '0.8rem', background: meditationDuration === dur ? 'rgba(212, 175, 55, 0.1)' : 'rgba(0,0,0,0.2)', borderColor: meditationDuration === dur ? 'var(--color-relic-glow)' : 'var(--color-iron-light)' }}
+                  onClick={() => { playClick(); setMeditationDuration(dur); }}
+                >
+                  {dur === 60 ? '1 мин' : dur === 180 ? '3 мин' : '5 мин'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.8rem' }}>
+            <button 
+              className="rpg-btn" 
+              style={{ flex: 1, padding: '0.6rem' }}
+              onClick={() => { playClick(); setMeditationSelectOpen(false); }}
+            >
+              Отмена
+            </button>
+            <button 
+              className="rpg-btn rpg-btn-mana" 
+              style={{ flex: 1, padding: '0.6rem', borderColor: 'var(--color-relic-glow)', color: '#ffb813' }}
+              onClick={() => {
+                setMeditationSelectOpen(false);
+                startTimedMeditation(meditationDuration, selectedMeditationType);
+              }}
+            >
+              🎪 Войти в Лагерь
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   // Instant Potion recovery (purchased in shop)
@@ -1337,26 +1451,50 @@ export default function CarriageSession({
           🎪 Когнитивный Лагерь Отдыха
         </h1>
         <p style={{ color: 'var(--color-bone-dim)', fontSize: '0.95rem', maxWidth: '550px', textAlign: 'center', lineHeight: '1.4', marginBottom: '1.5rem', fontStyle: 'italic' }}>
-          «Позвольте мыслям улечься, а скверне — рассеяться. Синхронизируйте дыхание с биением древнего круга, пока костер восстанавливает вашу силу.»
+          «Позвольте мыслям улечься, а скверне — рассеяться. Восстановите свою силу через выбранное действие.»
         </p>
 
-        {/* Breathing Circular Guide */}
-        <div className="breathing-circle-container">
-          <div className={`breathing-circle ${meditationPhase}`}>
-            <span className="breathing-phase-text">
-              {meditationPhase === 'inhale' && "Вдох"}
-              {meditationPhase === 'hold-in' && "Задержка"}
-              {meditationPhase === 'exhale' && "Выдох"}
-              {meditationPhase === 'hold-out' && "Задержка"}
-            </span>
-            <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '2px', opacity: 0.7 }}>
-              {meditationPhase === 'inhale' && "Расширяйте легкие"}
-              {meditationPhase === 'hold-in' && "Удерживайте фокус"}
-              {meditationPhase === 'exhale' && "Отпускайте тревогу"}
-              {meditationPhase === 'hold-out' && "Полное расслабление"}
-            </span>
+        {meditationType === 'breathing' ? (
+          /* Breathing Circular Guide */
+          <div className="breathing-circle-container">
+            <div className={`breathing-circle ${meditationPhase}`}>
+              <span className="breathing-phase-text">
+                {meditationPhase === 'inhale' && "Вдох"}
+                {meditationPhase === 'hold-in' && "Задержка"}
+                {meditationPhase === 'exhale' && "Выдох"}
+                {meditationPhase === 'hold-out' && "Задержка"}
+              </span>
+              <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '2px', opacity: 0.7 }}>
+                {meditationPhase === 'inhale' && "Расширяйте легкие"}
+                {meditationPhase === 'hold-in' && "Удерживайте фокус"}
+                {meditationPhase === 'exhale' && "Отпускайте тревогу"}
+                {meditationPhase === 'hold-out' && "Полное расслабление"}
+              </span>
+            </div>
           </div>
-        </div>
+        ) : (
+          /* Alternate physical activities guide */
+          <div style={{ margin: '2rem auto', textAlign: 'center' }}>
+            <div className="heartbeat-pulse" style={{ fontSize: '5rem', marginBottom: '1rem', filter: 'drop-shadow(0 0 15px var(--color-relic-glow))' }}>
+              {meditationType === 'mental' && "🧘"}
+              {meditationType === 'walk' && "🚶"}
+              {meditationType === 'stretch' && "🤸"}
+              {meditationType === 'expander' && "✊"}
+            </div>
+            <h3 style={{ fontSize: '1.25rem', color: '#fff', marginBottom: '0.5rem', fontFamily: 'var(--font-rpg)' }}>
+              {meditationType === 'mental' && "Медитация Бездны: созерцание тишины"}
+              {meditationType === 'walk' && "Вылазка по комнате: разомните ноги, посмотрите в окно"}
+              {meditationType === 'stretch' && "Разминка суставов: расправьте плечи и потянитесь"}
+              {meditationType === 'expander' && "Эспандер: пожамкайте антистресс-мяч или эспандер"}
+            </h3>
+            <p style={{ color: 'var(--color-bone-dim)', fontSize: '0.85rem', maxWidth: '400px', margin: '0 auto', lineHeight: '1.4' }}>
+              {meditationType === 'mental' && "Отпустите все мысли, как плывущие облака. Не концентрируйтесь на них, просто слушайте тишину Бездны."}
+              {meditationType === 'walk' && "Встаньте со стула, сделайте круг по комнате, посмотрите вдаль в окно. Налейте стакан прохладной воды."}
+              {meditationType === 'stretch' && "Сделайте глубокие круговые движения плечами, наклоните голову, потяните руки вверх. Снимите зажимы."}
+              {meditationType === 'expander' && "Сжимайте эспандер или антистресс-игрушку. Выпустите физическое напряжение и накопившийся стресс."}
+            </p>
+          </div>
+        )}
 
         {/* Remaining meditation time */}
         <div style={{ fontSize: '2rem', fontFamily: 'var(--font-rpg)', color: '#fff', marginBottom: '0.8rem' }}>
@@ -1391,7 +1529,7 @@ export default function CarriageSession({
     return (
       <div className="rpg-panel" style={{ maxWidth: '750px', margin: '3rem auto', padding: '2.5rem' }}>
         <h1 className="gothic-title" style={{ color: 'var(--color-blood-glow)', fontSize: '2rem', textAlign: 'center', marginBottom: '1.5rem' }}>
-          Повозка Смерти
+          Путешествие Смерти
         </h1>
         <p style={{ lineHeight: '1.7', color: 'var(--color-bone)', fontSize: '1.05rem', marginBottom: '1.5rem', fontFamily: 'Georgia, serif' }}>
           «Ты — изгнанник, совершивший непростительное злодеяние во вселенной Абаддона. Твои силы запечатаны, на руках звенят 
@@ -1400,7 +1538,7 @@ export default function CarriageSession({
         </p>
         <p style={{ lineHeight: '1.7', color: 'var(--color-bone-dim)', fontSize: '0.95rem', marginBottom: '2.5rem', fontFamily: 'Georgia, serif' }}>
           Но у судьбы свои планы. На рубежах Каргахаула повозка попадает в засаду. Скрежет железа, грохот... Тебе нужно выбраться. 
-          Но сперва давай разберемся с хаосом в твоей голове.
+          Ваше путешествие начинается здесь. Но сперва давай разберемся с хаосом в твоей голове.
         </p>
         <div style={{ textAlign: 'center' }}>
           <button className="rpg-btn rpg-btn-blood" style={{ padding: '0.8rem 2.5rem', fontSize: '1.1rem' }} onClick={generateRandomCharacter}>
@@ -1423,7 +1561,7 @@ export default function CarriageSession({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid var(--color-iron-light)', paddingBottom: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
             <h2 className="gothic-title" style={{ fontSize: '1.5rem', color: 'var(--color-relic-glow)' }}>
-              ⚜️ Военный Штаб Беглеца
+              ⚜️ Походный Штаб Путешествия
             </h2>
             <span style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)' }}>
               Класс: <b style={{ color: '#fff' }}>{character.class}</b> • Уровень: <b style={{ color: '#fff' }}>{character.level}</b>
@@ -1434,16 +1572,9 @@ export default function CarriageSession({
             <button 
               className="rpg-btn" 
               style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}
-              onClick={() => startTimedMeditation(180)}
+              onClick={() => { playClick(); setMeditationSelectOpen(true); }}
             >
               🎪 Войти в Лагерь (Медитация)
-            </button>
-            <button 
-              className="rpg-btn rpg-btn-mana" 
-              style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px', boxShadow: '0 0 8px rgba(0, 191, 255, 0.3)' }}
-              onClick={communeWithSpirits}
-            >
-              🧿 Обратиться к духам (Совет ИИ)
             </button>
             <button 
               className="rpg-btn rpg-btn-blood" 
@@ -1455,34 +1586,17 @@ export default function CarriageSession({
           </div>
         </div>
 
-        {/* Stats Row inside Hub */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '2rem' }}>
-          <div style={{ background: 'rgba(0,0,0,0.3)', padding: '0.8rem', border: '1px solid var(--color-iron-light)' }}>
-            <div style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)' }}>ЗДОРОВЬЕ (Cognitive HP):</div>
-            <div style={{ fontSize: '1.1rem', color: 'var(--color-blood-glow)', fontWeight: 'bold', fontFamily: 'var(--font-rpg)' }}>
-              ❤️ {Math.round(character.hp)} / {character.maxHp} HP
-            </div>
-          </div>
-          <div style={{ background: 'rgba(0,0,0,0.3)', padding: '0.8rem', border: '1px solid var(--color-iron-light)' }}>
-            <div style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)' }}>МАНА (Focus MP):</div>
-            <div style={{ fontSize: '1.1rem', color: 'var(--color-mana-glow)', fontWeight: 'bold', fontFamily: 'var(--font-rpg)' }}>
-              🔮 {Math.round(character.mana)} / {character.maxMana} MP
-            </div>
-          </div>
-          <div style={{ background: 'rgba(0,0,0,0.3)', padding: '0.8rem', border: '1px solid var(--color-iron-light)' }}>
-            <div style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)' }}>УСТАЛОСТЬ (Fatigue):</div>
-            <div style={{ fontSize: '1.1rem', color: 'var(--color-relic-glow)', fontWeight: 'bold', fontFamily: 'var(--font-rpg)' }}>
-              ⚡ {Math.floor(character.dailyWorkMinutes || 0)} / 300 мин
-            </div>
-          </div>
-        </div>
-
         {/* Active daily tasks list (RPG Bounty Contracts) */}
-        <h3 className="gothic-title" style={{ fontSize: '1.15rem', color: 'var(--color-bone)', marginBottom: '0.8rem' }}>
+        <h3 className="gothic-title" style={{ fontSize: '1.15rem', color: 'var(--color-bone)', marginBottom: '1.2rem' }}>
           ⚔️ Активные Боевые Контракты на Сегодня:
         </h3>
         
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '2rem' }}>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+          gap: '1.5rem',
+          marginBottom: '2rem'
+        }}>
           {todayTasks.length > 0 ? (
             todayTasks.map(task => {
               // Procedural profile generation for preview
@@ -1499,61 +1613,75 @@ export default function CarriageSession({
                 <div 
                   key={task.id} 
                   style={{
-                    background: 'rgba(0,0,0,0.4)',
-                    border: `1px solid ${isBoss ? 'var(--color-blood)' : 'var(--color-iron-light)'}`,
-                    borderLeft: `4px solid ${isBoss ? 'var(--color-blood)' : task.type === 'relic' ? 'var(--color-relic)' : 'var(--color-bone)'}`,
-                    padding: '1.2rem',
+                    background: 'radial-gradient(circle, rgba(25, 20, 30, 0.85) 0%, rgba(12, 10, 15, 0.95) 100%)',
+                    border: `2px solid ${isBoss ? 'var(--color-blood-glow)' : 'var(--color-iron-light)'}`,
+                    boxShadow: isBoss 
+                      ? '0 0 15px rgba(139, 26, 26, 0.4), inset 0 0 10px rgba(139, 26, 26, 0.1)'
+                      : '0 5px 15px rgba(0,0,0,0.5), inset 0 0 10px rgba(255,255,255,0.02)',
+                    padding: '1.5rem',
                     display: 'flex',
+                    flexDirection: 'column',
                     justifyContent: 'space-between',
-                    alignItems: 'center',
-                    flexWrap: 'wrap',
-                    gap: '1rem'
+                    minHeight: '380px',
+                    position: 'relative',
+                    transition: 'all 0.25s ease'
                   }}
+                  className="gothic-fate-card"
                 >
-                  <div style={{ flex: 1, minWidth: '220px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '1.25rem' }}>{variation.icon}</span>
-                      <h4 style={{ fontSize: '1.1rem', color: '#fff', fontWeight: 'bold', margin: 0 }}>{task.title}</h4>
-                      
+                  <div>
+                    {/* Centered Large Icon */}
+                    <div style={{ display: 'flex', justifyContent: 'center', fontSize: '3rem', margin: '0.5rem 0 1rem 0', filter: 'drop-shadow(0 0 10px rgba(255,255,255,0.05))' }}>
+                      {variation.icon}
+                    </div>
+
+                    <h4 className="gothic-title" style={{ fontSize: '1.1rem', color: '#fff', fontWeight: 'bold', margin: '0 0 0.8rem 0', textAlign: 'center', lineHeight: '1.4' }}>
+                      {task.title}
+                    </h4>
+                    
+                    {/* Nature / Mode Badges */}
+                    <div style={{ display: 'flex', justifyContent: 'center', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
                       <span style={{ 
-                        fontSize: '0.65rem', 
+                        fontSize: '0.62rem', 
                         color: task.nature === 'internal' ? '#4fc3f7' : '#ff8a80', 
                         background: 'rgba(0,0,0,0.4)', 
-                        padding: '1px 5px', 
+                        padding: '2px 6px', 
                         borderRadius: '3px',
                         border: `1px solid ${task.nature === 'internal' ? 'rgba(79, 195, 247, 0.25)' : 'rgba(255, 138, 128, 0.25)'}` 
                       }}>
-                        {task.nature === 'internal' ? '🧿 Внутренний Обет' : '⚔️ Внешняя Схватка'}
-                        {task.combatLore?.visualType ? ` (${task.combatLore.visualType})` : ''}
+                        {task.nature === 'internal' ? '🧿 Внутренний' : '⚔️ Внешний'}
                       </span>
                       {task.executionMode && task.executionMode !== 'ask_later' && (
                         <span style={{
-                          fontSize: '0.65rem',
+                          fontSize: '0.62rem',
                           color: 'var(--color-bone-dim)',
                           background: 'rgba(0,0,0,0.4)',
-                          padding: '1px 5px',
+                          padding: '2px 6px',
                           borderRadius: '3px',
                           border: '1px solid rgba(255, 255, 255, 0.1)'
                         }}>
-                          {task.executionMode === 'timer' ? '⏳ Таймер' : '🌅 В течение дня'}
+                          {task.executionMode === 'timer' ? '⏳ Таймер' : '🌅 День'}
                         </span>
                       )}
                     </div>
                     
-                    <div style={{ fontSize: '0.78rem', color: 'var(--color-bone-dim)', marginTop: '4px' }}>
-                      Враг: <b style={{ color: 'var(--color-blood-glow)' }}>{eName}</b> ({isBoss ? 'Босс Осады' : 'Существо Охоты'}) 
-                      • Время: <b>{task.pomodoroTime} мин</b> • Токсичность: <b>{task.toxicity === 'scary' ? 'Страшная' : task.toxicity === 'tedious' ? 'Скучная' : task.toxicity === 'vague' ? 'Мутная' : 'Обычная'}</b>
+                    {/* Details Info */}
+                    <div style={{ fontSize: '0.78rem', color: 'var(--color-bone-dim)', background: 'rgba(0,0,0,0.25)', padding: '0.6rem', border: '1px solid rgba(255,255,255,0.02)', marginBottom: '0.8rem' }}>
+                      <div style={{ marginBottom: '2px' }}>Враг: <b style={{ color: 'var(--color-blood-glow)' }}>{eName}</b></div>
+                      <div style={{ marginBottom: '2px' }}>Сущность: <b>{isBoss ? 'Осада (Босс)' : 'Охота'}</b></div>
+                      <div style={{ marginBottom: '2px' }}>Время: <b>{task.pomodoroTime} мин</b></div>
+                      <div>Токсичность: <b>{task.toxicity === 'scary' ? 'Страшная' : task.toxicity === 'tedious' ? 'Скучная' : task.toxicity === 'vague' ? 'Мутная' : 'Обычная'}</b></div>
                     </div>
+
                     {task.intent && (
-                      <div style={{ fontSize: '0.75rem', fontStyle: 'italic', color: '#8c7d6b', marginTop: '4px' }}>
+                      <p style={{ fontSize: '0.75rem', fontStyle: 'italic', color: '#8c7d6b', textAlign: 'center', margin: '0 0 1rem 0', lineHeight: '1.3' }}>
                         «{task.intent}»
-                      </div>
+                      </p>
                     )}
                   </div>
 
                   <button 
                     className="rpg-btn rpg-btn-blood"
-                    style={{ padding: '0.6rem 1.8rem', fontSize: '0.9rem' }}
+                    style={{ width: '100%', padding: '0.6rem 0', fontSize: '0.9rem', marginTop: 'auto' }}
                     onClick={() => {
                       playClick();
                       const runStart = (mode) => {
@@ -1580,13 +1708,13 @@ export default function CarriageSession({
                       }
                     }}
                   >
-                    {task.timeLeft !== undefined ? `⚔️ ВОЗОБНОВИТЬ БОЙ (${Math.ceil(task.timeLeft / 60)} мин)` : '⚔️ ВСТУПИТЬ В БОЙ'}
+                    {task.timeLeft !== undefined ? `⚔️ ВОЗОБНОВИТЬ (${Math.ceil(task.timeLeft / 60)}м)` : '⚔️ ВСТУПИТЬ В БОЙ'}
                   </button>
                 </div>
               );
             })
           ) : (
-            <div style={{ border: '1px dashed var(--color-iron-light)', padding: '2rem', textAlign: 'center', background: 'rgba(0,0,0,0.2)' }}>
+            <div style={{ border: '1px dashed var(--color-iron-light)', padding: '2rem', textAlign: 'center', background: 'rgba(0,0,0,0.2)', gridColumn: 'span 3' }}>
               <Compass size={32} style={{ color: 'var(--color-iron-light)', marginBottom: '0.5rem' }} />
               <p style={{ fontSize: '0.9rem', color: 'var(--color-bone-dim)' }}>
                 Свиток пуст. На сегодня нет активных контрактов (задач) в ежедневнике.
@@ -1597,6 +1725,7 @@ export default function CarriageSession({
             </div>
           )}
         </div>
+        {renderMeditationSelect()}
       </div>
     );
   }
@@ -1702,7 +1831,7 @@ export default function CarriageSession({
             ВЕРНУТЬСЯ
           </button>
           <button className="rpg-btn rpg-btn-blood" style={{ padding: '0.75rem 2.5rem' }} onClick={handleStartCrashSequence}>
-            РАЗБИТЬ ПОВОЗКУ И НАЧАТЬ
+            НАЧАТЬ ПУТЕШЕСТВИЕ
           </button>
         </div>
       </div>
@@ -1733,7 +1862,7 @@ export default function CarriageSession({
           <p style={{ fontSize: '1rem', color: 'var(--color-bone-dim)', marginBottom: '2rem' }}>
             Повозка перевернулась и разбита в щепки! Вы очнулись в кандалах под дождем. 
             Каргахаульские конвоиры лежат без сознания, но скверна стягивается.
-            <b> Напишите первое элементарное физическое или умственное действие, которое вы сделаете ПРЯМО СЕЙЧАС, чтобы запустить процесс.</b>
+            <b> Напишите первое элементарное физическое или умственное действие, которое вы сделаете ПРЯМО СЕЙЧАС, чтобы запустить путешествие.</b>
           </p>
 
           <div style={{ fontSize: '1.2rem', color: '#fff', fontFamily: 'var(--font-rpg)', marginBottom: '1.5rem' }}>
@@ -1823,7 +1952,7 @@ export default function CarriageSession({
           </div>
           <div style={{ display: 'flex', gap: '1rem', fontSize: '0.8rem', color: 'var(--color-bone-dim)' }}>
             <span>❤️ Здоровье: <b style={{ color: 'var(--color-blood-glow)' }}>{Math.round(character.hp)} HP</b></span>
-            <span>🔮 Мана: <b style={{ color: 'var(--color-mana-glow)' }}>{Math.round(character.mana)} MP</b></span>
+            <span>🔮 Ресурс: <b style={{ color: 'var(--color-mana-glow)' }}>{Math.round(character.mana)} RP</b></span>
           </div>
           <div style={{ fontSize: '0.8rem', color: 'var(--color-blood-glow)' }}>
             🚨 Угроза Скверны: {isRunning ? '⚔️ ИДЕТ СХВАТКА' : '⏸ БЕЗОПАСНЫЙ СОН'}
@@ -2429,7 +2558,7 @@ export default function CarriageSession({
                   <button 
                     className="rpg-btn" 
                     style={{ flex: 1, fontSize: '0.75rem', padding: '6px', background: 'rgba(0,0,0,0.5)', borderColor: 'var(--color-relic-glow)' }}
-                    onClick={() => startTimedMeditation(180)}
+                    onClick={() => { playClick(); setMeditationSelectOpen(true); }}
                   >
                     🎪 Войти в Лагерь (3м)
                   </button>
@@ -2480,6 +2609,7 @@ export default function CarriageSession({
 
         </div>
 
+        {renderMeditationSelect()}
       </div>
     );
   }
@@ -2601,7 +2731,7 @@ export default function CarriageSession({
   return (
     <div className="rpg-panel" style={{ textAlign: 'center', padding: '3rem' }}>
       <Skull size={48} style={{ color: 'var(--color-blood-glow)', marginBottom: '1rem' }} />
-      <h2 className="gothic-title">Повозка пуста</h2>
+      <h2 className="gothic-title">Путешествие пусто</h2>
       <p style={{ color: 'var(--color-bone-dim)', marginTop: '0.5rem' }}>
         Все текущие цели достигнуты, либо вы еще не сгенерировали своего беглеца.
       </p>

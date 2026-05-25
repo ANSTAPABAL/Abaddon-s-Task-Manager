@@ -23,6 +23,21 @@ export default function SpotifyPlayer({
     setSpotifyPlaying(isPlaying);
   }, [isPlaying, setSpotifyPlaying]);
 
+  // Check token age on load
+  useEffect(() => {
+    const token = localStorage.getItem('spotify_token');
+    const createdAt = localStorage.getItem('spotify_token_created_at');
+    if (token && createdAt) {
+      const elapsed = Date.now() - Number(createdAt);
+      if (elapsed > 3300 * 1000) { // 55 minutes
+        console.log("Spotify token expired by age check on startup, clearing...");
+        localStorage.removeItem('spotify_token');
+        localStorage.removeItem('spotify_token_created_at');
+        setSpotifyToken('');
+      }
+    }
+  }, [setSpotifyToken]);
+
   // Focus playlists custom state (user can paste their own Spotify URI links!)
   const [playlists, setPlaylists] = useState({
     escape: 'spotify:playlist:4lGv8NnJpX8v7CqL8JpDgu', // Atrium Carceri & Swans Dark Ambient Mix
@@ -107,6 +122,7 @@ export default function SpotifyPlayer({
 
           if (!response.ok) throw new Error("Failed token exchange");
           const data = await response.json();
+          localStorage.setItem('spotify_token_created_at', Date.now().toString());
           setSpotifyToken(data.access_token);
           // clean URL parameters
           window.history.replaceState({}, document.title, window.location.origin);
@@ -176,12 +192,27 @@ export default function SpotifyPlayer({
       setIsPlaying(!state.paused);
     });
 
+    // Add authentication error listeners to auto-reauth expired tokens
+    newPlayer.addListener('authentication_error', ({ message }) => {
+      console.error('Spotify SDK Authentication Error:', message);
+      setSpotifyError("Сессия Spotify истекла. Пожалуйста, переподключите аккаунт.");
+      setSpotifyToken('');
+      localStorage.removeItem('spotify_token');
+      localStorage.removeItem('spotify_token_created_at');
+    });
+
+    newPlayer.addListener('initialization_error', ({ message }) => {
+      console.error('Spotify SDK Initialization Error:', message);
+    });
+
     newPlayer.connect();
     setPlayer(newPlayer);
 
     return () => {
       newPlayer.removeListener('ready');
       newPlayer.removeListener('player_state_changed');
+      newPlayer.removeListener('authentication_error');
+      newPlayer.removeListener('initialization_error');
       newPlayer.disconnect();
       setPlayer(null);
     };

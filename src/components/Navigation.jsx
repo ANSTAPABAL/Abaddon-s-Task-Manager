@@ -1,8 +1,14 @@
 import React from 'react';
-import { Skull, Shield, BookOpen, AlertTriangle, Music } from 'lucide-react';
+import { Skull, Shield, BookOpen, AlertTriangle } from 'lucide-react';
 import { useAudio } from '../hooks/useAudio';
 
-export default function Navigation({ activeTab, setActiveTab, character, spotifyConnected }) {
+export default function Navigation({ 
+  activeTab, 
+  setActiveTab, 
+  character, 
+  characterDrawerOpen, 
+  setCharacterDrawerOpen 
+}) {
   const { playClick } = useAudio();
 
   const handleTabClick = (tab) => {
@@ -55,29 +61,44 @@ export default function Navigation({ activeTab, setActiveTab, character, spotify
           </div>
         </div>
 
-        {/* Center: HP & MP Bars */}
-        <div style={{ display: 'flex', gap: '1rem', flex: '1', maxWidth: '400px' }}>
+        {/* Center: HP, Resource & Fatigue Bars */}
+        <div style={{ display: 'flex', gap: '1rem', flex: '1', maxWidth: '550px' }}>
           {/* HP Bar */}
           <div style={{ flex: 1 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '2px', fontFamily: 'var(--font-rpg)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', marginBottom: '2px', fontFamily: 'var(--font-rpg)' }}>
               <span>ЗДОРОВЬЕ (КОГНИТИВНЫЙ РЕСУРС)</span>
-              <span>{character.hp}/{character.maxHp}</span>
+              <span>{Math.round(character.hp)}/{character.maxHp}</span>
             </div>
-            <div className="character-bar">
+            <div className="character-bar" style={{ height: '14px' }}>
               <div className="character-bar-fill hp" style={{ width: `${Math.max(0, (character.hp / character.maxHp) * 100)}%` }} />
               <div className="character-bar-text">HP</div>
             </div>
           </div>
 
-          {/* Mana Bar */}
+          {/* Resource Bar */}
           <div style={{ flex: 1 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '2px', fontFamily: 'var(--font-rpg)' }}>
-              <span>МАНА (ФОКУС / ЭНЕРГИЯ)</span>
-              <span>{character.mana}/{character.maxMana}</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', marginBottom: '2px', fontFamily: 'var(--font-rpg)' }}>
+              <span>РЕСУРС (ФОКУС / ЭНЕРГИЯ)</span>
+              <span>{Math.round(character.mana)}/{character.maxMana}</span>
             </div>
-            <div className="character-bar">
-              <div className="character-bar-fill mp" style={{ width: `${Math.max(0, (character.mana / character.maxMana) * 100)}%` }} />
-              <div className="character-bar-text">MP</div>
+            <div className="character-bar" style={{ height: '14px' }}>
+              <div className="character-bar-fill mp" style={{ width: `${Math.max(0, (character.mana / character.maxMana) * 100)}%`, background: 'linear-gradient(to right, #4b0082, #8a2be2)' }} />
+              <div className="character-bar-text">RP</div>
+            </div>
+          </div>
+
+          {/* Fatigue Bar */}
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', marginBottom: '2px', fontFamily: 'var(--font-rpg)' }}>
+              <span>ВЫНОСЛИВОСТЬ (УСТАЛОСТЬ)</span>
+              <span>{Math.floor(character.dailyWorkMinutes || 0)}/300 м</span>
+            </div>
+            <div className="character-bar" style={{ height: '14px' }}>
+              <div className="character-bar-fill fatigue" style={{
+                width: `${Math.min(100, Math.max(0, ((character.dailyWorkMinutes || 0) / 300) * 100))}%`,
+                background: 'linear-gradient(to right, #daa520, #ff8c00)'
+              }} />
+              <div className="character-bar-text">⚡</div>
             </div>
           </div>
         </div>
@@ -90,20 +111,20 @@ export default function Navigation({ activeTab, setActiveTab, character, spotify
             style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}
           >
             <Skull size={14} />
-            ПОВОЗКА
+            ПУТЕШЕСТВИЕ
           </button>
           
           <button 
-            className={`rpg-btn ${activeTab === 'character' ? 'rpg-btn-mana' : ''}`}
-            onClick={() => handleTabClick('character')}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}
+            className={`rpg-btn ${characterDrawerOpen ? 'rpg-btn-mana' : ''}`}
+            onClick={() => { playClick(); setCharacterDrawerOpen(!characterDrawerOpen); }}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', borderColor: characterDrawerOpen ? 'var(--color-mana)' : '' }}
           >
             <Shield size={14} />
-            ПЕРСОНАЖ
+            👤 ПЕРСОНАЖ
           </button>
 
           <button 
-            className={`rpg-btn ${activeTab === 'planner' ? '' : ''}`}
+            className={`rpg-btn ${activeTab === 'planner' ? 'rpg-btn-mana' : ''}`}
             onClick={() => handleTabClick('planner')}
             style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', borderColor: activeTab === 'planner' ? 'var(--color-bone)' : '' }}
           >

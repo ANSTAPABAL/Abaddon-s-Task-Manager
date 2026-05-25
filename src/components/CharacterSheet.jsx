@@ -23,7 +23,7 @@ export default function CharacterSheet({ character, setCharacter, tasks, setTask
     { id: 'item_sword', name: 'Палаш Кровавого Алтаря', slot: 'weapon', price: 25, bonus: '+25% к сбору Золота', icon: '⚔️' },
     { id: 'item_shield', name: 'Рунический Эгис Файрвола', slot: 'shield', price: 15, bonus: '+10 HP при отходе', icon: '🛡️' },
     { id: 'item_armor', name: 'Мантия Безмятежности', slot: 'armor', price: 30, bonus: '+25 к Макс HP', icon: '👘' },
-    { id: 'item_ring', name: 'Перстень Допаминовой Сети', slot: 'ring', price: 20, bonus: '+5 MP за микро-действия', icon: '💍' },
+    { id: 'item_ring', name: 'Перстень Допаминовой Сети', slot: 'ring', price: 20, bonus: '+5 RP за микро-действия', icon: '💍' },
     { id: 'item_potion', name: 'Зелье Когнитивной Выносливости', slot: 'potion', price: 8, bonus: 'Мгновенный сброс 60м усталости, лечит 25 HP', icon: '🧪' }
   ];
 
@@ -486,8 +486,46 @@ export default function CharacterSheet({ character, setCharacter, tasks, setTask
                       <h3 style={{ fontSize: '1.1rem', color: '#fff', textDecoration: task.status === 'completed' ? 'line-through' : 'none' }}>
                         {task.title}
                       </h3>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginTop: '2px' }}>
-                        {task.type === 'siege' ? 'ОСАДА (БОСС)' : task.type === 'relic' ? 'РЕЛИКВИЯ' : 'ОХОТА'} • {task.pomodoroTime} мин
+                      <div style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginTop: '2px', display: 'flex', flexWrap: 'wrap', gap: '0.4rem', alignItems: 'center' }}>
+                        <span>{task.type === 'siege' ? '💥 ОСАДА (БОСС)' : task.type === 'relic' ? '💎 РЕЛИКВИЯ' : '🏹 ОХОТА'} • {task.pomodoroTime} мин</span>
+                        
+                        {/* Schedule Badge */}
+                        {task.date === new Date().toISOString().split('T')[0] ? (
+                          <span style={{ color: '#1db954', background: 'rgba(29, 185, 84, 0.1)', border: '1px solid rgba(29, 185, 84, 0.25)', padding: '1px 5px', fontSize: '0.65rem' }}>
+                            📅 На сегодня
+                          </span>
+                        ) : task.date ? (
+                          <span style={{ color: '#ffb813', background: 'rgba(255, 184, 19, 0.1)', border: '1px solid rgba(255, 184, 19, 0.25)', padding: '1px 5px', fontSize: '0.65rem' }}>
+                            ⏳ Запланировано на {task.date}
+                          </span>
+                        ) : (
+                          <span style={{ color: '#a894c7', background: 'rgba(168, 148, 199, 0.1)', border: '1px solid rgba(168, 148, 199, 0.25)', padding: '1px 5px', fontSize: '0.65rem' }}>
+                            💀 В бэклоге
+                          </span>
+                        )}
+
+                        {/* Nature Badge */}
+                        <span style={{ 
+                          color: task.nature === 'internal' ? '#4fc3f7' : '#ff8a80', 
+                          background: task.nature === 'internal' ? 'rgba(79, 195, 247, 0.1)' : 'rgba(255, 138, 128, 0.1)', 
+                          border: `1px solid ${task.nature === 'internal' ? 'rgba(79, 195, 247, 0.25)' : 'rgba(255, 138, 128, 0.25)'}`,
+                          padding: '1px 5px', 
+                          fontSize: '0.65rem' 
+                        }}>
+                          {task.nature === 'internal' ? '🧿 Внутренний' : '⚔️ Внешний'} ({task.combatLore?.visualType || task.visualType || (task.nature === 'internal' ? 'ритуал' : 'схватка')})
+                        </span>
+                        
+                        {task.executionMode && task.executionMode !== 'ask_later' && (
+                          <span style={{
+                            color: 'var(--color-bone-dim)',
+                            background: 'rgba(255, 255, 255, 0.05)',
+                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                            padding: '1px 5px',
+                            fontSize: '0.65rem'
+                          }}>
+                            {task.executionMode === 'timer' ? '⏳ Таймер' : '🌅 В течение дня'}
+                          </span>
+                        )}
                       </div>
                     </div>
                     {task.curseLevel > 0 && (
@@ -786,7 +824,7 @@ export default function CharacterSheet({ character, setCharacter, tasks, setTask
                 Зал Пьедесталов пуст и погружен во тьму. Ваши герои еще не взошли на постамент бессмертия.
               </p>
               <p style={{ fontSize: '0.8rem', color: 'var(--color-iron-light)', marginTop: '8px', lineHeight: '1.4' }}>
-                ☀️ Запечатайте как минимум <b>15 контрактов</b> и одолейте <b>3 тяжелых Осады (Боссов)</b>, чтобы разблокировать Ритуал Искупления в боевом штабе Повозки и вписать своего первого героя в вечные летописи Света!
+                ☀️ Запечатайте как минимум <b>15 контрактов</b> и одолейте <b>3 тяжелых Осады (Боссов)</b>, чтобы разблокировать Ритуал Искупления в боевом штабе Путешествия и вписать своего первого героя в вечные летописи Света!
               </p>
             </div>
           )}

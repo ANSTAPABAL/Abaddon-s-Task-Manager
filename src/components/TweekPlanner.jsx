@@ -46,7 +46,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
       return;
     }
 
-    if (character.hp <= 15) {
+    if (character.hp <= 5) {
       alert("Ваш разум слишком слаб для этой жертвы! Восстановите HP (выпейте зелье или отдохните у костра).");
       return;
     }
@@ -54,7 +54,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
     playBoneCrack();
     
     // Move tasks to tomorrow and increase curse level
-    setTasks(prev => prev.map(t => {
+    const updatedTasks = tasks.map(t => {
       if (t.date === todayDateStr && t.status === 'active') {
         return {
           ...t,
@@ -63,17 +63,23 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
         };
       }
       return t;
-    }));
+    });
+    setTasks(updatedTasks);
 
     // Deduct HP
     setCharacter(prev => ({
       ...prev,
-      hp: Math.max(1, prev.hp - 15),
-      totalHpSacrificed: (prev.totalHpSacrificed || 0) + 15
+      hp: Math.max(1, prev.hp - 5),
+      totalHpSacrificed: (prev.totalHpSacrificed || 0) + 5
     }));
 
-    setRitualMessage(`💀 Сделка совершена! ${todayActiveTasks.length} задач перенесены на завтра. Потеряно 15 HP рассудка. Скверна перенесенных задач возросла!`);
+    setRitualMessage(`💀 Сделка совершена! ${todayActiveTasks.length} задач перенесены на завтра. Потеряно 5 HP рассудка. Скверна перенесенных задач возросла!`);
     setTimeout(() => setRitualMessage(''), 7000);
+
+    // Automatically trigger AI Spirits Counsel
+    if (communeWithSpirits) {
+      setTimeout(() => communeWithSpirits(updatedTasks), 150);
+    }
   };
 
   const handlePullTaskToToday = (taskId) => {
@@ -115,8 +121,8 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
     const targetTask = tasks.find(t => t.id === taskId);
     if (!targetTask) return;
 
-    if (character.hp <= 10) {
-      alert("Ваш разум слишком слаб для этой жертвы! Требуется 10 HP.");
+    if (character.hp <= 2) {
+      alert("Ваш разум слишком слаб для этой жертвы! Требуется 2 HP.");
       return;
     }
 
@@ -128,7 +134,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
       return d.toISOString().split('T')[0];
     })() : null; // backlog is null
 
-    setTasks(prev => prev.map(t => {
+    const updatedTasks = tasks.map(t => {
       if (t.id === taskId) {
         return {
           ...t,
@@ -137,18 +143,24 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
         };
       }
       return t;
-    }));
+    });
+    setTasks(updatedTasks);
 
     setCharacter(prev => ({
       ...prev,
-      hp: Math.max(1, prev.hp - 10),
-      totalHpSacrificed: (prev.totalHpSacrificed || 0) + 10
+      hp: Math.max(1, prev.hp - 2),
+      totalHpSacrificed: (prev.totalHpSacrificed || 0) + 2
     }));
 
     const destLabel = destination === 'tomorrow' ? 'на завтра' : 'в Бэклог';
-    setRitualMessage(`💀 Задача «${targetTask.title}» изгнана ${destLabel}! Потеряно 10 HP. Скверна задачи возросла.`);
+    setRitualMessage(`💀 Задача «${targetTask.title}» изгнана ${destLabel}! Потеряно 2 HP. Скверна задачи возросла.`);
     setTimeout(() => setRitualMessage(''), 5000);
     setTaskToPushId('');
+
+    // Automatically trigger AI Spirits Counsel
+    if (communeWithSpirits) {
+      setTimeout(() => communeWithSpirits(updatedTasks), 150);
+    }
   };
 
   const handleOpenEdit = (task) => {
@@ -399,7 +411,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
 
   const handlePostponeTask = (taskId, targetDateStr) => {
     playClick();
-    setTasks(prev => prev.map(t => {
+    const updatedTasks = tasks.map(t => {
       if (t.id === taskId) {
         const nextCurse = Math.min(5, t.curseLevel + 1);
         return { 
@@ -409,7 +421,13 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
         };
       }
       return t;
-    }));
+    });
+    setTasks(updatedTasks);
+
+    // Automatically trigger AI Spirits Counsel
+    if (communeWithSpirits) {
+      setTimeout(() => communeWithSpirits(updatedTasks), 150);
+    }
   };
 
   const handleBuryTask = (taskId) => {
@@ -445,17 +463,25 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
     if (!taskId) return;
 
     playClick();
-    setTasks(prev => prev.map(t => {
+    let dateChanged = false;
+    const updatedTasks = tasks.map(t => {
       if (t.id === taskId) {
         let curse = t.curseLevel;
         if (t.date && t.date !== targetDateStr && targetDateStr !== null) {
           curse = Math.min(5, curse + 1);
+          dateChanged = true;
         }
         return { ...t, date: targetDateStr, curseLevel: curse };
       }
       return t;
-    }));
+    });
+    setTasks(updatedTasks);
     setDraggedTaskId(null);
+
+    // Automatically trigger AI Spirits Counsel if rescheduled
+    if (dateChanged && communeWithSpirits) {
+      setTimeout(() => communeWithSpirits(updatedTasks), 150);
+    }
   };
 
   const renderJourneyMap = () => {
@@ -466,8 +492,8 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
       return acc + 5;
     }, 0);
 
-    let location = "🚐 Побег в Смертной Повозке";
-    let locationDesc = "Вы разбили повозку смерти и выбираетесь из лесов империи Света.";
+    let location = "🚐 Начало великого Путешествия";
+    let locationDesc = "Вы вырвались из оков и отправляетесь в мрачные земли Абаддона.";
     if (miles >= 20 && miles < 50) {
       location = "💀 Равнины Ндравна (Империя Нежити)";
       locationDesc = "Вокруг расстилается туман, земля усеяна костями. Шепчут духи мертвых.";
@@ -504,7 +530,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
 
         {/* Location tags below progress */}
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: 'var(--color-bone-dim)', marginTop: '6px', fontFamily: 'var(--font-rpg)' }}>
-          <span>Повозка (0м)</span>
+          <span>Начало (0м)</span>
           <span style={{ color: miles >= 20 ? '#fff' : '' }}>Ндравна (20м)</span>
           <span style={{ color: miles >= 50 ? '#fff' : '' }}>Каргахаул (50м)</span>
           <span style={{ color: miles >= 100 ? '#fff' : '' }}>Империи (100м)</span>
@@ -559,14 +585,6 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
           >
             <Plus size={16} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />
             ПРИБИТЬ К ДОГОВОРУ ДНЯ
-          </button>
-
-          <button 
-            className="rpg-btn"
-            style={{ fontSize: '0.9rem', borderColor: 'rgba(0, 191, 255, 0.4)', color: '#4fc3f7', background: 'rgba(0,0,0,0.3)', boxShadow: '0 0 5px rgba(0,191,255,0.1)' }}
-            onClick={communeWithSpirits}
-          >
-            🧿 Взывать к духам
           </button>
         </div>
       </div>

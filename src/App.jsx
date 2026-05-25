@@ -91,16 +91,26 @@ export default function App() {
   const [spiritsCounselText, setSpiritsCounselText] = useState('');
   const [spiritsCounselLoading, setSpiritsCounselLoading] = useState(false);
 
-  const handleCommuneWithSpirits = async () => {
+  // Character Sidebar Drawer state
+  const [characterDrawerOpen, setCharacterDrawerOpen] = useState(false);
+
+  // Daily Judgment states
+  const [judgmentOpen, setJudgmentOpen] = useState(false);
+  const [judgmentTasks, setJudgmentTasks] = useState([]);
+  const [judgmentIndex, setJudgmentIndex] = useState(0);
+  const [judgmentShowReschedule, setJudgmentShowReschedule] = useState(false);
+
+  const handleCommuneWithSpirits = async (overrideTasks) => {
     playClick();
     setSpiritsCounselOpen(true);
     setSpiritsCounselLoading(true);
     setSpiritsCounselText('');
 
     try {
+      const activeTasks = overrideTasks || tasks;
       const todayStr = new Date().toISOString().split('T')[0];
-      const todayTasks = tasks.filter(t => t.date === todayStr && t.status === 'active');
-      const backlogTasks = tasks.filter(t => t.date === null && t.status === 'active');
+      const todayTasks = activeTasks.filter(t => t.date === todayStr && t.status === 'active');
+      const backlogTasks = activeTasks.filter(t => t.date === null && t.status === 'active');
 
       const charContext = {
         name: character.name,
@@ -117,11 +127,12 @@ export default function App() {
 Пользователь обращается к тебе за советом по поводу своих задач.
 Пользователь имеет СДВГ. Твоя цель — дать атмосферный совет, поддержать и разгрузить его мозг, помочь с фокусом.
 
-Взгляни на его состояние (HP - когнитивный ресурс, Mana - энергия, время работы сегодня) и список задач (сегодняшние и бэклог).
+Взгляни на его состояние (HP - когнитивный ресурс, Mana - энергия, время работы сегодня) и список задач (сегодняшние и бэклог, включая уровень их скверны/переносов "curseLevel").
 
 Оцени его состояние:
 - Если HP низкое (меньше 40) или он проработал много минут сегодня: расскажи мрачным шепотом, что его душа истощена, он чувствует отягощение, и не стоит насиловать себя. Посоветуй отдохнуть, отложить сложные задачи ("осады") или заменить их на простые ритуалы.
 - Если HP высокое и задач сделано мало: подбодри его, скажи, что духи чувствуют прилив сил в его жилах, он на пике готовности к охоте.
+- Если в списке есть задачи с высоким уровнем скверны (curseLevel >= 2), обрати на них особое внимание. Объясни, что эти задачи долго откладывались или переносились, они высасывают силы одним своим видом. Посоветуй разбить их на микро-шаги, снизить сложность (например, превратить "осаду" в простую "охоту"), или просто начать с 2 минут действия.
 - Предложи конкретную задачу, с которой лучше начать (выбери самую простую или ту, которая снизит тревогу).
 - Если нужно, предложи заменить сложную задачу на более простую или разделить её.
 - Задай 1-2 интригующих вопроса, помогающих войти в состояние потока.
@@ -129,8 +140,8 @@ export default function App() {
 Напиши ответ в готическом, таинственном, но теплом и поддерживающем СДВГ-мозг стиле (на русском языке). Используй списки, абзацы и красивые выделения. Сделай ответ не слишком длинным (3-4 абзаца).`;
 
       const userMessage = `Персонаж: ${JSON.stringify(charContext)}
-Активные задачи на сегодня: ${JSON.stringify(todayTasks.map(t => ({ title: t.title, type: t.type, toxicity: t.toxicity, steps: t.steps.length })))}
-Задачи в бэклоге: ${JSON.stringify(backlogTasks.map(t => t.title))}
+Активные задачи на сегодня: ${JSON.stringify(todayTasks.map(t => ({ title: t.title, type: t.type, toxicity: t.toxicity, steps: t.steps.length, curseLevel: t.curseLevel })))}
+Задачи в бэклоге: ${JSON.stringify(backlogTasks.map(t => ({ title: t.title, curseLevel: t.curseLevel })))}
 `;
 
       const response = await fetch('http://localhost:3001/api/ai/complete', {
@@ -212,7 +223,6 @@ export default function App() {
   const [spotifyToken, setSpotifyToken] = useState(() => localStorage.getItem('spotify_token') || '');
   const [currentTrack, setCurrentTrack] = useState(null);
   const [activeSessionType, setActiveSessionType] = useState(null); // escape, hunt, siege, etc.
-  const [safeMode, setSafeMode] = useState(false);
 
   // Sync token to localStorage
   useEffect(() => {
@@ -286,7 +296,7 @@ export default function App() {
 
   const handleRerollCharacter = () => {
     playClick();
-    if (window.confirm("Вы уверены, что хотите стереть текущего героя и сгенерировать нового? Весь игровой прогресс будет сброшен.")) {
+    if (window.confirm("Вы уверены, что хотите стереть текущего героя и сгенерировать нового? Все ваши активные задачи будут перенесены как Долг прошлого (Труп прошлого).")) {
       const classes = [
         "Маг огня", "Маг земли", "Маг камня", "Маг молнии",
         "Маг огня и камня (Мультикласс)", "Маг молнии и земли (Мультикласс)",
@@ -358,6 +368,19 @@ export default function App() {
       };
 
       setCharacter(newChar);
+
+      // Convert active tasks to "corpse" (Труп прошлого / Debt)
+      setTasks(prev => prev.map(t => {
+        if (t.status === 'active') {
+          return {
+            ...t,
+            type: 'corpse',
+            curseLevel: Math.min(5, t.curseLevel + 1)
+          };
+        }
+        return t;
+      }));
+
       setSettingsOpen(false);
       setActiveTab('escape');
     }
@@ -406,6 +429,16 @@ export default function App() {
           nature: t.nature || 'external'
         }));
         setTasks(migrated);
+
+        // Trigger Daily Judgment Ceremony for overdue active contracts
+        const todayStr = new Date().toISOString().split('T')[0];
+        const overdue = migrated.filter(t => t.status === 'active' && t.date && t.date < todayStr);
+        if (overdue.length > 0) {
+          setJudgmentTasks(overdue);
+          setJudgmentIndex(0);
+          setJudgmentOpen(true);
+          setJudgmentShowReschedule(false);
+        }
       })
       .catch(err => console.warn("Using in-memory tasks (Backend server offline)"));
 
@@ -573,7 +606,6 @@ export default function App() {
   // --- DYNAMIC CORRUPTION EXHAUSTION SYSTEM ---
   // Calculates corruption overlay filter levels based on cursed or messy backlog tasks.
   const calculateCorruptionLevel = () => {
-    if (safeMode) return 0;
     const cursedTasksCount = tasks.filter(t => t.status === 'active' && t.curseLevel > 2).length;
     if (cursedTasksCount >= 8) return 5;
     if (cursedTasksCount >= 5) return 4;
@@ -621,8 +653,8 @@ export default function App() {
 
       {/* Settings gothic dropdown/modal panel */}
       {settingsOpen && (
-        <div className="gothic-modal-overlay" style={{ zIndex: 1050 }}>
-          <div className="gothic-modal-content" style={{ maxWidth: '500px', width: '90%', border: '2px solid var(--color-iron-light)' }}>
+        <div className="gothic-modal-overlay" style={{ zIndex: 1050 }} onClick={() => setSettingsOpen(false)}>
+          <div className="gothic-modal-content" style={{ maxWidth: '500px', width: '90%', border: '2px solid var(--color-iron-light)' }} onClick={(e) => e.stopPropagation()}>
             
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-iron-light)', paddingBottom: '0.6rem', marginBottom: '1.2rem' }}>
               <h3 className="gothic-title" style={{ fontSize: '1.2rem', color: '#ffb813', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -726,19 +758,9 @@ export default function App() {
             </div>
 
             {/* 3. ADDITIONAL UTILITIES */}
-            <div style={{ background: 'rgba(0,0,0,0.3)', padding: '1rem', border: '1px solid rgba(255,255,255,0.03)', display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+            {/* 3. ADDITIONAL UTILITIES */}
+            <div style={{ background: 'rgba(0,0,0,0.3)', padding: '1rem', border: '1px solid rgba(255,255,255,0.03)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)' }}>Режим Милосердия (Safe Focus):</span>
-                <button 
-                  className={`rpg-btn ${safeMode ? 'rpg-btn-mana' : ''}`}
-                  style={{ padding: '3px 10px', fontSize: '0.75rem' }}
-                  onClick={() => { playClick(); setSafeMode(!safeMode); }}
-                >
-                  {safeMode ? "АКТИВЕН" : "ОТКЛЮЧЕН"}
-                </button>
-              </div>
-
-              <div style={{ borderTop: '1px dashed rgba(255,255,255,0.05)', paddingTop: '0.8rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)' }}>Пересоздать героя (Реролл):</span>
                 <button 
                   className="rpg-btn" 
@@ -760,6 +782,8 @@ export default function App() {
         setActiveTab={handleTabChange} 
         character={character}
         spotifyConnected={!!spotifyToken}
+        characterDrawerOpen={characterDrawerOpen}
+        setCharacterDrawerOpen={setCharacterDrawerOpen}
       />
 
       {/* Main Tab Controller Grid */}
@@ -777,18 +801,6 @@ export default function App() {
             savePedestals={savePedestals}
             requestTaskExecutionModeSelect={requestTaskExecutionModeSelect}
             communeWithSpirits={handleCommuneWithSpirits}
-          />
-        )}
-
-        {activeTab === 'character' && (
-          <CharacterSheet 
-            character={character}
-            setCharacter={setCharacter}
-            tasks={tasks}
-            setTasks={setTasks}
-            requestDeconstruction={requestDeconstruction}
-            pedestals={pedestals}
-            savePedestals={savePedestals}
           />
         )}
 
@@ -816,17 +828,7 @@ export default function App() {
 
       {/* Spotify Integration Deck at Footer */}
       <footer style={{ marginTop: 'auto' }}>
-        <div className="rpg-panel" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.8rem 1.5rem', marginBottom: '0.5rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', fontSize: '0.8rem', color: 'var(--color-bone-dim)' }}>
-            <span>⚙ РЕЖИМ МИЛОСЕРДИЯ (SAFE FOCUS):</span>
-            <button 
-              className={`rpg-btn ${safeMode ? 'rpg-btn-mana' : ''}`}
-              style={{ padding: '2px 10px', fontSize: '0.75rem' }}
-              onClick={() => { playClick(); setSafeMode(!safeMode); }}
-            >
-              {safeMode ? "АКТИВЕН (Без Скверны)" : "ОТКЛЮЧЕН (Полный хоррор)"}
-            </button>
-          </div>
+        <div className="rpg-panel" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', padding: '0.8rem 1.5rem', marginBottom: '0.5rem' }}>
           <span style={{ fontSize: '0.75rem', color: 'var(--color-iron-light)' }}>
             Abaddon Task Vessel v1.0.0
           </span>
@@ -1041,6 +1043,351 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Character Sheet Sidebar Drawer */}
+      {characterDrawerOpen && (
+        <div className="character-drawer-overlay" style={{
+          position: 'fixed',
+          top: 0,
+          right: 0,
+          bottom: 0,
+          left: 0,
+          background: 'rgba(0,0,0,0.5)',
+          zIndex: 1000,
+          display: 'flex',
+          justifyContent: 'flex-end',
+        }} onClick={() => setCharacterDrawerOpen(false)}>
+          <div className="character-drawer-content" style={{
+            width: '480px',
+            maxWidth: '100%',
+            height: '100%',
+            background: 'linear-gradient(180deg, #151119 0%, #0c090e 100%)',
+            borderLeft: '2px solid var(--color-iron-light)',
+            boxShadow: '-5px 0 25px rgba(0,0,0,0.8)',
+            padding: '1.5rem',
+            overflowY: 'auto',
+            position: 'relative',
+            display: 'flex',
+            flexDirection: 'column'
+          }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-iron-light)', paddingBottom: '0.8rem', marginBottom: '1rem' }}>
+              <h3 className="gothic-title" style={{ fontSize: '1.25rem', color: 'var(--color-relic-glow)', margin: 0 }}>
+                👤 Лист Персонажа
+              </h3>
+              <button 
+                className="rpg-btn" 
+                style={{ padding: '2px 8px', fontSize: '0.8rem' }}
+                onClick={() => setCharacterDrawerOpen(false)}
+              >
+                Закрыть
+              </button>
+            </div>
+            <div style={{ flex: 1 }}>
+              <CharacterSheet 
+                character={character}
+                setCharacter={setCharacter}
+                tasks={tasks}
+                setTasks={setTasks}
+                requestDeconstruction={requestDeconstruction}
+                pedestals={pedestals}
+                savePedestals={savePedestals}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* СУДНЫЙ ДЕНЬ: ДНЕВНОЙ СУД НАД ПРОСРОЧЕННЫМИ КОНТРАКТАМИ */}
+      {judgmentOpen && judgmentTasks.length > 0 && judgmentIndex < judgmentTasks.length && (
+        <div className="gothic-modal-overlay animate-fade-in" style={{ zIndex: 1300, background: 'rgba(10, 5, 15, 0.95)' }}>
+          <div className="parchment-contract" style={{
+            maxWidth: '550px',
+            width: '90%',
+            padding: '2.5rem',
+            position: 'relative',
+            background: '#eeddbb',
+            color: '#2a1a08',
+            boxShadow: '0 10px 40px rgba(0, 0, 0, 0.9)',
+            borderRadius: '4px',
+            border: '3px double #5c4033',
+            textAlign: 'center'
+          }}>
+            <div className="dagger-pin" style={{ top: '-15px' }} />
+            
+            <h2 className="gothic-title" style={{ fontSize: '1.8rem', color: '#8b0000', margin: '0 0 10px 0', fontFamily: 'var(--font-gothic)', letterSpacing: '1px' }}>
+              💀 СУДНЫЙ ДЕНЬ БЕГЛЕЦА
+            </h2>
+            <p style={{ fontSize: '0.85rem', color: '#5c4033', margin: '0 0 20px 0', fontStyle: 'italic', fontFamily: 'var(--font-rpg)' }}>
+              Бездна проверяет старые долги. Контракт от {judgmentTasks[judgmentIndex].date} просрочен...
+            </p>
+
+            <div style={{ background: 'rgba(0,0,0,0.05)', border: '1px dashed #5c4033', padding: '1.2rem', marginBottom: '1.5rem' }}>
+              <h3 style={{ fontSize: '1.25rem', color: '#000', margin: '0 0 8px 0', fontWeight: 'bold' }}>
+                «{judgmentTasks[judgmentIndex].title}»
+              </h3>
+              <p style={{ fontSize: '0.85rem', color: '#4a321f', margin: 0 }}>
+                Сущность: {judgmentTasks[judgmentIndex].type === 'siege' ? '💥 ОСАДА (БОСС)' : judgmentTasks[judgmentIndex].type === 'relic' ? '💎 РЕЛИКВИЯ' : '🏹 ОХОТА'}
+              </p>
+            </div>
+
+            {!judgmentShowReschedule ? (
+              <div>
+                <p style={{ fontSize: '0.95rem', marginBottom: '1.5rem', fontWeight: 'bold' }}>
+                  Вы смогли завершить этот контракт вовремя?
+                </p>
+                <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+                  <button 
+                    className="rpg-btn"
+                    style={{ background: '#2ecc71', color: '#fff', borderColor: '#27ae60', padding: '8px 25px' }}
+                    onClick={() => {
+                      playClick();
+                      const task = judgmentTasks[judgmentIndex];
+                      const isSiege = task.type === 'siege';
+                      const exp = isSiege ? 60 : 25;
+                      const gold = isSiege ? 15 : 5;
+
+                      // Complete task
+                      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: 'completed' } : t));
+                      
+                      // Rewards
+                      setCharacter(c => {
+                        const nextXp = c.xp + exp;
+                        const needed = c.level * 100;
+                        let nextLvl = c.level;
+                        let rx = nextXp;
+                        if (rx >= needed) {
+                          nextLvl += 1;
+                          rx -= needed;
+                        }
+                        return {
+                          ...c,
+                          level: nextLvl,
+                          xp: rx,
+                          gold: (c.gold || 0) + gold,
+                          completedTasksCount: (c.completedTasksCount || 0) + 1,
+                          completedSiegesCount: (c.completedSiegesCount || 0) + (isSiege ? 1 : 0),
+                          totalGoldEarned: (c.totalGoldEarned || 0) + gold
+                        };
+                      });
+
+                      // Next
+                      if (judgmentIndex + 1 < judgmentTasks.length) {
+                        setJudgmentIndex(prev => prev + 1);
+                      } else {
+                        setJudgmentOpen(false);
+                      }
+                    }}
+                  >
+                    👍 ДА, ВЫПОЛНЕНО
+                  </button>
+                  
+                  <button 
+                    className="rpg-btn"
+                    style={{ background: '#e74c3c', color: '#fff', borderColor: '#c0392b', padding: '8px 25px' }}
+                    onClick={() => {
+                      playClick();
+                      // HP damage
+                      setCharacter(c => ({
+                        ...c,
+                        hp: Math.max(10, c.hp - 10),
+                        totalHpSacrificed: (c.totalHpSacrificed || 0) + 10
+                      }));
+                      setJudgmentShowReschedule(true);
+                    }}
+                  >
+                    👎 НЕТ, Я ЗАВАЛИЛ
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <p style={{ fontSize: '0.95rem', color: '#8b0000', marginBottom: '1.5rem', fontWeight: 'bold' }}>
+                  💥 Вы теряете 10 HP здоровья разума! <br />
+                  Куда перенесем этот оскверненный контракт?
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                  <button 
+                    className="rpg-btn"
+                    style={{ background: '#5c4033', color: '#eeddbb', borderColor: '#2a1a08' }}
+                    onClick={() => {
+                      playClick();
+                      const task = judgmentTasks[judgmentIndex];
+                      const todayStr = new Date().toISOString().split('T')[0];
+                      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, date: todayStr, curseLevel: Math.min(5, (t.curseLevel || 0) + 1) } : t));
+                      
+                      // Move next
+                      setJudgmentShowReschedule(false);
+                      if (judgmentIndex + 1 < judgmentTasks.length) {
+                        setJudgmentIndex(prev => prev + 1);
+                      } else {
+                        setJudgmentOpen(false);
+                      }
+                    }}
+                  >
+                    📅 Перенести на СЕГОДНЯ
+                  </button>
+                  <button 
+                    className="rpg-btn"
+                    style={{ background: '#5c4033', color: '#eeddbb', borderColor: '#2a1a08' }}
+                    onClick={() => {
+                      playClick();
+                      const task = judgmentTasks[judgmentIndex];
+                      const tomorrow = new Date();
+                      tomorrow.setDate(tomorrow.getDate() + 1);
+                      const tomorrowStr = tomorrow.toISOString().split('T')[0];
+                      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, date: tomorrowStr, curseLevel: Math.min(5, (t.curseLevel || 0) + 1) } : t));
+
+                      // Move next
+                      setJudgmentShowReschedule(false);
+                      if (judgmentIndex + 1 < judgmentTasks.length) {
+                        setJudgmentIndex(prev => prev + 1);
+                      } else {
+                        setJudgmentOpen(false);
+                      }
+                    }}
+                  >
+                    ⏳ Отложить на ЗАВТРА
+                  </button>
+                  <button 
+                    className="rpg-btn"
+                    style={{ background: '#5c4033', color: '#eeddbb', borderColor: '#2a1a08' }}
+                    onClick={() => {
+                      playClick();
+                      const task = judgmentTasks[judgmentIndex];
+                      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, date: null, curseLevel: Math.min(5, (t.curseLevel || 0) + 1) } : t));
+
+                      // Move next
+                      setJudgmentShowReschedule(false);
+                      if (judgmentIndex + 1 < judgmentTasks.length) {
+                        setJudgmentIndex(prev => prev + 1);
+                      } else {
+                        setJudgmentOpen(false);
+                      }
+                    }}
+                  >
+                    💀 Сбросить в БЭКЛОГ (Долг)
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ARPG Status Globes */}
+      <div className="arpg-globes-container" style={{ pointerEvents: 'none' }}>
+        {/* Left: Mana Globe */}
+        <div style={{
+          position: 'fixed',
+          bottom: '25px',
+          left: '25px',
+          width: '100px',
+          height: '100px',
+          borderRadius: '50%',
+          background: 'rgba(5, 5, 10, 0.8)',
+          border: '3px solid var(--color-iron-light)',
+          boxShadow: '0 0 20px rgba(0,0,0,0.8), inset 0 0 15px rgba(255,255,255,0.05)',
+          overflow: 'hidden',
+          zIndex: 900,
+          pointerEvents: 'auto'
+        }} title={`Ресурс (Мана): ${Math.round(character.mana)}/${character.maxMana}`}>
+          {/* Liquid Fill */}
+          <div style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: `${Math.min(100, Math.max(0, (character.mana / character.maxMana) * 100))}%`,
+            background: 'linear-gradient(to top, #3a0078 0%, #8a2be2 100%)',
+            boxShadow: '0 0 15px rgba(138, 43, 226, 0.6)',
+            transition: 'height 0.5s ease',
+            width: '100%'
+          }}>
+            <div style={{
+              position: 'absolute',
+              top: '-5px',
+              left: 0,
+              right: 0,
+              height: '10px',
+              background: 'rgba(255,255,255,0.15)',
+              borderRadius: '50%',
+              filter: 'blur(1px)'
+            }} />
+          </div>
+          <div style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            color: '#fff',
+            fontFamily: 'var(--font-rpg)',
+            fontSize: '0.78rem',
+            textShadow: '2px 2px 4px #000',
+            fontWeight: 'bold',
+            textAlign: 'center',
+            pointerEvents: 'none'
+          }}>
+            <div>{Math.round(character.mana)}</div>
+            <div style={{ fontSize: '0.55rem', opacity: 0.8 }}>RP</div>
+          </div>
+        </div>
+
+        {/* Right: HP Globe */}
+        <div style={{
+          position: 'fixed',
+          bottom: '25px',
+          right: '25px',
+          width: '100px',
+          height: '100px',
+          borderRadius: '50%',
+          background: 'rgba(10, 5, 5, 0.8)',
+          border: '3px solid var(--color-iron-light)',
+          boxShadow: '0 0 20px rgba(0,0,0,0.8), inset 0 0 15px rgba(255,255,255,0.05)',
+          overflow: 'hidden',
+          zIndex: 900,
+          pointerEvents: 'auto'
+        }} title={`Здоровье (HP): ${Math.round(character.hp)}/${character.maxHp}`}>
+          {/* Liquid Fill */}
+          <div style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: `${Math.min(100, Math.max(0, (character.hp / character.maxHp) * 100))}%`,
+            background: 'linear-gradient(to top, #5c0000 0%, #e74c3c 100%)',
+            boxShadow: '0 0 15px rgba(231, 76, 60, 0.6)',
+            transition: 'height 0.5s ease',
+            width: '100%'
+          }}>
+            <div style={{
+              position: 'absolute',
+              top: '-5px',
+              left: 0,
+              right: 0,
+              height: '10px',
+              background: 'rgba(255,255,255,0.15)',
+              borderRadius: '50%',
+              filter: 'blur(1px)'
+            }} />
+          </div>
+          <div style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            color: '#fff',
+            fontFamily: 'var(--font-rpg)',
+            fontSize: '0.78rem',
+            textShadow: '2px 2px 4px #000',
+            fontWeight: 'bold',
+            textAlign: 'center',
+            pointerEvents: 'none'
+          }}>
+            <div>{Math.round(character.hp)}</div>
+            <div style={{ fontSize: '0.55rem', opacity: 0.8 }}>HP</div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
