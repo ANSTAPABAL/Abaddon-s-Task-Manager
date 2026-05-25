@@ -406,14 +406,22 @@ class AudioSynthesizer {
     const frequencies = [800, 1250, 1500, 2200];
     frequencies.forEach((freq, idx) => {
       const osc = this.ctx.createOscillator();
+      const filter = this.ctx.createBiquadFilter();
       const gain = this.ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq + (Math.random() * 20 - 10), t);
-      const duration = 0.2 + Math.random() * 0.3;
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq + (Math.random() * 40 - 20), t);
+      
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(freq, t);
+      filter.Q.setValueAtTime(10, t); // High Q for resonant bell-like metallic clank
+      
+      const duration = 0.15 + Math.random() * 0.25;
       gain.gain.setValueAtTime(0, t);
-      gain.gain.linearRampToValueAtTime(0.05 * this.volume, t + 0.005);
+      gain.gain.linearRampToValueAtTime(0.04 * this.volume, t + 0.005);
       gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
-      osc.connect(gain);
+      
+      osc.connect(filter);
+      filter.connect(gain);
       gain.connect(this.getDestinationNode());
       osc.start(t);
       osc.stop(t + duration + 0.05);
@@ -497,8 +505,8 @@ class AudioSynthesizer {
     noise.buffer = buffer;
     const filter = this.ctx.createBiquadFilter();
     filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(1000, t);
-    filter.frequency.exponentialRampToValueAtTime(80, t + 1.2);
+    filter.frequency.setValueAtTime(280, t); // Lower cut frequency (280Hz instead of 1000Hz) to sound like deep rumble, avoiding static hiss
+    filter.frequency.exponentialRampToValueAtTime(35, t + 1.2);
     const gain = this.ctx.createGain();
     gain.gain.setValueAtTime(0, t);
     gain.gain.linearRampToValueAtTime(0.25 * this.volume, t + 0.05);
@@ -535,20 +543,20 @@ class AudioSynthesizer {
     const osc = this.ctx.createOscillator();
     const filter = this.ctx.createBiquadFilter();
     const gain = this.ctx.createGain();
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(500, t);
-    osc.frequency.linearRampToValueAtTime(750, t + 0.8);
-    osc.frequency.linearRampToValueAtTime(450, t + 1.6);
+    osc.type = 'sine'; // Use pure organic sine wave to avoid harsh buzzy sawtooth that sounds like radio transmission signals
+    osc.frequency.setValueAtTime(350, t);
+    osc.frequency.linearRampToValueAtTime(480, t + 0.8);
+    osc.frequency.linearRampToValueAtTime(320, t + 1.6);
     const vibrato = this.ctx.createOscillator();
-    vibrato.frequency.setValueAtTime(6, t);
+    vibrato.frequency.setValueAtTime(3.5, t); // Slow spectral moan instead of siren/telemetry
     const vibratoGain = this.ctx.createGain();
-    vibratoGain.gain.setValueAtTime(15, t);
+    vibratoGain.gain.setValueAtTime(8, t);
     vibrato.connect(vibratoGain);
     vibratoGain.connect(osc.frequency);
     filter.type = 'bandpass';
-    filter.frequency.setValueAtTime(800, t);
-    filter.frequency.exponentialRampToValueAtTime(1200, t + 1.6);
-    filter.Q.setValueAtTime(2.0, t);
+    filter.frequency.setValueAtTime(400, t);
+    filter.frequency.exponentialRampToValueAtTime(600, t + 1.6);
+    filter.Q.setValueAtTime(3.0, t);
     gain.gain.setValueAtTime(0, t);
     gain.gain.linearRampToValueAtTime(0.05 * this.volume, t + 0.3);
     gain.gain.exponentialRampToValueAtTime(0.001, t + 1.8);
@@ -629,9 +637,10 @@ class AudioSynthesizer {
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(320, time);
-      osc.frequency.exponentialRampToValueAtTime(390, time + 0.08);
-      osc.frequency.exponentialRampToValueAtTime(300, time + 0.22);
+      // Deeper frequencies to sound like a real organic breathy owl hoot instead of electronic whistle beeps
+      osc.frequency.setValueAtTime(180, time);
+      osc.frequency.exponentialRampToValueAtTime(215, time + 0.08);
+      osc.frequency.exponentialRampToValueAtTime(155, time + 0.22);
       gain.gain.setValueAtTime(0, time);
       gain.gain.linearRampToValueAtTime(0.08 * this.volume, time + 0.03);
       gain.gain.exponentialRampToValueAtTime(0.001, time + 0.22);
