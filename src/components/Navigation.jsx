@@ -2,12 +2,22 @@ import React from 'react';
 import { Skull, BookOpen, HelpCircle } from 'lucide-react';
 import { useAudio } from '../hooks/useAudio';
 
+const getRacePortraitUrl = (race) => {
+  const r = race ? race.toLowerCase() : '';
+  if (r.includes('человек')) return 'http://localhost:3001/races/human.jpg';
+  if (r.includes('эльф')) return 'http://localhost:3001/races/elf.jpg';
+  if (r.includes('тролль')) return 'http://localhost:3001/races/troll.jpg';
+  if (r.includes('каргахаул')) return 'http://localhost:3001/races/kargahaul.jpg';
+  return null;
+};
+
 export default function Navigation({ 
   activeTab, 
   setActiveTab, 
   character 
 }) {
   const { playClick } = useAudio();
+  const portraitUrl = getRacePortraitUrl(character.race);
 
   const handleTabClick = (tab) => {
     playClick();
@@ -73,9 +83,26 @@ export default function Navigation({
           justifyContent: 'center',
           alignItems: 'center',
           fontSize: '1.1rem',
+          overflow: 'hidden',
           boxShadow: '0 2px 6px rgba(0,0,0,0.5)'
         }}>
-          💀
+          {portraitUrl ? (
+            <img 
+              src={portraitUrl} 
+              alt={character.race} 
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover'
+              }}
+              onError={(e) => {
+                e.target.style.display = 'none';
+                e.target.parentNode.innerHTML = '💀';
+              }}
+            />
+          ) : (
+            '💀'
+          )}
         </div>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '2px' }}>
