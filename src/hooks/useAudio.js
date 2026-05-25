@@ -3,6 +3,8 @@ import { useEffect, useRef } from 'react';
 class AudioSynthesizer {
   constructor() {
     this.ctx = null;
+    this.masterCompressor = null;
+    this.masterGain = null;
     this.droneOsc1 = null;
     this.droneOsc2 = null;
     this.droneGain = null;
@@ -23,6 +25,24 @@ class AudioSynthesizer {
     if (!AudioContextClass) return;
     this.ctx = new AudioContextClass();
     
+    try {
+      this.masterCompressor = this.ctx.createDynamicsCompressor();
+      // Configure compressor to prevent clipping smoothly
+      this.masterCompressor.threshold.setValueAtTime(-16, this.ctx.currentTime);
+      this.masterCompressor.knee.setValueAtTime(25, this.ctx.currentTime);
+      this.masterCompressor.ratio.setValueAtTime(10, this.ctx.currentTime);
+      this.masterCompressor.attack.setValueAtTime(0.003, this.ctx.currentTime);
+      this.masterCompressor.release.setValueAtTime(0.15, this.ctx.currentTime);
+      
+      this.masterGain = this.ctx.createGain();
+      this.masterGain.gain.setValueAtTime(1.0, this.ctx.currentTime);
+      
+      this.masterCompressor.connect(this.masterGain);
+      this.masterGain.connect(this.ctx.destination);
+    } catch (e) {
+      console.warn("Could not initialize master compressor/gain:", e);
+    }
+    
     // Start ambient background drone
     this.setupDrone();
 
@@ -30,6 +50,10 @@ class AudioSynthesizer {
     if (this.useLocalDoublePlaylist) {
       this.setupLocalDoublePlayer();
     }
+  }
+
+  getDestinationNode() {
+    return this.masterCompressor || this.ctx.destination;
   }
 
   setMuted(muted) {
@@ -238,14 +262,23 @@ class AudioSynthesizer {
     this.rainGain.gain.setValueAtTime(vol, this.ctx.currentTime);
     this.rainSource.connect(this.rainFilter);
     this.rainFilter.connect(this.rainGain);
-    this.rainGain.connect(this.ctx.destination);
+    this.rainGain.connect(this.getDestinationNode());
     this.rainSource.start();
   }
 
   stopRain() {
     if (this.rainSource) {
       try { this.rainSource.stop(); } catch(e) {}
+      try { this.rainSource.disconnect(); } catch(e) {}
       this.rainSource = null;
+    }
+    if (this.rainFilter) {
+      try { this.rainFilter.disconnect(); } catch(e) {}
+      this.rainFilter = null;
+    }
+    if (this.rainGain) {
+      try { this.rainGain.disconnect(); } catch(e) {}
+      this.rainGain = null;
     }
   }
 
@@ -275,7 +308,7 @@ class AudioSynthesizer {
     this.riverLfoGain.connect(this.riverGain.gain);
     this.riverSource.connect(this.riverFilter);
     this.riverFilter.connect(this.riverGain);
-    this.riverGain.connect(this.ctx.destination);
+    this.riverGain.connect(this.getDestinationNode());
     this.riverSource.start();
     this.riverLfo.start();
   }
@@ -283,11 +316,25 @@ class AudioSynthesizer {
   stopRiver() {
     if (this.riverSource) {
       try { this.riverSource.stop(); } catch(e) {}
+      try { this.riverSource.disconnect(); } catch(e) {}
       this.riverSource = null;
+    }
+    if (this.riverFilter) {
+      try { this.riverFilter.disconnect(); } catch(e) {}
+      this.riverFilter = null;
+    }
+    if (this.riverGain) {
+      try { this.riverGain.disconnect(); } catch(e) {}
+      this.riverGain = null;
     }
     if (this.riverLfo) {
       try { this.riverLfo.stop(); } catch(e) {}
+      try { this.riverLfo.disconnect(); } catch(e) {}
       this.riverLfo = null;
+    }
+    if (this.riverLfoGain) {
+      try { this.riverLfoGain.disconnect(); } catch(e) {}
+      this.riverLfoGain = null;
     }
   }
 
@@ -329,7 +376,7 @@ class AudioSynthesizer {
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
     osc.connect(filter);
     filter.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.getDestinationNode());
     osc.start(t);
     osc.stop(t + 0.35);
   }
@@ -363,10 +410,11 @@ class AudioSynthesizer {
       osc.type = 'sine';
       osc.frequency.setValueAtTime(freq + (Math.random() * 20 - 10), t);
       const duration = 0.2 + Math.random() * 0.3;
-      gain.gain.setValueAtTime(0.05 * this.volume, t);
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.05 * this.volume, t + 0.005);
       gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
       osc.connect(gain);
-      gain.connect(this.ctx.destination);
+      gain.connect(this.getDestinationNode());
       osc.start(t);
       osc.stop(t + duration + 0.05);
     });
@@ -409,7 +457,7 @@ class AudioSynthesizer {
       gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.18);
       osc.connect(filter);
       filter.connect(gain);
-      gain.connect(this.ctx.destination);
+      gain.connect(this.getDestinationNode());
       osc.start(startTime);
       osc.stop(startTime + 0.2);
     };
@@ -452,11 +500,12 @@ class AudioSynthesizer {
     filter.frequency.setValueAtTime(1000, t);
     filter.frequency.exponentialRampToValueAtTime(80, t + 1.2);
     const gain = this.ctx.createGain();
-    gain.gain.setValueAtTime(0.25 * this.volume, t);
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(0.25 * this.volume, t + 0.05);
     gain.gain.exponentialRampToValueAtTime(0.001, t + 1.8);
     noise.connect(filter);
     filter.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.getDestinationNode());
     noise.start(t);
     noise.stop(t + 2.0);
   }
@@ -505,7 +554,7 @@ class AudioSynthesizer {
     gain.gain.exponentialRampToValueAtTime(0.001, t + 1.8);
     osc.connect(filter);
     filter.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.getDestinationNode());
     osc.start(t);
     vibrato.start(t);
     osc.stop(t + 2.0);
@@ -549,7 +598,7 @@ class AudioSynthesizer {
     gain.gain.exponentialRampToValueAtTime(0.001, t + 2.3);
     osc.connect(filter);
     filter.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.getDestinationNode());
     osc.start(t);
     osc.stop(t + 2.4);
   }
@@ -587,7 +636,7 @@ class AudioSynthesizer {
       gain.gain.linearRampToValueAtTime(0.08 * this.volume, time + 0.03);
       gain.gain.exponentialRampToValueAtTime(0.001, time + 0.22);
       osc.connect(gain);
-      gain.connect(this.ctx.destination);
+      gain.connect(this.getDestinationNode());
       osc.start(time);
       osc.stop(time + 0.25);
     };
@@ -617,7 +666,7 @@ class AudioSynthesizer {
     try {
       this.droneGain = this.ctx.createGain();
       this.droneGain.gain.setValueAtTime(0, this.ctx.currentTime);
-      this.droneGain.connect(this.ctx.destination);
+      this.droneGain.connect(this.getDestinationNode());
 
       // Low pass filter to make it dark and muffled
       const filter = this.ctx.createBiquadFilter();
@@ -700,11 +749,12 @@ class AudioSynthesizer {
     osc.frequency.setValueAtTime(150, t);
     osc.frequency.exponentialRampToValueAtTime(40, t + 0.08);
 
-    gain.gain.setValueAtTime(0.2 * this.volume, t);
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(0.2 * this.volume, t + 0.002);
     gain.gain.exponentialRampToValueAtTime(0.01, t + 0.08);
 
     osc.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.getDestinationNode());
 
     osc.start(t);
     osc.stop(t + 0.09);
@@ -739,12 +789,13 @@ class AudioSynthesizer {
     filter.Q.setValueAtTime(2, t);
 
     const gain = this.ctx.createGain();
-    gain.gain.setValueAtTime(0.35 * this.volume, t);
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(0.35 * this.volume, t + 0.005);
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
 
     noiseNode.connect(filter);
     filter.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.getDestinationNode());
 
     noiseNode.start(t);
     noiseNode.stop(t + 0.15);
@@ -780,7 +831,7 @@ class AudioSynthesizer {
 
     osc.connect(filter);
     filter.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.getDestinationNode());
 
     osc.start(time);
     osc.stop(time + 0.15);
@@ -831,7 +882,7 @@ class AudioSynthesizer {
       gain.gain.exponentialRampToValueAtTime(0.001, triggerTime + 0.8);
 
       osc.connect(gain);
-      gain.connect(this.ctx.destination);
+      gain.connect(this.getDestinationNode());
 
       osc.start(triggerTime);
       osc.stop(triggerTime + 0.9);
