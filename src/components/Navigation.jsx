@@ -188,7 +188,7 @@ export default function Navigation({
               color: '#fff',
               fontWeight: 'bold',
               textDecoration: 'underline',
-              maxWidth: '120px',
+              maxWidth: '280px',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
