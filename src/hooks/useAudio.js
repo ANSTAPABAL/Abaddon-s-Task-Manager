@@ -40,11 +40,21 @@ class AudioSynthesizer {
       this.stopHeartbeat();
       if (this.localDoublePlayer1) this.localDoublePlayer1.pause();
       if (this.localDoublePlayer2) this.localDoublePlayer2.pause();
+      this.stopRain();
+      this.stopRiver();
+      this.stopSwamp();
+      this.stopChains();
+      this.stopDogs();
+      this.stopLightning();
+      this.stopScreams();
+      this.stopWolves();
+      this.stopOwls();
     } else {
       if (this.useLocalDoublePlaylist && !this.spotifyPlaying) {
         if (this.localDoublePlayer1) this.localDoublePlayer1.play().catch(e => {});
         if (this.localDoublePlayer2) this.localDoublePlayer2.play().catch(e => {});
       }
+      this.restartActiveLayers();
     }
   }
 
@@ -52,6 +62,7 @@ class AudioSynthesizer {
     this.volume = Math.max(0, Math.min(1, vol));
     this.updateDroneVolume();
     this.updateLocalDoubleVolume();
+    this.updateAmbientVolume();
   }
 
   updateDroneVolume() {
@@ -65,14 +76,25 @@ class AudioSynthesizer {
     this.spotifyPlaying = isPlaying;
     this.updateDroneVolume();
     this.updateLocalDoubleVolume();
+    this.updateAmbientVolume();
     if (isPlaying) {
       if (this.localDoublePlayer1) this.localDoublePlayer1.pause();
       if (this.localDoublePlayer2) this.localDoublePlayer2.pause();
+      this.stopRain();
+      this.stopRiver();
+      this.stopSwamp();
+      this.stopChains();
+      this.stopDogs();
+      this.stopLightning();
+      this.stopScreams();
+      this.stopWolves();
+      this.stopOwls();
     } else {
       if (this.useLocalDoublePlaylist && !this.isMuted) {
         if (this.localDoublePlayer1) this.localDoublePlayer1.play().catch(e => {});
         if (this.localDoublePlayer2) this.localDoublePlayer2.play().catch(e => {});
       }
+      this.restartActiveLayers();
     }
   }
 
@@ -146,6 +168,434 @@ class AudioSynthesizer {
   }
 
   // --- AUTOMATIC DUAL FILE-OR-SYNTH CONNECTOR ---
+  
+  setAmbientLayerActive(layerId, isActive) {
+    this.init();
+    if (isActive) {
+      localStorage.setItem('ambient_layer_' + layerId, 'true');
+      if (layerId === 'rain') this.startRain();
+      else if (layerId === 'river') this.startRiver();
+      else if (layerId === 'swamp') this.startSwamp();
+      else if (layerId === 'chains') this.startChains();
+      else if (layerId === 'dogs') this.startDogs();
+      else if (layerId === 'lightning') this.startLightning();
+      else if (layerId === 'screams') this.startScreams();
+      else if (layerId === 'wolves') this.startWolves();
+      else if (layerId === 'owls') this.startOwls();
+    } else {
+      localStorage.setItem('ambient_layer_' + layerId, 'false');
+      if (layerId === 'rain') this.stopRain();
+      else if (layerId === 'river') this.stopRiver();
+      else if (layerId === 'swamp') this.stopSwamp();
+      else if (layerId === 'chains') this.stopChains();
+      else if (layerId === 'dogs') this.stopDogs();
+      else if (layerId === 'lightning') this.stopLightning();
+      else if (layerId === 'screams') this.stopScreams();
+      else if (layerId === 'wolves') this.stopWolves();
+      else if (layerId === 'owls') this.stopOwls();
+    }
+  }
+
+  restartActiveLayers() {
+    if (this.isMuted || this.spotifyPlaying) return;
+    const layers = ['chains', 'dogs', 'lightning', 'rain', 'screams', 'river', 'swamp', 'wolves', 'owls'];
+    layers.forEach(l => {
+      if (localStorage.getItem('ambient_layer_' + l) === 'true') {
+        this.setAmbientLayerActive(l, true);
+      }
+    });
+  }
+
+  updateAmbientVolume() {
+    if (!this.ctx) return;
+    const vol = (this.spotifyPlaying ? 0 : 0.12) * this.volume;
+    if (this.rainGain) {
+      this.rainGain.gain.setTargetAtTime(vol, this.ctx.currentTime, 0.5);
+    }
+    if (this.riverGain) {
+      this.riverGain.gain.setTargetAtTime(vol * 1.25, this.ctx.currentTime, 0.5);
+    }
+  }
+
+  startRain() {
+    if (!this.ctx || this.isMuted || this.spotifyPlaying) return;
+    this.stopRain();
+    const bufferSize = this.ctx.sampleRate * 2;
+    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+    this.rainSource = this.ctx.createBufferSource();
+    this.rainSource.buffer = buffer;
+    this.rainSource.loop = true;
+    this.rainFilter = this.ctx.createBiquadFilter();
+    this.rainFilter.type = 'bandpass';
+    this.rainFilter.frequency.setValueAtTime(700, this.ctx.currentTime);
+    this.rainFilter.Q.setValueAtTime(1.0, this.ctx.currentTime);
+    this.rainGain = this.ctx.createGain();
+    const vol = (this.spotifyPlaying ? 0 : 0.12) * this.volume;
+    this.rainGain.gain.setValueAtTime(vol, this.ctx.currentTime);
+    this.rainSource.connect(this.rainFilter);
+    this.rainFilter.connect(this.rainGain);
+    this.rainGain.connect(this.ctx.destination);
+    this.rainSource.start();
+  }
+
+  stopRain() {
+    if (this.rainSource) {
+      try { this.rainSource.stop(); } catch(e) {}
+      this.rainSource = null;
+    }
+  }
+
+  startRiver() {
+    if (!this.ctx || this.isMuted || this.spotifyPlaying) return;
+    this.stopRiver();
+    const bufferSize = this.ctx.sampleRate * 2;
+    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+    this.riverSource = this.ctx.createBufferSource();
+    this.riverSource.buffer = buffer;
+    this.riverSource.loop = true;
+    this.riverFilter = this.ctx.createBiquadFilter();
+    this.riverFilter.type = 'lowpass';
+    this.riverFilter.frequency.setValueAtTime(350, this.ctx.currentTime);
+    this.riverGain = this.ctx.createGain();
+    const vol = (this.spotifyPlaying ? 0 : 0.15) * this.volume;
+    this.riverGain.gain.setValueAtTime(vol, this.ctx.currentTime);
+    this.riverLfo = this.ctx.createOscillator();
+    this.riverLfo.frequency.setValueAtTime(0.2, this.ctx.currentTime);
+    this.riverLfoGain = this.ctx.createGain();
+    this.riverLfoGain.gain.setValueAtTime(vol * 0.4, this.ctx.currentTime);
+    this.riverLfo.connect(this.riverLfoGain);
+    this.riverLfoGain.connect(this.riverGain.gain);
+    this.riverSource.connect(this.riverFilter);
+    this.riverFilter.connect(this.riverGain);
+    this.riverGain.connect(this.ctx.destination);
+    this.riverSource.start();
+    this.riverLfo.start();
+  }
+
+  stopRiver() {
+    if (this.riverSource) {
+      try { this.riverSource.stop(); } catch(e) {}
+      this.riverSource = null;
+    }
+    if (this.riverLfo) {
+      try { this.riverLfo.stop(); } catch(e) {}
+      this.riverLfo = null;
+    }
+  }
+
+  startSwamp() {
+    this.stopSwamp();
+    const scheduleNext = () => {
+      const delay = 4000 + Math.random() * 8000;
+      this.swampTimer = setTimeout(() => {
+        this.playSquelch();
+        scheduleNext();
+      }, delay);
+    };
+    scheduleNext();
+  }
+
+  stopSwamp() {
+    if (this.swampTimer) {
+      clearTimeout(this.swampTimer);
+      this.swampTimer = null;
+    }
+  }
+
+  playSquelch() {
+    if (!this.ctx || this.isMuted || this.spotifyPlaying) return;
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const filter = this.ctx.createBiquadFilter();
+    const gain = this.ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(80, t);
+    osc.frequency.exponentialRampToValueAtTime(30, t + 0.3);
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(150, t);
+    filter.frequency.exponentialRampToValueAtTime(400, t + 0.1);
+    filter.frequency.exponentialRampToValueAtTime(100, t + 0.3);
+    filter.Q.setValueAtTime(8, t);
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(0.18 * this.volume, t + 0.05);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.35);
+  }
+
+  startChains() {
+    this.stopChains();
+    const scheduleNext = () => {
+      const delay = 6000 + Math.random() * 12000;
+      this.chainsTimer = setTimeout(() => {
+        this.playChainClank();
+        scheduleNext();
+      }, delay);
+    };
+    scheduleNext();
+  }
+
+  stopChains() {
+    if (this.chainsTimer) {
+      clearTimeout(this.chainsTimer);
+      this.chainsTimer = null;
+    }
+  }
+
+  playChainClank() {
+    if (!this.ctx || this.isMuted || this.spotifyPlaying) return;
+    const t = this.ctx.currentTime;
+    const frequencies = [800, 1250, 1500, 2200];
+    frequencies.forEach((freq, idx) => {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq + (Math.random() * 20 - 10), t);
+      const duration = 0.2 + Math.random() * 0.3;
+      gain.gain.setValueAtTime(0.05 * this.volume, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(t);
+      osc.stop(t + duration + 0.05);
+    });
+  }
+
+  startDogs() {
+    this.stopDogs();
+    const scheduleNext = () => {
+      const delay = 10000 + Math.random() * 15000;
+      this.dogsTimer = setTimeout(() => {
+        this.playDogBark();
+        scheduleNext();
+      }, delay);
+    };
+    scheduleNext();
+  }
+
+  stopDogs() {
+    if (this.dogsTimer) {
+      clearTimeout(this.dogsTimer);
+      this.dogsTimer = null;
+    }
+  }
+
+  playDogBark() {
+    if (!this.ctx || this.isMuted || this.spotifyPlaying) return;
+    const t = this.ctx.currentTime;
+    const triggerBark = (startTime) => {
+      const osc = this.ctx.createOscillator();
+      const filter = this.ctx.createBiquadFilter();
+      const gain = this.ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(140, startTime);
+      osc.frequency.exponentialRampToValueAtTime(60, startTime + 0.15);
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(250, startTime);
+      filter.Q.setValueAtTime(2.0, startTime);
+      gain.gain.setValueAtTime(0, startTime);
+      gain.gain.linearRampToValueAtTime(0.12 * this.volume, startTime + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.18);
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(startTime);
+      osc.stop(startTime + 0.2);
+    };
+    triggerBark(t);
+    triggerBark(t + 0.22);
+  }
+
+  startLightning() {
+    this.stopLightning();
+    const scheduleNext = () => {
+      const delay = 35000 + Math.random() * 45000;
+      this.lightningTimer = setTimeout(() => {
+        this.playLightningStrike();
+        scheduleNext();
+      }, delay);
+    };
+    scheduleNext();
+  }
+
+  stopLightning() {
+    if (this.lightningTimer) {
+      clearTimeout(this.lightningTimer);
+      this.lightningTimer = null;
+    }
+  }
+
+  playLightningStrike() {
+    if (!this.ctx || this.isMuted || this.spotifyPlaying) return;
+    const t = this.ctx.currentTime;
+    const bufferSize = this.ctx.sampleRate * 2.0;
+    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = buffer;
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(1000, t);
+    filter.frequency.exponentialRampToValueAtTime(80, t + 1.2);
+    const gain = this.ctx.createGain();
+    gain.gain.setValueAtTime(0.25 * this.volume, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 1.8);
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.ctx.destination);
+    noise.start(t);
+    noise.stop(t + 2.0);
+  }
+
+  startScreams() {
+    this.stopScreams();
+    const scheduleNext = () => {
+      const delay = 25000 + Math.random() * 45000;
+      this.screamsTimer = setTimeout(() => {
+        this.playDistantScream();
+        scheduleNext();
+      }, delay);
+    };
+    scheduleNext();
+  }
+
+  stopScreams() {
+    if (this.screamsTimer) {
+      clearTimeout(this.screamsTimer);
+      this.screamsTimer = null;
+    }
+  }
+
+  playDistantScream() {
+    if (!this.ctx || this.isMuted || this.spotifyPlaying) return;
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const filter = this.ctx.createBiquadFilter();
+    const gain = this.ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(500, t);
+    osc.frequency.linearRampToValueAtTime(750, t + 0.8);
+    osc.frequency.linearRampToValueAtTime(450, t + 1.6);
+    const vibrato = this.ctx.createOscillator();
+    vibrato.frequency.setValueAtTime(6, t);
+    const vibratoGain = this.ctx.createGain();
+    vibratoGain.gain.setValueAtTime(15, t);
+    vibrato.connect(vibratoGain);
+    vibratoGain.connect(osc.frequency);
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(800, t);
+    filter.frequency.exponentialRampToValueAtTime(1200, t + 1.6);
+    filter.Q.setValueAtTime(2.0, t);
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(0.05 * this.volume, t + 0.3);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 1.8);
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(t);
+    vibrato.start(t);
+    osc.stop(t + 2.0);
+    vibrato.stop(t + 2.0);
+  }
+
+  startWolves() {
+    this.stopWolves();
+    const scheduleNext = () => {
+      const delay = 45000 + Math.random() * 45000;
+      this.wolvesTimer = setTimeout(() => {
+        this.playWolfHowl();
+        scheduleNext();
+      }, delay);
+    };
+    scheduleNext();
+  }
+
+  stopWolves() {
+    if (this.wolvesTimer) {
+      clearTimeout(this.wolvesTimer);
+      this.wolvesTimer = null;
+    }
+  }
+
+  playWolfHowl() {
+    if (!this.ctx || this.isMuted || this.spotifyPlaying) return;
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    const filter = this.ctx.createBiquadFilter();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(180, t);
+    osc.frequency.exponentialRampToValueAtTime(450, t + 0.6);
+    osc.frequency.setValueAtTime(450, t + 1.2);
+    osc.frequency.exponentialRampToValueAtTime(150, t + 2.2);
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(800, t);
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(0.06 * this.volume, t + 0.4);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 2.3);
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(t);
+    osc.stop(t + 2.4);
+  }
+
+  startOwls() {
+    this.stopOwls();
+    const scheduleNext = () => {
+      const delay = 20000 + Math.random() * 30000;
+      this.owlsTimer = setTimeout(() => {
+        this.playOwlHoot();
+        scheduleNext();
+      }, delay);
+    };
+    scheduleNext();
+  }
+
+  stopOwls() {
+    if (this.owlsTimer) {
+      clearTimeout(this.owlsTimer);
+      this.owlsTimer = null;
+    }
+  }
+
+  playOwlHoot() {
+    if (!this.ctx || this.isMuted || this.spotifyPlaying) return;
+    const t = this.ctx.currentTime;
+    const hoot = (time) => {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(320, time);
+      osc.frequency.exponentialRampToValueAtTime(390, time + 0.08);
+      osc.frequency.exponentialRampToValueAtTime(300, time + 0.22);
+      gain.gain.setValueAtTime(0, time);
+      gain.gain.linearRampToValueAtTime(0.08 * this.volume, time + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.22);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(time);
+      osc.stop(time + 0.25);
+    };
+    hoot(t);
+    hoot(t + 0.3);
+  }
+
+
   playFileOrSynth(fileUrl, synthMethod) {
     if (this.isMuted) return;
     this.init();
@@ -408,6 +858,14 @@ export function useAudio() {
   const setSpotifyPlaying = (isPlaying) => synth.setSpotifyPlaying(isPlaying);
   const setUseLocalDoublePlaylist = (useDouble) => synth.setUseLocalDoublePlaylist(useDouble);
 
+  const setAmbientLayerActive = (layerId, isActive) => {
+    synth.setAmbientLayerActive(layerId, isActive);
+  };
+
+  const restartActiveLayers = () => {
+    synth.restartActiveLayers();
+  };
+
   return {
     initAudio,
     playClick,
@@ -420,6 +878,8 @@ export function useAudio() {
     stopHeartbeat,
     setSpotifyPlaying,
     setUseLocalDoublePlaylist,
+    setAmbientLayerActive,
+    restartActiveLayers,
     synthInstance: synth
   };
 }

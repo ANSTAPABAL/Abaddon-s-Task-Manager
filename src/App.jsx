@@ -11,7 +11,7 @@ import { Settings as SettingsIcon, Volume2, VolumeX, Sliders } from 'lucide-reac
 import { getVirtualTodayStr, getVirtualTomorrowStr } from './utils/dateUtils';
 
 export default function App() {
-  const { initAudio, setAtmosphereMood, playClick, playSuccess, setMuted, setVolume, setUseLocalDoublePlaylist, synthInstance } = useAudio();
+  const { initAudio, setAtmosphereMood, playClick, playSuccess, setMuted, setVolume, setUseLocalDoublePlaylist, setAmbientLayerActive, restartActiveLayers, synthInstance } = useAudio();
   
   // App States
   const [activeTab, setActiveTab] = useState('escape'); // escape, character, planner, recovery
@@ -221,6 +221,30 @@ export default function App() {
 
   // Settings & Env Configuration State
   const [settingsOpen, setSettingsOpen] = useState(false);
+
+  const [ambientLayers, setAmbientLayers] = useState({
+    chains: localStorage.getItem('ambient_layer_chains') === 'true',
+    dogs: localStorage.getItem('ambient_layer_dogs') === 'true',
+    lightning: localStorage.getItem('ambient_layer_lightning') === 'true',
+    rain: localStorage.getItem('ambient_layer_rain') === 'true',
+    screams: localStorage.getItem('ambient_layer_screams') === 'true',
+    river: localStorage.getItem('ambient_layer_river') === 'true',
+    swamp: localStorage.getItem('ambient_layer_swamp') === 'true',
+    wolves: localStorage.getItem('ambient_layer_wolves') === 'true',
+    owls: localStorage.getItem('ambient_layer_owls') === 'true'
+  });
+
+  const handleToggleAmbientLayer = (layerId, isChecked) => {
+    playClick();
+    setAmbientLayers(prev => ({
+      ...prev,
+      [layerId]: isChecked
+    }));
+    if (setAmbientLayerActive) {
+      setAmbientLayerActive(layerId, isChecked);
+    }
+  };
+
   const [envConfig, setEnvConfig] = useState({ configured: false, key: '', port: 3001 });
   const [inputApiKey, setInputApiKey] = useState('');
   const [inputPort, setInputPort] = useState(3001);
@@ -254,6 +278,9 @@ export default function App() {
   useEffect(() => {
     const handleGesture = () => {
       initAudio();
+      if (restartActiveLayers) {
+        restartActiveLayers();
+      }
       document.removeEventListener('click', handleGesture);
     };
     document.addEventListener('click', handleGesture);
@@ -808,6 +835,45 @@ export default function App() {
                   </select>
                 </div>
 
+                <div style={{ marginTop: '1rem', borderTop: '1px dashed rgba(255,255,255,0.05)', paddingTop: '0.8rem', marginBottom: '0.5rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-bone-dim)', marginBottom: '8px' }}>
+                    🌲 Дополнительные слои окружения (Web Audio Synth):
+                  </label>
+                  
+                  <div style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', 
+                    gap: '0.5rem',
+                    fontSize: '0.75rem',
+                    color: 'var(--color-bone)'
+                  }}>
+                    {[
+                      { id: 'rain', label: '🌧️ Дождь' },
+                      { id: 'river', label: '🌊 Река' },
+                      { id: 'swamp', label: '🐊 Болото' },
+                      { id: 'chains', label: '⛓️ Цепи' },
+                      { id: 'dogs', label: '🐕 Собаки' },
+                      { id: 'lightning', label: '⚡ Молния' },
+                      { id: 'screams', label: '👻 Крики' },
+                      { id: 'wolves', label: '🐺 Волки' },
+                      { id: 'owls', label: '🦉 Совы' }
+                    ].map(layer => (
+                      <label 
+                        key={layer.id} 
+                        style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
+                      >
+                        <input 
+                          type="checkbox"
+                          checked={ambientLayers[layer.id]}
+                          onChange={(e) => handleToggleAmbientLayer(layer.id, e.target.checked)}
+                          style={{ accentColor: 'var(--color-blood)', cursor: 'pointer' }}
+                        />
+                        <span>{layer.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
                 <button 
                   className="rpg-btn rpg-btn-mana"
                   style={{ width: '100%', fontSize: '0.8rem', padding: '6px 10px', marginTop: '4px', borderColor: 'var(--color-relic-glow)', color: 'var(--color-relic-glow)' }}
@@ -817,7 +883,13 @@ export default function App() {
                     localStorage.setItem('default_volume', String(audioVolume));
                     localStorage.setItem('default_ambience', synthInstance?.currentMood || 'quiet_focus');
                     localStorage.setItem('use_local_double_playlist', useLocalDoublePlaylist ? 'true' : 'false');
-                    alert("Текущие настройки звука и выбранный эмбиент успешно сохранены как настройки по умолчанию!");
+                    
+                    // Save all ambient layers
+                    Object.keys(ambientLayers).forEach(k => {
+                      localStorage.setItem('ambient_layer_' + k, ambientLayers[k] ? 'true' : 'false');
+                    });
+                    
+                    alert("Текущие настройки звука, эмбиент и слои окружения сохранены по умолчанию!");
                   }}
                 >
                   💾 Сохранить звук как по умолчанию
