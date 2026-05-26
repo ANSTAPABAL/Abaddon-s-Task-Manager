@@ -330,6 +330,11 @@ export default function CarriageSession({
   const [editExecutionMode, setEditExecutionMode] = useState('ask_later');
   const [editDeconstructLoading, setEditDeconstructLoading] = useState(false);
 
+  // Guided Deconstruction (ADHD Interview) States inside Edit Modal
+  const [guidedStep, setGuidedStep] = useState(0); // 0 = default, 1 = answering questions, 2 = done
+  const [guidedQuestions, setGuidedQuestions] = useState([]);
+  const [guidedAnswers, setGuidedAnswers] = useState({});
+
   // Sync state to parent layout
   useEffect(() => {
     if (onStateSync) {
@@ -613,6 +618,8 @@ export default function CarriageSession({
     setEditDeadline(task.deadline || '');
     setEditNature(task.nature || 'external');
     setEditExecutionMode(task.executionMode || 'ask_later');
+    setGuidedStep(0);
+    setGuidedAnswers({});
   };
 
   const handleSaveEdit = () => {
@@ -636,18 +643,16 @@ export default function CarriageSession({
     }));
     playSuccess();
     setEditingTask(null);
+    setGuidedStep(0);
+    setGuidedAnswers({});
   };
 
   const handleDetailedDeconstructInEdit = async () => {
-    if (!requestDeconstruction) return;
+    if (!editTitle.trim()) return;
     playClick();
     setEditDeconstructLoading(true);
     try {
-      const tempTask = {
-        title: editTitle,
-        intent: editIntent,
-        steps: editSteps.map(s => s.title)
-      };
+      const tempTask = { title: editTitle, type: editType };
       const response = await requestDeconstruction(tempTask, 'instant');
       if (response && response.steps) {
         const generated = response.steps.map((s, idx) => ({
@@ -656,10 +661,64 @@ export default function CarriageSession({
           completed: false
         }));
         setEditSteps(generated);
+        setEditIntent(response.intent || '');
         playSuccess();
       }
     } catch (e) {
-      alert("Не удалось переразбить задачу: " + e.message);
+      console.warn("AI deconstruction failed, falling back to local steps", e);
+      const localSteps = generateLocalSteps(editTitle, editType).map((s, idx) => ({
+        id: `step-${idx}-${Date.now()}`,
+        title: s,
+        completed: false
+      }));
+      setEditSteps(localSteps);
+      setEditIntent("Локальный контракт воли (ИИ Бездны оффлайн)");
+      playSuccess();
+    } finally {
+      setEditDeconstructLoading(false);
+    }
+  };
+
+  const handleEditStartGuided = async () => {
+    if (!editTitle.trim()) return;
+    playClick();
+    setEditDeconstructLoading(true);
+    try {
+      const tempTask = { title: editTitle };
+      const response = await requestDeconstruction(tempTask, 'guided_questions');
+      setGuidedQuestions(response.questions || [
+        "Какой технологический стек или инструменты вы планируете использовать?",
+        "Какие конкретные функциональные требования должны быть выполнены?",
+        "Что будет являться промежуточным результатом, а что итоговым?"
+      ]);
+      setGuidedStep(1);
+    } catch (e) {
+      alert("Ошибка запуска ритуала: " + e.message);
+    } finally {
+      setEditDeconstructLoading(false);
+    }
+  };
+
+  const handleEditAnswerSubmit = async () => {
+    playClick();
+    setEditDeconstructLoading(true);
+    try {
+      const tempTask = { title: editTitle };
+      const response = await requestDeconstruction(tempTask, 'guided_steps', {
+        questions: guidedQuestions,
+        answers: guidedAnswers
+      });
+      const steps = response.steps.map((s, idx) => ({
+        id: `step-${idx}-${Date.now()}`,
+        title: s,
+        completed: false
+      }));
+      setEditSteps(steps);
+      setEditIntent(response.intent || '');
+      setGuidedStep(2);
+      playSuccess();
+    } catch (e) {
+      alert("Ошибка ритуала: " + e.message);
     } finally {
       setEditDeconstructLoading(false);
     }
@@ -1818,214 +1877,265 @@ const handleWinActiveSession = (task) => {
             </button>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', marginBottom: '1.2rem' }}>
-            
-            {/* 1. Title, Type, and Time */}
-            <div style={{ display: 'grid', gridTemplateColumns: '2.5fr 1fr 1fr', gap: '0.8rem' }}>
-              <div style={{ gridColumn: 'span 1' }}>
-                <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginBottom: '4px' }}>НАЗВАНИЕ КВЕСТА</label>
-                <textarea 
-                  className="rpg-input rpg-input-auto" 
-                  style={{ 
-                    width: '100%', 
-                    minHeight: '40px',
-                    height: '40px',
-                    resize: 'none',
-                    overflowY: 'auto',
-                    paddingTop: '8px',
-                    paddingBottom: '8px',
-                    lineHeight: '1.3',
-                    display: 'block'
-                  }} 
-                  value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
-                />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginBottom: '4px' }}>ТИП СУЩНОСТИ</label>
-                <select 
-                  className="rpg-input" 
-                  style={{ width: '100%', fontSize: '0.9rem' }}
-                  value={editType}
-                  onChange={(e) => setEditType(e.target.value)}
-                >
-                  <option value="hunt">🏹 Охота</option>
-                  <option value="siege">💥 Осада</option>
-                  <option value="relic">💎 Реликвия</option>
-                  <option value="corpse">💀 Труп прошлого</option>
-                </select>
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginBottom: '4px' }}>ВРЕМЯ (МИН)</label>
-                <input 
-                  type="number" 
-                  className="rpg-input" 
-                  style={{ width: '100%', fontSize: '0.9rem' }} 
-                  value={editTime}
-                  onChange={(e) => setEditTime(e.target.value)}
-                />
-              </div>
+          {editDeconstructLoading && guidedStep === 0 && (
+            <div style={{ textAlign: 'center', padding: '3rem' }}>
+              <RefreshCw className="heartbeat-pulse fast" style={{ color: 'var(--color-mana-glow)', marginBottom: '1rem' }} size={32} />
+              <p style={{ fontFamily: 'var(--font-rpg)' }}>Взывание к Бездне... ИИ перестраивает шаги под новый контекст...</p>
             </div>
+          )}
 
-            {/* Nature, Execution Mode and Deadline selectors */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.8rem' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginBottom: '4px' }}>ПРИРОДА ЗАДАЧИ</label>
-                <select 
-                  className="rpg-input" 
-                  style={{ width: '100%', fontSize: '0.9rem' }}
-                  value={editNature}
-                  onChange={(e) => setEditNature(e.target.value)}
-                >
-                  <option value="internal">🧿 Внутренний Обет (для себя)</option>
-                  <option value="external">⚔️ Внешняя Схватка (для мира)</option>
-                </select>
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginBottom: '4px' }}>РЕЖИМ ВЫПОЛНЕНИЯ</label>
-                <select 
-                  className="rpg-input" 
-                  style={{ width: '100%', fontSize: '0.9rem' }}
-                  value={editExecutionMode}
-                  onChange={(e) => setEditExecutionMode(e.target.value)}
-                >
-                  <option value="timer">⏳ Таймер (Печать Времени)</option>
-                  <option value="day">🌅 В течение дня (Свободный Переход)</option>
-                  <option value="ask_later">❓ Спросить позже (Шепот Сомнений)</option>
-                </select>
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginBottom: '4px' }}>СРОК (ДЕДЛАЙН)</label>
-                <input 
-                  type="text" 
-                  className="rpg-input" 
-                  style={{ width: '100%', fontSize: '0.9rem' }} 
-                  placeholder="Например: до 18:00, через 2 дня"
-                  value={editDeadline}
-                  onChange={(e) => setEditDeadline(e.target.value)}
-                />
-              </div>
-            </div>
-
-            {/* 2. Intent Field ("Зачем мне это сегодня") */}
+          {guidedStep === 1 && (
             <div>
-              <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginBottom: '4px' }}>
-                СМЫСЛОВОЙ ЯКОРЬ (НАМЕРЕНИЕ ДЛЯ ADHD - ЗАЧЕМ МНЕ ЭТО СЕГОДНЯ?)
-              </label>
-              <textarea 
-                className="rpg-input" 
-                style={{ width: '100%', minHeight: '45px', fontSize: '0.85rem', resize: 'vertical' }}
-                placeholder="Например: Чтобы сдать проект и получить деньги..."
-                value={editIntent}
-                onChange={(e) => setEditIntent(e.target.value)}
-              />
-            </div>
-
-            {/* 3. AI Deconstructor Panel */}
-            <div style={{ background: 'rgba(0,0,0,0.3)', padding: '0.8rem', border: '1px solid var(--color-iron-light)' }}>
-              <h4 style={{ fontSize: '0.85rem', color: 'var(--color-mana-glow)', marginBottom: '4px', fontFamily: 'var(--font-rpg)' }}>
-                🔮 Авто-настройка шагов ИИ (Контекст Бездны)
-              </h4>
-              <p style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginBottom: '8px' }}>
-                ИИ автоматически перестроит структуру шагов, используя отредактированное название и намерение выше.
-              </p>
-              
-              <button 
-                className="rpg-btn rpg-btn-mana" 
-                style={{ width: '100%', fontSize: '0.85rem', padding: '6px 0' }} 
-                onClick={handleDetailedDeconstructInEdit}
-                disabled={editDeconstructLoading}
-              >
-                {editDeconstructLoading ? "🔮 ПЕРЕПИСЫВАНИЕ ШАГОВ БЕЗДНОЙ..." : "🚀 РАСЩЕПИТЬ КВЕСТ ИИ НА МИКРО-ДЕЙСТВИЯ"}
-              </button>
-            </div>
-
-            {/* 4. Manual steps manipulation */}
-            <div>
-              <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-bone)', marginBottom: '4px', fontFamily: 'var(--font-rpg)' }}>
-                СПИСОК ШАГОВ (ЖМИТЕ НА ТЕКСТ ДЛЯ РЕДАКТИРОВАНИЯ ИЛИ ДОБАВЬТЕ/УДАЛИТЕ):
-              </label>
-              
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '260px', overflowY: 'auto', marginBottom: '0.6rem' }} className="rpg-scrollbar">
-                {editSteps.map(s => (
-                  <div 
-                    key={s.id} 
-                    style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: '0.5rem', 
-                      background: 'rgba(0,0,0,0.2)', 
-                      padding: '4px 10px', 
-                      border: '1px solid var(--color-iron-light)' 
-                    }}
-                  >
-                    <input 
-                      type="checkbox" 
-                      checked={s.completed} 
-                      onChange={() => handleToggleEditStep(s.id)}
-                      style={{ cursor: 'pointer' }}
-                    />
+              <h4 className="rpg-title" style={{ color: 'var(--color-mana-glow)', marginBottom: '0.8rem', fontFamily: 'var(--font-rpg)' }}>Ритуал уточняющих вопросов:</h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
+                {guidedQuestions.map((q, idx) => (
+                  <div key={idx}>
+                    <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--color-bone-dim)', marginBottom: '4px' }}>
+                      Вопрос {idx + 1}: {q}
+                    </label>
                     <input 
                       type="text" 
                       className="rpg-input" 
-                      style={{ 
-                        flex: 1, 
-                        fontSize: '0.85rem', 
-                        background: 'transparent', 
-                        border: 'none', 
-                        borderBottom: '1px dashed rgba(255,255,255,0.1)', 
-                        padding: '2px 0',
-                        color: s.completed ? 'var(--color-bone-dim)' : '#fff',
-                        textDecoration: s.completed ? 'line-through' : 'none'
-                      }}
-                      value={s.title}
-                      onChange={(e) => handleUpdateEditStepText(s.id, e.target.value)}
+                      style={{ width: '100%', fontSize: '0.9rem' }}
+                      placeholder="Ответьте честно..."
+                      value={guidedAnswers[idx] || ''}
+                      onChange={(e) => setGuidedAnswers({ ...guidedAnswers, [idx]: e.target.value })}
                     />
-                    <button 
-                      className="rpg-btn" 
-                      style={{ padding: '2px 6px', color: 'var(--color-blood-glow)', fontSize: '0.75rem' }} 
-                      onClick={() => handleRemoveEditStep(s.id)}
-                    >
-                      ✕
-                    </button>
                   </div>
                 ))}
-                {editSteps.length === 0 && (
-                  <div style={{ fontSize: '0.8rem', fontStyle: 'italic', color: 'var(--color-iron-light)', padding: '5px' }}>
-                    Нет шагов в контракте. Сделайте ручной шаг или призовите ИИ.
-                  </div>
-                )}
               </div>
-
-              {/* Manual Step Adding Field */}
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <input 
-                  type="text" 
-                  className="rpg-input" 
-                  style={{ flex: 1, fontSize: '0.85rem' }} 
-                  placeholder="Добавить свой ручной шаг..."
-                  value={newStepText}
-                  onChange={(e) => setNewStepText(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleAddEditStep()}
-                />
-                <button className="rpg-btn" onClick={handleAddEditStep} disabled={!newStepText.trim()}>
-                  Добавить
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                <button className="rpg-btn" onClick={() => setGuidedStep(0)}>Назад</button>
+                <button 
+                  className="rpg-btn rpg-btn-mana" 
+                  onClick={handleEditAnswerSubmit}
+                  disabled={Object.keys(guidedAnswers).length < guidedQuestions.length || editDeconstructLoading}
+                >
+                  {editDeconstructLoading ? "🔮 ПРОВЕДЕНИЕ РИТУАЛА..." : "Завершить разбор"}
                 </button>
               </div>
             </div>
+          )}
 
-          </div>
+          {guidedStep !== 1 && !editDeconstructLoading && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+              
+              {/* 1. Title, Type, and Time */}
+              <div style={{ display: 'grid', gridTemplateColumns: '2.5fr 1fr 1fr', gap: '0.8rem' }}>
+                <div style={{ gridColumn: 'span 1' }}>
+                  <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginBottom: '4px' }}>НАЗВАНИЕ КВЕСТА</label>
+                  <textarea 
+                    className="rpg-input rpg-input-auto" 
+                    style={{ 
+                      width: '100%', 
+                      minHeight: '40px',
+                      height: '40px',
+                      resize: 'none',
+                      overflowY: 'auto',
+                      paddingTop: '8px',
+                      paddingBottom: '8px',
+                      lineHeight: '1.3',
+                      display: 'block'
+                    }} 
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginBottom: '4px' }}>ТИП СУЩНОСТИ</label>
+                  <select 
+                    className="rpg-input" 
+                    style={{ width: '100%', fontSize: '0.9rem' }}
+                    value={editType}
+                    onChange={(e) => setEditType(e.target.value)}
+                  >
+                    <option value="hunt">🏹 Охота</option>
+                    <option value="siege">💥 Осада</option>
+                    <option value="relic">💎 Реликвия</option>
+                    <option value="corpse">💀 Труп прошлого</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginBottom: '4px' }}>ВРЕМЯ (МИН)</label>
+                  <input 
+                    type="number" 
+                    className="rpg-input" 
+                    style={{ width: '100%', fontSize: '0.9rem' }} 
+                    value={editTime}
+                    onChange={(e) => setEditTime(e.target.value)}
+                  />
+                </div>
+              </div>
 
-          {/* Footer Controls */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', borderTop: '1px solid var(--color-iron-light)', paddingTop: '0.8rem', marginTop: '0.4rem' }}>
-            <button className="rpg-btn" onClick={() => setEditingTask(null)}>
-              ОТМЕНИТЬ
-            </button>
-            <button className="rpg-btn rpg-btn-blood" onClick={handleSaveEdit}>
-              СОХРАНИТЬ КОНТРАКТ В БАЗУ
-            </button>
-          </div>
+              {/* Nature, Execution Mode and Deadline selectors */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.8rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginBottom: '4px' }}>ПРИРОДА ЗАДАЧИ</label>
+                  <select 
+                    className="rpg-input" 
+                    style={{ width: '100%', fontSize: '0.9rem' }}
+                    value={editNature}
+                    onChange={(e) => setEditNature(e.target.value)}
+                  >
+                    <option value="internal">🧿 Внутренний Обет (для себя)</option>
+                    <option value="external">⚔️ Внешняя Схватка (для мира)</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginBottom: '4px' }}>РЕЖИМ ВЫПОЛНЕНИЯ</label>
+                  <select 
+                    className="rpg-input" 
+                    style={{ width: '100%', fontSize: '0.9rem' }}
+                    value={editExecutionMode}
+                    onChange={(e) => setEditExecutionMode(e.target.value)}
+                  >
+                    <option value="timer">⏳ Таймер (Печать Времени)</option>
+                    <option value="day">🌅 В течение дня (Свободный Переход)</option>
+                    <option value="ask_later">❓ Спросить позже (Шепот Сомнений)</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginBottom: '4px' }}>СРОК (ДЕДЛАЙН)</label>
+                  <input 
+                    type="text" 
+                    className="rpg-input" 
+                    style={{ width: '100%', fontSize: '0.9rem' }} 
+                    placeholder="Например: до 18:00, через 2 дня"
+                    value={editDeadline}
+                    onChange={(e) => setEditDeadline(e.target.value)}
+                  />
+                </div>
+              </div>
 
+              {/* 2. Intent Field ("Зачем мне это сегодня") */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginBottom: '4px' }}>
+                  СМЫСЛОВОЙ ЯКОРЬ (НАМЕРЕНИЕ ДЛЯ ADHD - ЗАЧЕМ МНЕ ЭТО СЕГОДНЯ?)
+                </label>
+                <textarea 
+                  className="rpg-input" 
+                  style={{ width: '100%', minHeight: '45px', fontSize: '0.85rem', resize: 'vertical' }}
+                  placeholder="Например: Чтобы сдать проект и получить деньги..."
+                  value={editIntent}
+                  onChange={(e) => setEditIntent(e.target.value)}
+                />
+              </div>
+
+              {/* 3. DeepSeek AI Deconstructor Panel */}
+              <div style={{ background: 'rgba(0,0,0,0.3)', padding: '0.8rem', border: '1px solid var(--color-iron-light)', borderRadius: '4px' }}>
+                <h4 style={{ fontSize: '0.85rem', color: 'var(--color-mana-glow)', marginBottom: '4px', fontFamily: 'var(--font-rpg)' }}>
+                  🔮 Авто-настройка шагов ИИ (Контекст Бездны)
+                </h4>
+                <p style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginBottom: '8px' }}>
+                  ИИ перестроит структуру шагов, используя отредактированное название и ваши ответы как истинный контекст.
+                </p>
+                
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button 
+                    className="rpg-btn" 
+                    style={{ flex: 1, fontSize: '0.8rem', padding: '6px 0' }} 
+                    onClick={handleDetailedDeconstructInEdit}
+                    disabled={editDeconstructLoading}
+                  >
+                    🚀 БЫСТРО И ГРУБО
+                  </button>
+                  <button 
+                    className="rpg-btn rpg-btn-mana" 
+                    style={{ flex: 1, fontSize: '0.8rem', padding: '6px 0' }} 
+                    onClick={handleEditStartGuided}
+                    disabled={editDeconstructLoading}
+                  >
+                    🔮 С СОПРОВОЖДЕНИЕМ
+                  </button>
+                </div>
+              </div>
+
+              {/* 4. Manual steps manipulation */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-bone)', marginBottom: '4px', fontFamily: 'var(--font-rpg)' }}>
+                  СПИСОК ШАГОВ (ЖМИТЕ НА ТЕКСТ ДЛЯ РЕДАКТИРОВАНИЯ ИЛИ ДОБАВЬТЕ/УДАЛИТЕ):
+                </label>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '260px', overflowY: 'auto', marginBottom: '0.6rem' }} className="rpg-scrollbar">
+                  {editSteps.map(s => (
+                    <div 
+                      key={s.id} 
+                      style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '0.5rem', 
+                        background: 'rgba(0,0,0,0.2)', 
+                        padding: '4px 10px', 
+                        border: '1px solid var(--color-iron-light)' 
+                      }}
+                    >
+                      <input 
+                        type="checkbox" 
+                        checked={s.completed} 
+                        onChange={() => handleToggleEditStep(s.id)}
+                        style={{ cursor: 'pointer' }}
+                      />
+                      <input 
+                        type="text" 
+                        className="rpg-input" 
+                        style={{ 
+                          flex: 1, 
+                          fontSize: '0.85rem', 
+                          background: 'transparent', 
+                          border: 'none', 
+                          borderBottom: '1px dashed rgba(255,255,255,0.1)', 
+                          padding: '2px 0',
+                          color: s.completed ? 'var(--color-bone-dim)' : '#fff',
+                          textDecoration: s.completed ? 'line-through' : 'none'
+                        }}
+                        value={s.title}
+                        onChange={(e) => handleUpdateEditStepText(s.id, e.target.value)}
+                      />
+                      <button 
+                        className="rpg-btn" 
+                        style={{ padding: '2px 6px', color: 'var(--color-blood-glow)', fontSize: '0.75rem' }} 
+                        onClick={() => handleRemoveEditStep(s.id)}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                  {editSteps.length === 0 && (
+                    <div style={{ fontSize: '0.8rem', fontStyle: 'italic', color: 'var(--color-iron-light)', padding: '5px' }}>
+                      Нет шагов в контракте. Сделайте ручной шаг или призовите ИИ.
+                    </div>
+                  )}
+                </div>
+
+                {/* Manual Step Adding Field */}
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <input 
+                    type="text" 
+                    className="rpg-input" 
+                    style={{ flex: 1, fontSize: '0.85rem' }} 
+                    placeholder="Добавить свой ручной шаг..."
+                    value={newStepText}
+                    onChange={(e) => setNewStepText(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAddEditStep()}
+                  />
+                  <button className="rpg-btn" onClick={handleAddEditStep} disabled={!newStepText.trim()}>
+                    Добавить
+                  </button>
+                </div>
+              </div>
+
+              {/* Footer Controls */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', borderTop: '1px solid var(--color-iron-light)', paddingTop: '0.8rem', marginTop: '0.4rem' }}>
+                <button className="rpg-btn" onClick={() => setEditingTask(null)}>
+                  ОТМЕНИТЬ
+                </button>
+                <button className="rpg-btn rpg-btn-blood" onClick={handleSaveEdit}>
+                  СОХРАНИТЬ КОНТРАКТ В БАЗУ
+                </button>
+              </div>
+
+            </div>
+          )}
         </div>
       </div>
     );
