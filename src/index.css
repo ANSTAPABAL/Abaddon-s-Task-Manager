@@ -414,6 +414,9 @@ body::before {
   position: relative;
   transition: all 0.25s ease;
   user-select: none;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
 }
 
 .task-card:hover {

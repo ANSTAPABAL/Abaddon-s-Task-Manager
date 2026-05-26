@@ -2,7 +2,54 @@ import React, { useState, useRef } from 'react';
 import { Skull, Pin, Trash2, Shield, Calendar, Sparkles, CheckSquare, Plus, ArrowRight, UserCheck, Flame, RefreshCw } from 'lucide-react';
 import { useAudio } from '../hooks/useAudio';
 
-export default function TweekPlanner({ tasks, setTasks, character, setCharacter, requestDeconstruction, communeWithSpirits, triggerRuneOfReturn }) {
+const generateLocalSteps = (title, type) => {
+  const t = title.toLowerCase();
+  
+  if (t.includes('код') || t.includes('программ') || t.includes('питон') || t.includes('тест') || t.includes('написать') || t.includes('разработ') || t.includes('фикс') || t.includes('баг') || t.includes('dev') || t.includes('react') || t.includes('js') || t.includes('css')) {
+    return [
+      "Найти безопасное место в укрытии (Включить компьютер, открыть IDE)",
+      "Снять ржавые кандалы апатии (Закрыть все развлекательные вкладки и чаты)",
+      "Заварить эликсир концентрации (Налить стакан свежей воды или чая)",
+      "Совершить пробный выпад клинком (Написать одну строчку кода, функцию или комментарий)",
+      "Проверить натяжение тетивы (Запустить сборку проекта, тесты или проверить в браузере)",
+      "Осадить врага до конца (Сосредоточенно работать в течение 10-15 минут)"
+    ];
+  }
+  
+  if (t.includes('изучить') || t.includes('прочитать') || t.includes('почитать') || t.includes('курс') || t.includes('книг') || t.includes('лекци') || t.includes('учить') || t.includes('разобрать') || t.includes('исследов') || t.includes('анализ')) {
+    return [
+      "Протереть линзы очков мудрости (Открыть нужный учебный материал, статью или книгу)",
+      "Запечатать посторонние шепоты (Поставить телефон на беззвучный режим)",
+      "Прочесть первую руну древнего свитка (Внимательно прочесть ровно один абзац или 1 слайд)",
+      "Записать ценное откровение в летопись (Выписать одну ключевую мысль или термин в блокнот)",
+      "Укрепить ментальный барьер (Прочитать еще 2-3 страницы без самокритики)",
+      "Осознать полученное знание (Сделать краткую паузу и осмыслить прочитанное)"
+    ];
+  }
+  
+  if (t.includes('помыть') || t.includes('убрать') || t.includes('стир') || t.includes('уборка') || t.includes('комнат') || t.includes('вещи') || t.includes('посуд') || t.includes('пыль') || t.includes('чистк')) {
+    return [
+      "Надеть латные рукавицы выживания (Встать со стула и дойти до места уборки)",
+      "Собрать осколки Скверны Бездны (Выбросить в мусорку ровно 3 ненужные вещи/бумажки)",
+      "Призвать силу Водного Источника (Включить воду, взять тряпку или губку)",
+      "Очистить первый рубеж обороны (Помыть или убрать одну конкретную тарелку, вещь или полку)",
+      "Объявить о победе в лагере (Поставить очищенный предмет на его законное место)",
+      "Оглядеть очищенные земли (Оценить результат и похвалить себя за сделанный шаг)"
+    ];
+  }
+  
+  // Generic fallback steps
+  return [
+    "Снять кандалы ступора (Сделать глубокий вдох и выдох по схеме 4-4-4-4)",
+    "Разведать территорию боя (Открыть материалы задачи, файл или блокнот перед собой)",
+    "Совершить микро-удар кинжалом (Сделать любое простейшее действие по задаче за 2 минуты)",
+    "Прорвать когнитивную блокаду (Сделать второе простое микро-действие)",
+    "Занять доминирующую позицию (Продолжить работу в спокойном ритме в течение 5 минут)",
+    "Оценить первый рубеж (Свериться с планом и продолжить путь)"
+  ];
+};
+
+export default function TweekPlanner({ tasks, setTasks, character, setCharacter, requestDeconstruction, communeWithSpirits, triggerRuneOfReturn, parseMessyTasks }) {
   const { playClick, playBoneCrack, playSuccess } = useAudio();
   const [activeKanbanDay, setActiveKanbanDay] = useState(null); // YYYY-MM-DD
   const [newTaskTitle, setNewTaskTitle] = useState('');
@@ -14,6 +61,11 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
   const [taskDateOption, setTaskDateOption] = useState(new Date().toISOString().split('T')[0]);
   const [customDateValue, setCustomDateValue] = useState('');
   const [isLongJourney, setIsLongJourney] = useState(false);
+
+  // Chaos Dump State
+  const [chaosDumpOpen, setChaosDumpOpen] = useState(false);
+  const [chaosText, setChaosText] = useState('');
+  const [chaosLoading, setChaosLoading] = useState(false);
 
   const getTaskDateOptions = () => {
     const options = [];
@@ -74,6 +126,54 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
     const walk = (x - startX.current) * 1.5; // Scroll multiplier
     if (scrollRef.current) {
       scrollRef.current.scrollLeft = scrollLeft.current - walk;
+    }
+  };
+
+  const handleChaosDumpParse = async () => {
+    if (!chaosText.trim() || !parseMessyTasks) return;
+    playClick();
+    setChaosLoading(true);
+    try {
+      const result = await parseMessyTasks(chaosText);
+      if (result && Array.isArray(result)) {
+        const todayDateStr = new Date().toISOString().split('T')[0];
+        const newTasks = result.map((t, idx) => {
+          const initialType = t.type || classifyLocally(t.title);
+          return {
+            id: `task-${Date.now()}-${idx}`,
+            title: t.title,
+            type: initialType,
+            status: 'active',
+            date: t.deadline ? todayDateStr : null, // if they have a deadline, add to today, else backlog
+            pomodoroTime: t.estimatedTime || (initialType === 'siege' ? 50 : 25),
+            pomodoroSpent: 0,
+            toxicity: t.toxicity || 'standard',
+            barrierType: null,
+            curseLevel: 0,
+            isLongJourney: t.isLongJourney || false,
+            // Fallback to local steps if AI didn't provide steps
+            steps: t.steps ? t.steps.map((s, sIdx) => ({ id: `step-${sIdx}-${Date.now()}`, title: s, completed: false })) : generateLocalSteps(t.title, initialType).map((s, sIdx) => ({ id: `step-${sIdx}-${Date.now()}`, title: s, completed: false })),
+            intent: t.intent || '',
+            deadline: t.deadline || '',
+            combatLore: {
+              enemyName: t.enemyName || "Безымянный Ужас Бездны",
+              visualType: t.visualType || initialType,
+              weakPoints: t.weakPoints || ["Монстр боится разбития.", "Сделайте шаг за 5 минут!"],
+              randomEvent: t.randomEvent || "Бой протекает при поддержке Бездны."
+            }
+          };
+        });
+        setTasks(prev => [...prev, ...newTasks]);
+        setChaosText('');
+        setChaosDumpOpen(false);
+        playBoneCrack();
+        playSuccess();
+        alert(`🔮 Бездна успешно извлекла ${newTasks.length} квестов и занесла их в ваш Задачник!`);
+      }
+    } catch (e) {
+      alert("Не удалось разобрать хаос Бездной: " + e.message);
+    } finally {
+      setChaosLoading(false);
     }
   };
 
@@ -359,7 +459,15 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
       setEditIntent(response.intent || '');
       playSuccess();
     } catch (e) {
-      alert("Не удалось переразбить ИИ: " + e.message);
+      console.warn("AI deconstruction failed, falling back to local steps", e);
+      const localSteps = generateLocalSteps(editTitle, editType).map((s, idx) => ({
+        id: `step-${idx}-${Date.now()}`,
+        title: s,
+        completed: false
+      }));
+      setEditSteps(localSteps);
+      setEditIntent("Локальный контракт воли (ИИ Бездны оффлайн)");
+      playSuccess();
     } finally {
       setEditDeconstructLoading(false);
     }
@@ -487,6 +595,12 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
     const initialType = classifyLocally(title);
     
     const taskId = `task-${Date.now()}`;
+    const localSteps = generateLocalSteps(title, initialType).map((s, sIdx) => ({
+      id: `step-${sIdx}-${Date.now()}`,
+      title: s,
+      completed: false
+    }));
+    
     const newTask = {
       id: taskId,
       title: title,
@@ -498,7 +612,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
       toxicity: 'standard',
       barrierType: null,
       curseLevel: 0,
-      steps: [],
+      steps: localSteps,
       intent: '',
       isLongJourney: isLongJourney
     };
@@ -516,7 +630,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
       setEditType(initialType);
       setEditTime(initialType === 'siege' ? 50 : 25);
       setEditIntent('');
-      setEditSteps([]);
+      setEditSteps(localSteps);
       setNewStepText('');
       setEditNature('external');
       setEditExecutionMode('ask_later');
@@ -888,6 +1002,42 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
         <div style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', paddingLeft: '0.5rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
           💡 <i>Дважды кликните по любой задаче, чтобы изменить её поля, намерение или переразбить ИИ.</i>
         </div>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-start', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '0.6rem', marginTop: '0.4rem', paddingLeft: '0.5rem' }}>
+          <button
+            className={`rpg-btn ${chaosDumpOpen ? 'rpg-btn-blood' : ''}`}
+            style={{ fontSize: '0.8rem', padding: '5px 12px', display: 'flex', alignItems: 'center', gap: '6px', height: '32px' }}
+            onClick={() => { playClick(); setChaosDumpOpen(!chaosDumpOpen); }}
+          >
+            <span>🔮</span>
+            <span>{chaosDumpOpen ? 'СКРЫТЬ ОМУТ ХАОСА' : 'ОМУТ ХАОСА (ДАМП МЫСЛЕЙ)'}</span>
+          </button>
+        </div>
+
+        {chaosDumpOpen && (
+          <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', marginTop: '0.8rem', background: 'rgba(0,0,0,0.3)', padding: '1rem', border: '1px dashed var(--color-iron-light)', borderRadius: '4px' }}>
+            <label style={{ fontSize: '0.82rem', color: 'var(--color-bone-dim)', fontFamily: 'var(--font-rpg)', textTransform: 'uppercase', letterSpacing: '1px' }}>
+              🌌 Вылейте хаос своего разума (СДВГ-дамп мыслей):
+            </label>
+            <textarea
+              className="rpg-input"
+              style={{ width: '100%', minHeight: '120px', resize: 'vertical', fontSize: '0.92rem', background: 'rgba(10,5,15,0.6)', border: '1px solid rgba(255,255,255,0.08)', fontFamily: 'monospace', lineHeight: '1.4' }}
+              placeholder="Например: мне надо помыть посуду, но блин раковина полная и воняет, это пипец страшно начать. Еще сдать проект заказчику до среды, там куча мелких правок, надо написать тесты и проверить сборку, это огромная осада! Еще купить корм коту, это быстро."
+              value={chaosText}
+              onChange={(e) => setChaosText(e.target.value)}
+              disabled={chaosLoading}
+            />
+            <button
+              className="rpg-btn rpg-btn-mana"
+              style={{ alignSelf: 'flex-end', display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 20px', fontSize: '0.85rem' }}
+              onClick={handleChaosDumpParse}
+              disabled={chaosLoading || !chaosText.trim()}
+            >
+              {chaosLoading ? <RefreshCw className="heartbeat-pulse fast" size={14} /> : <span>🔮</span>}
+              <span>{chaosLoading ? 'РАСШИФРОВКА ХАОСА...' : 'РАСШИФРОВАТЬ СХВАТКИ БЕЗДНОЙ'}</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* 1.5. Ritual Alert Notification */}

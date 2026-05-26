@@ -161,27 +161,117 @@ const BIG_BREAK_ACTIVITIES = [
 ];
 
 
-const generateEnrichedEnemyDescription = (enemyName, taskTitle, toxicity, variation) => {
-  const intros = [
-    `Из темного влажного грота, волоча за собой шлейф удушливого тумана, медленно выползает темный клубок шевелящихся, суставчатых конечностей.`,
-    `С тихим шорохом костей и ржавой стали из провала в полу выползает бесформенный черный клубок переплетенных лап и бритвенно-острых когтей.`,
-    `Из бездонного разлома к вам тянется содрогающийся клубок смоляных щупалец и костлявых отростков, окружая ваше сознание холодным дыханием сомнения.`,
-    `Окутанный багровым паром, из зловещей темноты грота выкатывается плотный шевелящийся конгломерат искаженных конечностей и слепых, моргающих глаз.`
-  ];
+const generateLocalSteps = (title, type) => {
+  const t = title.toLowerCase();
   
+  if (t.includes('код') || t.includes('программ') || t.includes('питон') || t.includes('тест') || t.includes('написать') || t.includes('разработ') || t.includes('фикс') || t.includes('баг') || t.includes('dev') || t.includes('react') || t.includes('js') || t.includes('css')) {
+    return [
+      "Найти безопасное место в укрытии (Включить компьютер, открыть IDE)",
+      "Снять ржавые кандалы апатии (Закрыть все развлекательные вкладки и чаты)",
+      "Заварить эликсир концентрации (Налить стакан свежей воды или чая)",
+      "Совершить пробный выпад клинком (Написать одну строчку кода, функцию или комментарий)",
+      "Проверить натяжение тетивы (Запустить сборку проекта, тесты или проверить в браузере)",
+      "Осадить врага до конца (Сосредоточенно работать в течение 10-15 минут)"
+    ];
+  }
+  
+  if (t.includes('изучить') || t.includes('прочитать') || t.includes('почитать') || t.includes('курс') || t.includes('книг') || t.includes('лекци') || t.includes('учить') || t.includes('разобрать') || t.includes('исследов') || t.includes('анализ')) {
+    return [
+      "Протереть линзы очков мудрости (Открыть нужный учебный материал, статью или книгу)",
+      "Запечатать посторонние шепоты (Поставить телефон на беззвучный режим)",
+      "Прочесть первую руну древнего свитка (Внимательно прочесть ровно один абзац или 1 слайд)",
+      "Записать ценное откровение в летопись (Выписать одну ключевую мысль или термин в блокнот)",
+      "Укрепить ментальный барьер (Прочитать еще 2-3 страницы без самокритики)",
+      "Осознать полученное знание (Сделать краткую паузу и осмыслить прочитанное)"
+    ];
+  }
+  
+  if (t.includes('помыть') || t.includes('убрать') || t.includes('стир') || t.includes('уборка') || t.includes('комнат') || t.includes('вещи') || t.includes('посуд') || t.includes('пыль') || t.includes('чистк')) {
+    return [
+      "Надеть латные рукавицы выживания (Встать со стула и дойти до места уборки)",
+      "Собрать осколки Скверны Бездны (Выбросить в мусорку ровно 3 ненужные вещи/бумажки)",
+      "Призвать силу Водного Источника (Включить воду, взять тряпку или губку)",
+      "Очистить первый рубеж обороны (Помыть или убрать одну конкретную тарелку, вещь или полку)",
+      "Объявить о победе в лагере (Поставить очищенный предмет на его законное место)",
+      "Оглядеть очищенные земли (Оценить результат и похвалить себя за сделанный шаг)"
+    ];
+  }
+  
+  // Generic fallback steps
+  return [
+    "Снять кандалы ступора (Сделать глубокий вдох и выдох по схеме 4-4-4-4)",
+    "Разведать территорию боя (Открыть материалы задачи, файл или блокнот перед собой)",
+    "Совершить микро-удар кинжалом (Сделать любое простейшее действие по задаче за 2 минуты)",
+    "Прорвать когнитивную блокаду (Сделать второе простое микро-действие)",
+    "Занять доминирующую позицию (Продолжить работу в спокойном ритме в течение 5 минут)",
+    "Оценить первый рубеж (Свериться с планом и продолжить путь)"
+  ];
+};
+
+const generateEnrichedEnemyDescription = (enemyName, taskTitle, toxicity, variation) => {
   const hashStr = enemyName + taskTitle;
   let hash = 0;
   for (let i = 0; i < hashStr.length; i++) {
     hash = hashStr.charCodeAt(i) + ((hash << 5) - hash);
   }
   hash = Math.abs(hash);
-  const intro = intros[hash % intros.length];
+
+  const classes = [
+    "ослепший паладин Бездны",
+    "падшая сирена Каргахаульских перекатов",
+    "сутулый костяной жнец",
+    "безумный чернокнижник прокрастинации",
+    "тяжеловооруженный инквизитор Ока",
+    "призрачный лорд Забвения",
+    "каратель Багрового Храма",
+    "повелитель железных цепей"
+  ];
+
+  const appearances = [
+    "в растрескавшихся, сочащихся багровой кровью латах",
+    "под маской из отполированной человеческой кости",
+    "с пронзительно горящими фиолетовым пламенем глазницами",
+    "чье исхудавшее, бледное тело обвито звенящими ржавыми цепями",
+    "в изорванном священном одеянии, исписанном светящимися рунами",
+    "с холодным, безжизненным взором и неестественно бледной кожей",
+    "в оскверненной чешуйчатой броне, покрытой наростами черной соли",
+    "с костяными наростами вместо ребер и оскаленным лицом древнего воина"
+  ];
+
+  const weapons = [
+    "держащий в дрожащих руках гигантский зазубренный двуручный меч",
+    "сжимающий в длинных суставчатых пальцах тлеющий свиток Скверны",
+    "вооруженный тяжелым ржавым шипастым цепом",
+    "направляющий на вас оскверненное багровое кадило",
+    "держащий в руках старинные песочные часы, отсчитывающие секунды вашей воли",
+    "направляющий острие обжигающего эфирного клинка",
+    "сжимающий в когтях окровавленный жезл Империи",
+    "перебирающий длинными пальцами невидимые нити ментальной ловушки"
+  ];
+
+  const behaviors = [
+    "Он хрипло, прерывисто дышит, медленно высматривая малейшую когнитивную слабость в вашей осанке.",
+    "Он безумно хохочет, сотрясая камни грота и пытаясь заглушить ваш мысленный фокус.",
+    "Он медленно чертит круги на сырой земле, ожидая вашей первой оплошности или прокрастинации.",
+    "Он замирает в неподвижной зловещей стойке, готовясь совершить молниеносный смертельный выпад.",
+    "Существо шипит и медленно пятится, ослепленное ровным светом вашей решимости.",
+    "Он издает протяжный, полный боли стон, транслируя в вашу голову образы прошлых ошибок.",
+    "Монстр медленно приближается к вам, заставляя воздух вокруг густеть и леденеть.",
+    "Он расправляет свои плечи и яростно бьет оружием о щит, требуя идеальности каждого вашего шага."
+  ];
+
+  const cls = classes[hash % classes.length];
+  const app = appearances[(hash >> 2) % appearances.length];
+  const wpn = weapons[(hash >> 4) % weapons.length];
+  const beh = behaviors[(hash >> 6) % behaviors.length];
+
+  const intro = `Из сырого мрака грота, волоча за собой тяжелый могильный холод, медленно выходит ${cls}, ${app}, ${wpn}. ${beh}`;
 
   const descriptions = {
-    scary: `Существо соткано из вашего первобытного страха перед началом. Оно застывает на месте, готовясь к резкому прыжку, если вы проявите нерешительность. Однако в его движениях сквозит фатальная медлительность: резкий шаг вперед, простое физическое действие расколет его хрупкий панцирь. Одолеть его можно, совершив мгновенный выпад — сделайте простейшее микро-действие прямо сейчас!`,
-    tedious: `Тварь медлительна, но неумолимо давит своим весом, пытаясь погрузить ваш разум в вязкое болото скуки. Она не выносит резкого темпа и быстрой музыки. Ваша лучшая стратегия — двигаться быстро, обходя ее громоздкие фланги. Резкий и короткий шаг (работа ровно 10 минут) заставит монстра споткнуться и откроет его уязвимое ядро!`,
-    vague: `Этот монстр постоянно меняет очертания, расплываясь в воздухе туманными пятнами. Он слепнет от яркого света конкретики. Чтобы одолеть его, совершите точный, выверенный шаг — зафиксируйте в мыслях конкретное физическое действие, и его размытая форма материализуется, став уязвимой для вашего клинка!`,
-    standard: `Теневой паразит, питающийся вашим временем. Он медленно кружит вокруг, выжидая, когда вы отвлечетесь. У него есть скрытая слабость — он неповоротлив и впадает в ступор при виде планомерной атаки. Резкий шаг, даже самый скромный, собьет его с толку. Не давайте ему передышки, наносите удары по очереди!`
+    scary: `Существо соткано из вашего первобытного страха перед началом квеста. Оно застывает на месте, готовясь к резкому броску, если вы проявите нерешительность. Однако в его движениях сквозит фатальная медлительность: резкий шаг вперед, простейшее физическое микро-действие расколет его хрупкий костяной панцирь. Одолеть его можно, совершив мгновенный выпад прямо сейчас!`,
+    tedious: `Тварь медлительна, но неумолимо давит своим жутким весом, пытаясь погрузить ваш разум в вязкое болото уныния. Она не выносит резкого темпа и напора. Ваша лучшая стратегия — двигаться быстро, обходя ее громоздкие фланги. Резкий и короткий шаг (работа ровно 10 минут) заставит монстра споткнуться и откроет его уязвимое ядро!`,
+    vague: `Этот монстр постоянно меняет свои очертания, расплываясь в воздухе туманными пятнами и сбивая вас с толку. Он слепнет от яркого света конкретики. Чтобы одолеть его, совершите точный шаг — зафиксируйте в мыслях конкретное физическое действие, и его размытая форма материализуется, став уязвимой для вашего клинка!`,
+    standard: `Теневой паразит Бездны, питающийся вашим временем. Он медленно кружит вокруг, выжидая момент, когда вы отвлечетесь от пути. У него есть скрытая слабость — он неповоротлив и впадает в ступор при виде планомерной, решительной атаки. Резкий шаг, даже самый скромный, собьет его с толку. Не давайте ему передышки!`
   };
 
   const body = descriptions[toxicity] || descriptions.standard;
@@ -379,6 +469,123 @@ export default function CarriageSession({
   // --- LEGACY LEGEND & WIN CONDITION FUNCTIONS ---
 
   
+  const enrichTaskAndLore = async (task) => {
+    // If the task already has steps AND custom combatLore, we can skip it
+    if (task.steps && task.steps.length > 0 && task.combatLore && !task.combatLore.isGeneric) {
+      return;
+    }
+
+    try {
+      const needsSteps = !task.steps || task.steps.length === 0;
+      
+      const systemPrompt = `Ты — Древний Летописец Бездны во вселенной Абаддона (grim-dark RPG).
+Твоя задача — проанализировать задачу пользователя и вернуть JSON с геймификацией и деконструкцией.
+
+1. Классифицируй задачу по типу ("type"):
+   - "siege" (осада): крупные проекты, сложные отчеты, курсовые, дипломные, написание большого объема кода/текста.
+   - "relic" (реликвия): изучение нового, чтение документации, рисование, исследование, анализ.
+   - "corpse" (тлен/труп): разбор старых хвостов, долгов, уборка, очистка файлов, рутина.
+   - "hunt" (охота): стандартные дела, звонки, отправка писем, быстрые задачи.
+
+2. Сгенерируй атмосферного уникального врага:
+   - Враг должен быть преимущественно ГУМАНОИДНЫМ или МИФОЛОГИЧЕСКИМ существом из жанра grim-dark (например: ослепший паладин, плачущая сирена, костяной ткач, безумный жрец Бездны, пожиратель кожи, повелитель цепей, безголовый командор).
+   - Дай ему жуткое, уникальное имя ("enemyName") и подробное описание его появления из грота ("loreDescription", 3-4 предложения) с его повадками, оружием и внешним видом. Описание должно сочно и детализированно рисовать гуманоидный или мифологический grim-dark силуэт (его пронзительный взгляд, очертания лат или масок, трещины на оружии, мрачные повадки). СТРОГО ЗАПРЕЩЕНЫ любые бесформенные летающие сгустки плоти, аморфные черные черви, склизкие паразиты и клубки конечностей (избегай этого клише полностью).
+   - Сгенерируй 2 слабости ("weakPoints") на основе его повадок (например: "он медлителен из-за тяжелых лат...", "боится резких шагов...").
+   - Сгенерируй 1 случайное событие поля боя ("randomEvent").
+
+3. Если needsSteps равен true, разложи задачу на 4-6 элементарных физических микро-шагов ("steps"). Шаги должны быть геймифицированы (RPG действие + в скобках простое реальное действие, например: "Прочесть первую страницу древнего фолианта (Открыть документацию)"). Также дай краткое намерение квеста ("intent").
+
+Выведи ТОЛЬКО валидный JSON-объект в формате:
+{
+  "type": "siege"|"relic"|"hunt"|"corpse",
+  "enemyName": "Имя врага",
+  "loreDescription": "Жуткое подробное описание появления врага из грота.",
+  "weakPoints": ["Слабость 1", "Слабость 2"],
+  "randomEvent": "Событие на поле боя",
+  "intent": "Намерение",
+  "steps": ["Микро-шаг 1", "Микро-шаг 2"] // вернуть только если needsSteps равен true
+}`;
+
+      const userPrompt = `Задача: "${task.title}". Текущий тип: ${task.type || 'hunt'}. Требуется шагов (needsSteps): ${needsSteps}.`;
+
+      const response = await fetch('http://localhost:3001/api/ai/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ]
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        let text = data.choices[0].message.content.trim();
+        if (text.startsWith("```json")) text = text.slice(7);
+        if (text.endsWith("```")) text = text.slice(0, -3);
+        const parsed = JSON.parse(text.trim());
+
+        const updatedLore = {
+          enemyName: parsed.enemyName || "Безымянный Ужас Бездны",
+          visualType: parsed.type || task.type || 'hunt',
+          weakPoints: parsed.weakPoints || ["Враг неповоротлив: начните с простого действия."],
+          randomEvent: parsed.randomEvent || "Тьма сгущается над полем боя.",
+          loreDescription: parsed.loreDescription || "Жуткая тварь преграждает вам путь.",
+          isGeneric: false
+        };
+
+        const generatedSteps = parsed.steps ? parsed.steps.map((st, index) => ({
+          id: `step-${Date.now()}-${index}`,
+          title: st,
+          completed: false
+        })) : [];
+
+        // Update tasks list in parent state
+        setTasks(prev => prev.map(t => t.id === task.id ? {
+          ...t,
+          type: updatedLore.visualType,
+          pomodoroTime: updatedLore.visualType === 'siege' ? 50 : 25,
+          combatLore: updatedLore,
+          steps: needsSteps ? generatedSteps : t.steps,
+          intent: parsed.intent || t.intent
+        } : t));
+
+        // Update current activeTask state
+        setActiveTask(prev => {
+          if (prev && prev.id === task.id) {
+            return {
+              ...prev,
+              type: updatedLore.visualType,
+              pomodoroTime: updatedLore.visualType === 'siege' ? 50 : 25,
+              combatLore: updatedLore,
+              steps: needsSteps ? generatedSteps : prev.steps,
+              intent: parsed.intent || prev.intent
+            };
+          }
+          return prev;
+        });
+
+        if (needsSteps) {
+          setSessionSteps(generatedSteps);
+          setEnemyHp(100);
+        }
+
+        setEnemyName(updatedLore.enemyName);
+        setCombatVignette(`💥 Режим схватки: [${updatedLore.visualType.toUpperCase()}]. ${updatedLore.loreDescription}`);
+        setCombatLog(prev => [
+          ...prev,
+          `⚔️ Духовная связь установлена! Противник опознан как: ${updatedLore.enemyName}.`,
+          `👁️ Мысль о слабости врага: "${updatedLore.weakPoints[0]}"`,
+          `🌀 Событие поля боя: ${updatedLore.randomEvent}`
+        ]);
+      }
+    } catch (e) {
+      console.warn("Could not enrich task and lore with AI, generating procedural local values:", e);
+      generateCombatEncounter(task);
+    }
+  };
+
   const handleStartCombatSession = (task) => {
     const runStart = (mode) => {
       setActiveTask(task);
@@ -401,6 +608,9 @@ export default function CarriageSession({
       }
       setAtmosphereMood(task.type === 'siege' ? 'siege' : 'hunt');
       if (playActiveSessionTrack) playActiveSessionTrack(task.type === 'siege' ? 'siege' : 'hunt');
+      
+      // Async enrich lore and steps using AI!
+      enrichTaskAndLore(task);
     };
 
     if (!task.executionMode || task.executionMode === 'ask_later') {
@@ -442,7 +652,7 @@ export default function CarriageSession({
       toxicity: 'standard',
       barrierType: null,
       curseLevel: 0,
-      steps: [],
+      steps: generateLocalSteps(title, initialType).map((s, sIdx) => ({ id: `step-${sIdx}-${Date.now()}`, title: s, completed: false })),
       intent: '',
       isLongJourney: false
     };
@@ -451,36 +661,6 @@ export default function CarriageSession({
     handleStartCombatSession(newTask);
     playSuccess();
 
-    try {
-      const systemPrompt = `Ты — Распределитель Контрактов Бездны. Твоя задача — классифицировать задачу по типу сложности для ADHD/СДВГ-игрока.
-Возвращай ТОЛЬКО JSON {"type": "siege"|"relic"|"hunt"|"corpse"}.`;
-      const response = await fetch('http://localhost:3001/api/ai/complete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: `Определи тип для задачи: "${title}"` }
-          ]
-        })
-      });
-      if (response.ok) {
-        const data = await response.json();
-        let text = data.choices[0].message.content.trim();
-        if (text.startsWith("\x60\x60\x60json")) text = text.slice(7);
-        if (text.endsWith("\x60\x60\x60")) text = text.slice(0, -3);
-        const parsed = JSON.parse(text.trim());
-        if (['hunt', 'siege', 'relic', 'corpse'].includes(parsed.type)) {
-          setTasks(prev => prev.map(t => t.id === taskId ? {
-            ...t,
-            type: parsed.type,
-            pomodoroTime: parsed.type === 'siege' ? 50 : 25
-          } : t));
-        }
-      }
-    } catch (err) {
-      console.warn("AI background classification failed", err);
-    }
   };
 
 const handleWinActiveSession = (task) => {
@@ -697,7 +877,8 @@ const handleWinActiveSession = (task) => {
         visualType: variation.type,
         weakPoints: weakPoints,
         randomEvent: randomEvent,
-        loreDescription: detailedDesc
+        loreDescription: detailedDesc,
+        isGeneric: true
       };
     }
 
@@ -881,7 +1062,9 @@ const handleWinActiveSession = (task) => {
         barrierType: null,
         curseLevel: 0,
         isLongJourney: t.isLongJourney || false,
-        steps: t.steps ? t.steps.map((s, sIdx) => ({ id: `step-${sIdx}-${Date.now()}`, title: s, completed: false })) : [],
+        steps: (t.steps && t.steps.length > 0) 
+          ? t.steps.map((s, sIdx) => ({ id: `step-${sIdx}-${Date.now()}`, title: s, completed: false })) 
+          : generateLocalSteps(t.title, t.type || 'hunt').map((s, sIdx) => ({ id: `step-${sIdx}-${Date.now()}`, title: s, completed: false })),
         intent: t.intent || '',
         deadline: t.deadline || '',
         combatLore: {
@@ -1541,21 +1724,85 @@ const handleWinActiveSession = (task) => {
             )}
           </div>
 
-          {/* Activity Dropdown */}
+          {/* Activity Dropdown or Premium Grid for Short Tasks */}
           <div style={{ marginBottom: '1.2rem' }}>
-            <label style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)', fontFamily: 'var(--font-rpg)', display: 'block', marginBottom: '0.4rem' }}>
+            <label style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)', fontFamily: 'var(--font-rpg)', display: 'block', marginBottom: '0.6rem' }}>
               {isBig ? '🍽️ Выбери способ восстановления:' : '🎯 Выбери активность перерыва:'}
             </label>
-            <select className="rpg-input" style={{ width: '100%', fontSize: '0.95rem', padding: '0.6rem' }} value={breakActivityChoice} onChange={(e) => setBreakActivityChoice(e.target.value)}>
-              {activities.map(a => (<option key={a.id} value={a.id}>{a.label}</option>))}
-            </select>
-            <div style={{ fontSize: '0.7rem', color: '#8c7d6b', fontStyle: 'italic', marginTop: '4px' }}>В мире Бездны: «{selectedActivity.lore}»</div>
+            
+            {activeTask && activeTask.pomodoroTime < 20 ? (
+              /* Premium Grid of Buttons for Tasks under 20 mins */
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))', 
+                gap: '0.6rem', 
+                marginBottom: '1rem',
+                maxHeight: '180px',
+                overflowY: 'auto',
+                padding: '4px',
+                border: '1px solid rgba(255,255,255,0.05)',
+                background: 'rgba(0,0,0,0.2)'
+              }} className="rpg-scrollbar">
+                {activities.map(a => {
+                  const isSelected = breakActivityChoice === a.id;
+                  return (
+                    <button
+                      key={a.id}
+                      className={`rpg-btn ${isSelected ? 'rpg-btn-mana' : ''}`}
+                      onClick={() => { playClick(); setBreakActivityChoice(a.id); }}
+                      style={{
+                        padding: '8px 6px',
+                        fontSize: '0.78rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '4px',
+                        minHeight: '65px',
+                        borderColor: isSelected ? '#ffb813' : 'rgba(255,255,255,0.08)',
+                        background: isSelected ? 'rgba(212,175,55,0.12)' : 'rgba(10,8,12,0.6)',
+                        transition: 'all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1)',
+                        boxShadow: isSelected ? '0 0 12px rgba(255, 184, 19, 0.2)' : 'none',
+                        whiteSpace: 'normal',
+                        lineHeight: '1.25'
+                      }}
+                    >
+                      <span style={{ color: isSelected ? '#ffd700' : 'var(--color-bone)', fontWeight: isSelected ? 'bold' : 'normal' }}>
+                        {a.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              /* Standard dropdown for longer tasks */
+              <select className="rpg-input" style={{ width: '100%', fontSize: '0.95rem', padding: '0.6rem' }} value={breakActivityChoice} onChange={(e) => setBreakActivityChoice(e.target.value)}>
+                {activities.map(a => (<option key={a.id} value={a.id}>{a.label}</option>))}
+              </select>
+            )}
+
+            <div style={{ fontSize: '0.72rem', color: '#ffb813', fontStyle: 'italic', marginTop: '4px', textAlign: 'center', background: 'rgba(0,0,0,0.25)', padding: '6px', borderLeft: '3px solid #ffb813' }}>
+              В мире Бездны: «{selectedActivity.lore}»
+            </div>
           </div>
 
           {/* AI Generate Button */}
           {!breakAiText && !breakAiLoading && (
-            <button className="rpg-btn rpg-btn-mana" style={{ width: '100%', padding: '0.7rem', fontSize: '0.95rem', marginBottom: '1rem' }} onClick={handleBreakAiGenerate}>
-              {npc.icon} ПРИЗВАТЬ {npc.name.toUpperCase()}
+            <button 
+              className="rpg-btn rpg-btn-mana heartbeat-pulse" 
+              style={{ 
+                width: '100%', 
+                padding: '0.8rem', 
+                fontSize: '1rem', 
+                marginBottom: '1rem',
+                borderColor: '#ffb813',
+                color: '#ffb813',
+                boxShadow: '0 0 15px rgba(212,175,55,0.2)',
+                fontWeight: 'bold'
+              }} 
+              onClick={handleBreakAiGenerate}
+            >
+              🔮 {activeTask && activeTask.pomodoroTime < 20 ? 'АКТИВИРОВАТЬ ВСТРЕЧУ' : `ПРИЗВАТЬ ${npc.name.toUpperCase()}`}
             </button>
           )}
 
@@ -2523,33 +2770,46 @@ const handleWinActiveSession = (task) => {
             </h3>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '1.5rem' }}>
-              {sessionSteps.map((step) => (
-                <div 
-                  key={step.id} 
-                  onClick={() => handleToggleStep(step.id)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.8rem',
-                    padding: '0.75rem',
-                    background: step.completed ? 'rgba(0,0,0,0.25)' : 'var(--color-iron)',
-                    border: '1px solid var(--color-iron-light)',
-                    textDecoration: step.completed ? 'line-through' : 'none',
-                    opacity: step.completed ? 0.45 : 1,
-                    cursor: 'pointer'
-                  }}
-                >
-                  <input 
-                    type="checkbox" 
-                    checked={step.completed} 
-                    onChange={() => {}} 
-                    style={{ pointerEvents: 'none' }}
-                  />
-                  <span style={{ fontSize: '0.9rem', color: step.completed ? 'var(--color-bone-dim)' : '#fff' }}>
-                    {step.title}
-                  </span>
+              {sessionSteps.length > 0 ? (
+                sessionSteps.map((step) => (
+                  <div 
+                    key={step.id} 
+                    onClick={() => handleToggleStep(step.id)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.8rem',
+                      padding: '0.75rem',
+                      background: step.completed ? 'rgba(0,0,0,0.25)' : 'var(--color-iron)',
+                      border: '1px solid var(--color-iron-light)',
+                      textDecoration: step.completed ? 'line-through' : 'none',
+                      opacity: step.completed ? 0.45 : 1,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <input 
+                      type="checkbox" 
+                      checked={step.completed} 
+                      onChange={() => {}} 
+                      style={{ pointerEvents: 'none' }}
+                    />
+                    <span style={{ fontSize: '0.9rem', color: step.completed ? 'var(--color-bone-dim)' : '#fff' }}>
+                      {step.title}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <div style={{
+                  padding: '1rem',
+                  border: '1px dashed var(--color-bone-dim)',
+                  textAlign: 'center',
+                  fontStyle: 'italic',
+                  color: 'var(--color-bone-dim)',
+                  fontSize: '0.85rem'
+                }}>
+                  🔮 Бездна расшифровывает фазы прорыва квеста...
                 </div>
-              ))}
+              )}
             </div>
 
             {/* Controls */}
