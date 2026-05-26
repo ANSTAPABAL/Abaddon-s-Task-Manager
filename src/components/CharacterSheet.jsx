@@ -368,7 +368,7 @@ export default function CharacterSheet({ character, setCharacter, tasks, setTask
                   />
                 ) : (
                   <span style={{ fontSize: '4.5rem', filter: 'drop-shadow(0 0 15px rgba(255,255,255,0.05))' }}>
-                    {character.race === 'Каргахаулец (Бледный гигант)' ? '👹' : character.race === 'Нежить' ? '💀' : character.race === 'Эльф' ? '🧝' : '👤'}
+                    {character.race === 'Каргахаулец' ? '👹' : character.race === 'Нежить' ? '💀' : character.race === 'Эльф' ? '🧝' : '👤'}
                   </span>
                 )}
                 
@@ -457,7 +457,7 @@ export default function CharacterSheet({ character, setCharacter, tasks, setTask
                 trait: '🐗 Регенерация плоти: Повышенное исцеление HP при использовании зелий.',
                 icon: '🐗'
               },
-              'Каргахаулец (Бледный гигант)': {
+              'Каргахаулец': {
                 lore: 'Суровый исполин из заснеженных клыков Каргахаула. Привык преодолевать ледяные бури и колоссальные препятствия.',
                 trait: '👹 Ледяная стойкость: Увеличенный максимальный запас HP разума.',
                 icon: '👹'
