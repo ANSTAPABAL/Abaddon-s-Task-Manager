@@ -1803,7 +1803,7 @@ const handleWinActiveSession = (task) => {
     if (!editingTask) return null;
     return (
       <div className="gothic-modal-overlay" style={{ zIndex: 99999 }}>
-        <div className="gothic-modal-content" style={{ maxWidth: '1000px', width: '96%', maxHeight: '98vh', overflowY: 'auto', padding: '1.25rem 2.5rem' }}>
+        <div className="gothic-modal-content" style={{ maxWidth: '1300px', width: '98%', maxHeight: '98vh', overflowY: 'auto', padding: '1.25rem 2.5rem' }}>
           
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-iron-light)', paddingBottom: '0.6rem', marginBottom: '0.8rem' }}>
             <h3 className="gothic-title" style={{ fontSize: '1.25rem', color: 'var(--color-relic-glow)' }}>
