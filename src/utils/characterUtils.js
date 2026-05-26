@@ -145,6 +145,8 @@ export function rollStartingCharacter(pedestals = []) {
     pedigreeDesc = "Первопроходец Бездны. Его роду еще предстоит вписать свои имена в летописи.";
   }
 
+  const startingBio = `Родился под знаком Бездны как ${race} (${chosenClass}). Ступил на путь когнитивного искупления в Абаддоне, неся напутствие рода: "${nickname} — ${pedigreeDesc.split('.')[0]}."`;
+
   return {
     name: baseName,
     nickname: nickname,
@@ -169,6 +171,17 @@ export function rollStartingCharacter(pedestals = []) {
     totalManaSpent: 0,
     totalHpSacrificed: 0,
     potionsDrunk: 0,
-    meditationsCount: 0
+    meditationsCount: 0,
+    biography: [startingBio]
   };
 }
+
+export const merchantItems = [
+  { id: 'item_dagger', name: 'Кинжал Отсечения Долгов', slot: 'weapon', price: 10, bonus: '+15% к скорости Охоты', icon: '🗡️' },
+  { id: 'item_sword', name: 'Палаш Кровавого Алтаря', slot: 'weapon', price: 25, bonus: '+25% к сбору Золота', icon: '⚔️' },
+  { id: 'item_shield', name: 'Рунический Эгис Файрвола', slot: 'shield', price: 15, bonus: '+10 HP при отходе', icon: '🛡️' },
+  { id: 'item_armor', name: 'Мантия Безмятежности', slot: 'armor', price: 30, bonus: '+25 к Макс HP', icon: '👘' },
+  { id: 'item_ring', name: 'Перстень Допаминовой Сети', slot: 'ring', price: 20, bonus: '+5 RP за микро-действия', icon: '💍' },
+  { id: 'item_potion', name: 'Зелье Когнитивной Выносливости', slot: 'potion', price: 8, bonus: 'Мгновенный сброс 60м усталости, лечит 25 HP', icon: '🧪' }
+];
+

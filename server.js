@@ -126,6 +126,8 @@ function getRandomStartingCharacter() {
     chosenClass = legendaries[Math.floor(Math.random() * legendaries.length)];
   }
 
+  const startBio = `Родился под знаком Бездны как ${race} (${chosenClass}). Ступил на путь когнитивного искупления в Абаддоне.`;
+
   return {
     name: "Изгнанник",
     race: race,
@@ -148,7 +150,8 @@ function getRandomStartingCharacter() {
     shacklesBroken: false,
     intensity: "grim",
     returnAnchor: "",
-    barrierType: null
+    barrierType: null,
+    biography: [startBio]
   };
 }
 

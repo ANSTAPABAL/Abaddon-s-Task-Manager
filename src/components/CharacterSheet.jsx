@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Shield, Sparkles, BookOpen, AlertCircle, RefreshCw, Trash2, Heart, Award, Key, DollarSign, Package, Eye, FileText } from 'lucide-react';
+import { Shield, Sparkles, BookOpen, AlertCircle, RefreshCw, Trash2, Heart, Award, Key, DollarSign, Package, Eye, FileText, Skull } from 'lucide-react';
 import { useAudio } from '../hooks/useAudio';
 
 const getRacePortraitUrl = (race) => {
@@ -505,299 +505,77 @@ export default function CharacterSheet({ character, setCharacter, tasks, setTask
           </div>
         </div>
 
-        {/* 2. Item Shop Board */}
-        <div className="rpg-panel" style={{ border: '1px solid var(--color-relic-glow)', background: 'radial-gradient(circle, var(--color-iron-dark) 0%, var(--color-void) 100%)' }}>
-          <h3 className="gothic-title" style={{ fontSize: '1.1rem', color: 'var(--color-relic-glow)', marginBottom: '0.6rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-            🏪 Лавка Темного Торговца
-          </h3>
-          <p style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginBottom: '1rem', lineHeight: '1.3' }}>
-            В лавке Абаддона продаются артефакты, помогающие ADHD-беглецам удерживать когнитивное внимание.
-          </p>
+              </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-            {merchantItems.map(item => {
-              const alreadyBought = item.slot !== 'potion' && (character.inventory?.some(i => i.id === item.id) || Object.values(character.equipped).some(i => i && i.id === item.id));
-              
-              return (
-                <div 
-                  key={item.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.8rem',
-                    background: 'rgba(0,0,0,0.4)',
-                    border: '1px solid var(--color-iron-light)',
-                    padding: '8px 10px',
-                    opacity: alreadyBought ? 0.4 : 1
-                  }}
-                >
-                  <div style={{ fontSize: '1.5rem' }}>{item.icon}</div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '0.85rem', color: '#fff', fontWeight: 'bold' }}>{item.name}</div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--color-bone-dim)', fontStyle: 'italic' }}>{item.bonus}</div>
-                  </div>
-                  <button 
-                    className="rpg-btn" 
-                    style={{ fontSize: '0.75rem', padding: '4px 10px', borderColor: 'var(--color-relic-glow)' }}
-                    onClick={() => handleBuyItem(item)}
-                    disabled={alreadyBought}
-                  >
-                    {alreadyBought ? 'Приобретено' : `🪙 ${item.price}`}
-                  </button>
-                </div>
-              );
-            })}
+      {/* RIGHT COLUMN: Hero Biography Scroll */}
+      <div className="rpg-panel" style={{ 
+        background: 'radial-gradient(circle, #1a1412 0%, #0a0706 100%)', 
+        border: '2px solid var(--color-relic-glow)',
+        boxShadow: '0 10px 25px rgba(0,0,0,0.8), inset 0 0 20px rgba(212,175,55,0.05)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '1rem',
+        minHeight: '400px'
+      }}>
+        <div style={{ borderBottom: '1px solid #4a3e31', paddingBottom: '0.8rem', textAlign: 'center' }}>
+          <span style={{ fontSize: '2rem' }}>📜</span>
+          <h2 className="gothic-title" style={{ fontSize: '1.4rem', color: 'var(--color-relic-glow)', margin: '0.3rem 0 0 0' }}>
+            Хроника Жизни и Деяний
+          </h2>
+          <div style={{ fontSize: '0.72rem', color: 'var(--color-bone-dim)', textTransform: 'uppercase', letterSpacing: '1px', fontFamily: 'var(--font-rpg)' }}>
+            Биография Изгнанника разума
           </div>
         </div>
 
-      </div>
-
-      {/* RIGHT COLUMN: Active Quests list & AI Deconstructors */}
-      <div className="rpg-panel">
-        <h2 className="gothic-title" style={{ fontSize: '1.3rem', marginBottom: '1.2rem' }}>
-          Активные Контракты (Квесты)
-        </h2>
-
-        {tasks.filter(t => t.status === 'active').length === 0 ? (
-          <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-bone-dim)', fontStyle: 'italic' }}>
-            Нет активных контрактов. Отправьтесь в Задачник, чтобы добавить цели!
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            {tasks.filter(t => t.status === 'active').map(task => {
-              const isSelected = selectedTask && selectedTask.id === task.id;
-              
-              return (
-                <div 
-                  key={task.id} 
-                  style={{
-                    background: isSelected ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.2)',
-                    border: `1px solid ${isSelected ? 'var(--color-bone-dim)' : 'var(--color-iron-light)'}`,
-                    borderLeft: `4px solid ${task.type === 'siege' ? 'var(--color-blood)' : task.type === 'relic' ? 'var(--color-relic)' : 'var(--color-bone)'}`,
-                    padding: '1rem',
-                    transition: 'all 0.25s ease'
-                  }}
-                >
-                  <div 
-                    onClick={() => { playClick(); setSelectedTask(isSelected ? null : task); }}
-                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', cursor: 'pointer' }}
-                  >
-                    <div>
-                      <h3 style={{ fontSize: '1.1rem', color: '#fff', textDecoration: task.status === 'completed' ? 'line-through' : 'none' }}>
-                        {task.title}
-                      </h3>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginTop: '2px', display: 'flex', flexWrap: 'wrap', gap: '0.4rem', alignItems: 'center' }}>
-                        <span>{task.type === 'siege' ? '💥 ОСАДА (БОСС)' : task.type === 'relic' ? '💎 РЕЛИКВИЯ' : '🏹 ОХОТА'} • {task.pomodoroTime} мин</span>
-                        
-                        {/* Schedule Badge */}
-                        {task.date === new Date().toISOString().split('T')[0] ? (
-                          <span style={{ color: '#1db954', background: 'rgba(29, 185, 84, 0.1)', border: '1px solid rgba(29, 185, 84, 0.25)', padding: '1px 5px', fontSize: '0.65rem' }}>
-                            📅 На сегодня
-                          </span>
-                        ) : task.date ? (
-                          <span style={{ color: '#ffb813', background: 'rgba(255, 184, 19, 0.1)', border: '1px solid rgba(255, 184, 19, 0.25)', padding: '1px 5px', fontSize: '0.65rem' }}>
-                            ⏳ Запланировано на {task.date}
-                          </span>
-                        ) : (
-                          <span style={{ color: '#a894c7', background: 'rgba(168, 148, 199, 0.1)', border: '1px solid rgba(168, 148, 199, 0.25)', padding: '1px 5px', fontSize: '0.65rem' }}>
-                            💀 В бэклоге
-                          </span>
-                        )}
-
-                        {/* Nature Badge */}
-                        <span style={{ 
-                          color: task.nature === 'internal' ? '#4fc3f7' : '#ff8a80', 
-                          background: task.nature === 'internal' ? 'rgba(79, 195, 247, 0.1)' : 'rgba(255, 138, 128, 0.1)', 
-                          border: `1px solid ${task.nature === 'internal' ? 'rgba(79, 195, 247, 0.25)' : 'rgba(255, 138, 128, 0.25)'}`,
-                          padding: '1px 5px', 
-                          fontSize: '0.65rem' 
-                        }}>
-                          {task.nature === 'internal' ? '🧿 Внутренний' : '⚔️ Внешний'} ({task.combatLore?.visualType || task.visualType || (task.nature === 'internal' ? 'ритуал' : 'схватка')})
-                        </span>
-                        
-                        {task.executionMode && task.executionMode !== 'ask_later' && (
-                          <span style={{
-                            color: 'var(--color-bone-dim)',
-                            background: 'rgba(255, 255, 255, 0.05)',
-                            border: '1px solid rgba(255, 255, 255, 0.1)',
-                            padding: '1px 5px',
-                            fontSize: '0.65rem'
-                          }}>
-                            {task.executionMode === 'timer' ? '⏳ Таймер' : '🌅 В течение дня'}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    {task.curseLevel > 0 && (
-                      <span className="heartbeat-pulse" style={{ fontSize: '0.8rem', background: 'var(--color-curse)', color: '#fff', padding: '2px 6px', border: '1px solid var(--color-curse-glow)' }}>
-                        ☠ СКВЕРНА УР.{task.curseLevel}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Expanded Task Deconstruction Options */}
-                  {isSelected && (
-                    <div style={{ marginTop: '1rem', borderTop: '1px solid var(--color-iron-light)', paddingTop: '1rem' }}>
-                      
-                      {/* Active Intent display */}
-                      {task.intent && (
-                        <div style={{ padding: '0.5rem 0.8rem', background: 'rgba(0,0,0,0.3)', borderLeft: '2px solid var(--color-mana)', fontSize: '0.8rem', marginBottom: '1rem', fontStyle: 'italic' }}>
-                          <b>Зачем мне это сегодня:</b> {task.intent}
-                        </div>
-                      )}
-
-                      {/* AI Deconstructor trigger buttons */}
-                      {(!task.steps || task.steps.length === 0) ? (
-                        <div>
-                          <p style={{ fontSize: '0.85rem', color: 'var(--color-bone-dim)', marginBottom: '0.8rem' }}>
-                            Эта задача еще не разложена на элементарные действия. СДВГ-мозг боится больших и неясных объемов. Позвольте Бездне разобрать её:
-                          </p>
-                          <div style={{ display: 'flex', gap: '0.5rem' }}>
-                            <button 
-                              className="rpg-btn" 
-                              onClick={() => handleInstantDeconstruct(task)}
-                              disabled={deconstructLoading}
-                              style={{ flex: 1, fontSize: '0.8rem' }}
-                            >
-                              🚀 БЫСТРО И ГРУБО
-                            </button>
-                            <button 
-                              className="rpg-btn rpg-btn-mana" 
-                              onClick={() => handleStartGuidedDeconstruct(task)}
-                              disabled={deconstructLoading}
-                              style={{ flex: 1, fontSize: '0.8rem' }}
-                            >
-                              🔮 СОПРОВОЖДЕНИЕ (ВОПРОСЫ)
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                            <span style={{ fontSize: '0.85rem', color: 'var(--color-bone-dim)', fontWeight: 'bold' }}>Шаги преодоления:</span>
-                            <button 
-                              className="rpg-btn" 
-                              style={{ fontSize: '0.7rem', padding: '3px 8px' }}
-                              onClick={() => handleInstantDeconstruct(task)}
-                              disabled={deconstructLoading}
-                            >
-                              {deconstructLoading ? 'ПЕРЕСОЗДАЕМ...' : '🔄 ПЕРЕРАЗБИТЬ ИИ'}
-                            </button>
-                          </div>
-
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                            {task.steps.map(step => (
-                              <label 
-                                key={step.id} 
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '0.5rem',
-                                  fontSize: '0.9rem',
-                                  color: step.completed ? 'var(--color-bone-dim)' : '#fff',
-                                  textDecoration: step.completed ? 'line-through' : 'none',
-                                  cursor: 'pointer',
-                                  padding: '4px',
-                                  background: 'rgba(0,0,0,0.15)'
-                                }}
-                              >
-                                <input 
-                                  type="checkbox" 
-                                  checked={step.completed} 
-                                  onChange={() => handleToggleStep(task.id, step.id)}
-                                />
-                                <span>{step.title}</span>
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* GUIDED DECONSTRUCTION INTERACTIVE MODAL */}
-      {guidedModalOpen && selectedTask && (
-        <div className="gothic-modal-overlay">
-          <div className="gothic-modal-content" style={{ animation: 'screen-shiver 0.3s 1' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid var(--color-iron-light)', paddingBottom: '0.5rem' }}>
-              <h3 className="gothic-title" style={{ fontSize: '1.2rem', color: 'var(--color-mana-glow)' }}>
-                🔮 Ритуал Интеллектуальной Декомпозиции
-              </h3>
-              <button 
-                onClick={() => setGuidedModalOpen(false)}
-                style={{ background: 'none', border: 'none', color: 'var(--color-bone-dim)', cursor: 'pointer' }}
+        <div className="rpg-scrollbar" style={{ 
+          flex: 1, 
+          maxHeight: '480px', 
+          overflowY: 'auto', 
+          padding: '0.5rem', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          gap: '1rem' 
+        }}>
+          {(() => {
+            const bio = character.biography && character.biography.length > 0
+              ? character.biography 
+              : [`Родился под знаком Бездны как ${character.race || 'Человек'} (${character.class || 'Воин'}). Ступил на путь когнитивного искупления в Абаддоне.`];
+            
+            return bio.map((entry, idx) => (
+              <div 
+                key={idx}
+                style={{ 
+                  background: 'rgba(0,0,0,0.3)', 
+                  border: '1px solid #33281e', 
+                  borderLeft: '3px solid var(--color-relic)', 
+                  padding: '0.8rem 1rem',
+                  borderRadius: '3px',
+                  boxShadow: 'inset 0 0 10px rgba(0,0,0,0.5)'
+                }}
               >
-                <Trash2 size={16} />
-              </button>
-            </div>
-
-            {deconstructLoading && guidedStep === 0 && (
-              <div style={{ textAlign: 'center', padding: '3rem' }}>
-                <RefreshCw className="heartbeat-pulse fast" style={{ color: 'var(--color-mana-glow)', marginBottom: '1rem' }} size={32} />
-                <p style={{ fontFamily: 'var(--font-rpg)' }}>ИИ анализирует токсичность задачи и готовит ритуал вопросов...</p>
-              </div>
-            )}
-
-            {guidedStep === 1 && (
-              <div>
-                <p style={{ fontSize: '0.9rem', color: 'var(--color-bone)', marginBottom: '1.5rem' }}>
-                  Чтобы разгрузить ваш когнитивный ресурс и обойти барьер «Стены Тошнотворного Страха», честно ответьте на эти уточняющие вопросы Безны:
-                </p>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '2rem' }}>
-                  {guidedQuestions.map((q, idx) => (
-                    <div key={idx}>
-                      <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--color-bone-dim)', marginBottom: '4px', fontFamily: 'var(--font-rpg)' }}>
-                        Вопрос {idx + 1}: {q}
-                      </label>
-                      <input 
-                        type="text" 
-                        className="rpg-input" 
-                        style={{ width: '100%', fontSize: '0.95rem' }}
-                        placeholder="Мой честный ответ..."
-                        value={guidedAnswers[idx] || ''}
-                        onChange={(e) => setGuidedAnswers({ ...guidedAnswers, [idx]: e.target.value })}
-                      />
-                    </div>
-                  ))}
+                <div style={{ fontSize: '0.68rem', color: 'var(--color-iron-light)', fontFamily: 'monospace', marginBottom: '4px', textTransform: 'uppercase' }}>
+                  Запись #{idx + 1}
                 </div>
-
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-                  <button className="rpg-btn" onClick={() => setGuidedModalOpen(false)}>
-                    ОТСТУПИТЬ
-                  </button>
-                  <button 
-                    className="rpg-btn rpg-btn-mana" 
-                    onClick={handleAnswerSubmit}
-                    disabled={deconstructLoading || Object.keys(guidedAnswers).length < guidedQuestions.length}
-                  >
-                    {deconstructLoading ? 'РАЗРУШАЕМ КАМЕНЬ...' : '✨ РАСЩЕПИТЬ НА ШАГИ'}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {guidedStep === 2 && (
-              <div style={{ textAlign: 'center' }}>
-                <Award size={48} style={{ color: 'var(--color-relic-glow)', marginBottom: '1rem' }} />
-                <h3 className="gothic-title" style={{ color: '#fff', marginBottom: '1rem' }}>Ритуал Завершен!</h3>
-                <p style={{ fontSize: '0.9rem', color: 'var(--color-bone-dim)', marginBottom: '1.5rem' }}>
-                  Бездна успешно расщепила тяжелый камень задачи на микро-кусочки. Оковы разума спали. Нажмите кнопку, чтобы закрыть окно и начать бой!
+                <p style={{ 
+                  fontSize: '0.85rem', 
+                  color: '#dfc5c5', 
+                  lineHeight: '1.5', 
+                  fontFamily: 'Georgia, serif', 
+                  margin: 0, 
+                  textAlign: 'justify',
+                  whiteSpace: 'pre-line' 
+                }}>
+                  {entry}
                 </p>
-                <button className="rpg-btn rpg-btn-mana" onClick={() => setGuidedModalOpen(false)}>
-                  ПРИНЯТЬ КОНТРАКТ
-                </button>
               </div>
-            )}
-          </div>
+            ));
+          })()}
         </div>
-      )}
+        
+        <div style={{ borderTop: '1px solid #33281e', paddingTop: '0.6rem', textAlign: 'center', fontSize: '0.75rem', color: 'var(--color-bone-dim)', fontStyle: 'italic' }}>
+          Каждый запечатанный контракт и совершенный выбор вписывают новую главу в эту летопись.
+        </div>
+      </div>
 
       {/* ASSET CUSTOMIZATION HANDBOOK MODAL */}
       {assetScrollOpen && (
@@ -860,103 +638,240 @@ export default function CharacterSheet({ character, setCharacter, tasks, setTask
         /* Persistent Hall of Pedestals (Legends Gallery) */
         <div className="rpg-panel" style={{ background: 'radial-gradient(circle, #0e0a0f 0%, #050406 100%)', border: '2px solid var(--color-relic-glow)', padding: '2rem' }}>
           <h2 className="gothic-title" style={{ fontSize: '1.8rem', color: 'var(--color-relic-glow)', textAlign: 'center', marginBottom: '1.5rem', letterSpacing: '0.1em' }}>
-            🏛️ Зал Бессмертных Легенд Абаддона
+            🏛️ Зал Вечных Пьедесталов
           </h2>
           <p style={{ color: 'var(--color-bone-dim)', fontSize: '0.9rem', textAlign: 'center', maxWidth: '650px', margin: '0 auto 2.5rem auto', lineHeight: '1.5', fontStyle: 'italic' }}>
-            «В этих холодных стенах застыли души тех беглецов, что сотворили великую добродетель, запечатали Скверну 
-            и с триумфом покинули мрачные границы Абаддона, обретя новые благородные цели.»
+            Здесь увековечены духи героев, бросивших вызов когнитивному застою. Те, кто искупил свои долги пред Светом, сияют на Золотых Столпах. Те, кто сдался Бездне, навек погребены в багровом мраке...
           </p>
 
           {/* Legend stats header badges */}
           <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginBottom: '2.5rem', flexWrap: 'wrap' }}>
             <span style={{ background: 'rgba(212,175,55,0.06)', border: '1px solid rgba(212,175,55,0.35)', padding: '6px 16px', fontSize: '0.85rem', color: '#ffb813', borderRadius: '3px', fontFamily: 'var(--font-rpg)', letterSpacing: '0.5px' }}>
-              ☀️ ОСВЯЩЕННЫЕ ДУШИ: <b>{pedestals.filter(p => p.legacyStatus !== 'stained').length}</b>
+              😇 Освященные души: <b>{pedestals.filter(p => p.legacyStatus === 'sanctified').length}</b>
             </span>
             <span style={{ background: 'rgba(207,20,43,0.06)', border: '1px solid rgba(207,20,43,0.35)', padding: '6px 16px', fontSize: '0.85rem', color: '#ff4d4d', borderRadius: '3px', fontFamily: 'var(--font-rpg)', letterSpacing: '0.5px' }}>
-              💀 ЗАПЯТНАННЫЕ ИМЕНА: <b>{pedestals.filter(p => p.legacyStatus === 'stained').length}</b>
+              💀 Запятнанные души: <b>{pedestals.filter(p => p.legacyStatus === 'stained').length}</b>
             </span>
           </div>
 
-          {pedestals.length > 0 ? (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '1.5rem' }}>
-              {pedestals.map((legend, idx) => {
-                const isStained = legend.legacyStatus === 'stained';
-                const cardBorder = isStained 
-                  ? 'linear-gradient(to bottom, #cf142b, #8b0000, #220000) 1'
-                  : 'linear-gradient(to bottom, #d4af37, #aa820a, #1a1505) 1';
-                const cardShadow = isStained
-                  ? '0 10px 25px rgba(139,0,0,0.5), inset 0 0 15px rgba(139,0,0,0.1)'
-                  : '0 10px 25px rgba(0,0,0,0.8), inset 0 0 15px rgba(212,175,55,0.05)';
-                const icon = isStained ? '☠️' : '☀️';
-                const label = isStained ? 'ЗАПЯТНАННОЕ ИМЯ' : `ЛЕГЕНДА #${idx + 1}`;
-                const titleColor = isStained ? '#ff4d4d' : '#ffb813';
-                const scrollBg = isStained
-                  ? 'radial-gradient(circle, #1c0e0e 0%, #0d0505 100%)'
-                  : 'radial-gradient(circle, #1a1613 0%, #0d0b09 100%)';
-                const scrollBorder = isStained ? '#5c1a1a' : '#4a3e31';
-                const scrollText = isStained ? '#dfc5c5' : '#cbbba5';
-                const scrollTitleColor = isStained ? '#ff4d4d' : '#ffb813';
-                const scrollTitle = isStained ? '📜 Печать Тлена / Летопись Падения:' : '📜 Летопись Искупления ИИ:';
+          {pedestals && pedestals.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
+              
+              {/* === THE THREE PILLARS OF ASCENSION === */}
+              {(() => {
+                const sorted = [...pedestals].sort((a, b) => {
+                  const scoreA = (a.completedTasksCount || 0) + (a.completedSiegesCount || 0) * 3;
+                  const scoreB = (b.completedTasksCount || 0) + (b.completedSiegesCount || 0) * 3;
+                  return scoreB - scoreA;
+                });
+                
+                const top3 = sorted.slice(0, 3);
+                const rest = sorted.slice(3);
+                
+                const getPillarTitle = (legend) => {
+                  const sieges = legend.completedSiegesCount || 0;
+                  const lvl = legend.level || 1;
+                  if (legend.legacyStatus === 'stained') return "Падшая Тень Бездны";
+                  if (sieges >= 5) return "Верховный Истребитель Скверны";
+                  if (lvl >= 5) return "Архимагистр Когнитивной Воли";
+                  return "Искупивший Изгнанник";
+                };
+
+                const getPillarIcon = (legend) => {
+                  const c = legend.class ? legend.class.toLowerCase() : "";
+                  if (c.includes("некромант")) return "💀";
+                  if (c.includes("рыцарь")) return "⚔️";
+                  if (c.includes("маг огня")) return "🔥";
+                  if (c.includes("маг крови")) return "🩸";
+                  if (c.includes("маг света")) return "☀️";
+                  if (c.includes("маг тьмы")) return "🌑";
+                  if (c.includes("маг бездны")) return "🕳️";
+                  return "👤";
+                };
 
                 return (
-                  <div 
-                    key={idx} 
-                    style={{
-                      background: '#0a080c',
-                      border: '2px solid',
-                      borderImage: cardBorder,
-                      padding: '1.5rem',
-                      boxShadow: cardShadow,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '1rem'
-                    }}
-                  >
-                    <div style={{ borderBottom: '1px solid ' + (isStained ? '#5c1a1a' : '#4a3e31'), paddingBottom: '0.8rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '1.5rem' }}>{icon}</span>
-                        <span style={{ fontSize: '0.75rem', color: titleColor, fontFamily: 'var(--font-rpg)', fontWeight: 'bold' }}>{label}</span>
-                      </div>
-                      <h3 className="gothic-title" style={{ fontSize: '1.3rem', color: titleColor, marginTop: '4px' }}>
-                        {legend.name}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                    <div style={{ borderBottom: '1px dashed #d4af37', paddingBottom: '0.5rem', textAlign: 'center' }}>
+                      <h3 className="gothic-title" style={{ fontSize: '1.4rem', color: '#ffb813', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                        👑 ТРИ ВЕЛИКИХ СТОЛПА ВОСХОЖДЕНИЯ 👑
                       </h3>
-                      {legend.nickname && (
-                        <div style={{ fontSize: '0.72rem', color: 'var(--color-bone-dim)', fontStyle: 'italic', marginTop: '-3px' }}>
-                          «{legend.nickname}»
+                      <span style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', textTransform: 'uppercase' }}>Лучшие из лучших героев в истории Абаддона</span>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
+                      {top3.map((legend, idx) => {
+                        const isStained = legend.legacyStatus === 'stained';
+                        const border = isStained 
+                          ? '3px solid #ff4d4d' 
+                          : '3px solid #ffb813';
+                        const glow = isStained 
+                          ? '0 0 25px rgba(255, 77, 77, 0.4), inset 0 0 15px rgba(255, 77, 77, 0.1)' 
+                          : '0 0 25px rgba(255, 184, 19, 0.4), inset 0 0 15px rgba(255, 184, 19, 0.1)';
+                        const rankLabel = ["🥇 ПЕРВЫЙ СТОЛП", "🥈 ВТОРОЙ СТОЛП", "🥉 ТРЕТИЙ СТОЛП"][idx];
+                        const titleColor = isStained ? '#ff4d4d' : '#ffb813';
+                        
+                        return (
+                          <div 
+                            key={idx}
+                            style={{
+                              background: '#0c0a0e',
+                              border: border,
+                              padding: '1.5rem 1rem',
+                              boxShadow: glow,
+                              textAlign: 'center',
+                              position: 'relative',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '0.8rem'
+                            }}
+                          >
+                            <div style={{ fontSize: '0.75rem', color: titleColor, fontWeight: 'bold', fontFamily: 'var(--font-rpg)', letterSpacing: '1px' }}>
+                              {rankLabel}
+                            </div>
+
+                            <div style={{
+                              width: '60px',
+                              height: '60px',
+                              borderRadius: '50%',
+                              background: isStained ? '#1a0505' : '#1e1a0a',
+                              border: `2px solid ${titleColor}`,
+                              display: 'flex',
+                              justifyContent: 'center',
+                              alignItems: 'center',
+                              fontSize: '2.2rem',
+                              margin: '0.5rem auto',
+                              boxShadow: `0 0 15px ${titleColor}33`
+                            }}>
+                              {getPillarIcon(legend)}
+                            </div>
+
+                            <div>
+                              <h4 className="gothic-title" style={{ fontSize: '1.25rem', color: '#fff', margin: 0 }}>
+                                {legend.name}
+                              </h4>
+                              {legend.nickname && (
+                                <div style={{ fontSize: '0.7rem', color: 'var(--color-bone-dim)', fontStyle: 'italic', margin: '2px 0' }}>
+                                  «{legend.nickname}»
+                                </div>
+                              )}
+                              <span style={{ fontSize: '0.68rem', background: isStained ? 'rgba(255,77,77,0.1)' : 'rgba(212,175,55,0.1)', border: `1px solid ${titleColor}44`, color: titleColor, padding: '2px 8px', textTransform: 'uppercase', fontFamily: 'var(--font-rpg)', display: 'inline-block', marginTop: '4px' }}>
+                                {getPillarTitle(legend)}
+                              </span>
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.3rem', fontSize: '0.7rem', color: 'var(--color-bone-dim)', background: 'rgba(0,0,0,0.3)', padding: '6px', border: '1px solid var(--color-iron-light)' }}>
+                              <div>📜 Задачи: <b>{legend.completedTasksCount || 0}</b></div>
+                              <div>👹 Боссы: <b>{legend.completedSiegesCount || 0}</b></div>
+                              <div>🪙 Золото: <b>{legend.totalGoldEarned || 0}</b></div>
+                              <div>🔮 Ур: <b>{legend.level || 1}</b></div>
+                            </div>
+
+                            <div style={{ 
+                              background: isStained ? 'radial-gradient(circle, #1c0e0e 0%, #0d0505 100%)' : 'radial-gradient(circle, #1a1613 0%, #0d0b09 100%)', 
+                              border: `1px solid ${isStained ? '#5c1a1a' : '#4a3e31'}`, 
+                              padding: '8px', 
+                              color: isStained ? '#dfc5c5' : '#cbbba5', 
+                              fontSize: '0.7rem', 
+                              textAlign: 'justify',
+                              maxHeight: '100px',
+                              overflowY: 'auto'
+                            }} className="rpg-scrollbar">
+                              <b>Летопись деяний:</b>
+                              <br />
+                              {legend.pedestalEulogy}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {rest.length > 0 && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
+                        <div style={{ borderBottom: '1px dashed var(--color-iron-light)', paddingBottom: '0.5rem', textAlign: 'left' }}>
+                          <h4 className="gothic-title" style={{ fontSize: '1.2rem', color: 'var(--color-bone-dim)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            ⚓ ДРУГИЕ ДУХИ БЕЗДНЫ (ПАВШИЕ ИЛИ ВОЗНЕСШИЕСЯ)
+                          </h4>
+                          <span style={{ fontSize: '0.68rem', color: 'var(--color-iron-light)' }}>Упорядочены по очкам славы и заслугам</span>
                         </div>
-                      )}
-                      <div style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)', marginTop: '4px' }}>
-                        {legend.race} • {legend.class} • <b>Уровень {legend.level}</b>
-                      </div>
-                    </div>
 
-                    {/* Eulogy stats grid */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem', fontSize: '0.75rem', color: 'var(--color-bone-dim)', background: 'rgba(0,0,0,0.3)', padding: '8px', border: '1px solid var(--color-iron-light)', textAlign: 'left' }}>
-                      <div>📜 Квесты: <b>{legend.completedTasksCount || 0} шт</b></div>
-                      <div>👹 Боссы: <b>{legend.completedSiegesCount || 0} шт</b></div>
-                      <div>🪙 Золото: <b>{legend.totalGoldEarned || 0}</b></div>
-                      <div>🔮 Мана: <b>{legend.totalManaSpent || 0} MP</b></div>
-                      <div>🧪 Зелья: <b>{legend.potionsDrunk || 0} шт</b></div>
-                      <div>🎪 Медитации: <b>{legend.meditationsCount || 0}</b></div>
-                      <div style={{ gridColumn: 'span 2' }}>🩸 Пролито здоровья: <b>{legend.totalHpSacrificed || 0} HP</b></div>
-                    </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                          {rest.map((legend, idx) => {
+                            const isStained = legend.legacyStatus === 'stained';
+                            const cardBorder = isStained 
+                              ? 'linear-gradient(to bottom, #cf142b, #8b0000, #220000) 1'
+                              : 'linear-gradient(to bottom, #d4af37, #aa820a, #1a1505) 1';
+                            const cardShadow = isStained
+                              ? '0 5px 15px rgba(139,0,0,0.3), inset 0 0 10px rgba(139,0,0,0.05)'
+                              : '0 5px 15px rgba(0,0,0,0.6), inset 0 0 10px rgba(212,175,55,0.02)';
+                            const icon = isStained ? '☠️' : '☀️';
+                            const label = isStained ? 'ЗАПЯТНАННОЕ ИМЯ' : `ЛЕГЕНДА #${idx + 4}`;
+                            const titleColor = isStained ? '#ff4d4d' : '#ffb813';
+                            const scrollBg = isStained
+                              ? 'radial-gradient(circle, #1c0e0e 0%, #0d0505 100%)'
+                              : 'radial-gradient(circle, #1a1613 0%, #0d0b09 100%)';
+                            const scrollBorder = isStained ? '#5c1a1a' : '#4a3e31';
+                            const scrollText = isStained ? '#dfc5c5' : '#cbbba5';
+                            const scrollTitleColor = isStained ? '#ff4d4d' : '#ffb813';
+                            const scrollTitle = isStained ? '📜 Печать Тлена / Летопись Падения:' : '📜 Летопись Искупления ИИ:';
 
-                    {/* Unfolding AI Scroll */}
-                    <div style={{ background: scrollBg, border: '1px solid ' + scrollBorder, padding: '1rem', color: scrollText, textAlign: 'left' }}>
-                      <h4 style={{ fontSize: '0.78rem', fontFamily: 'var(--font-rpg)', borderBottom: '1px solid ' + (isStained ? '#441414' : '#33281e'), paddingBottom: '3px', marginBottom: '8px', color: scrollTitleColor, textTransform: 'uppercase' }}>
-                        {scrollTitle}
-                      </h4>
-                      <div style={{ fontSize: '0.75rem', lineHeight: '1.4', overflowY: 'auto', maxHeight: '180px', textAlign: 'justify', whiteSpace: 'pre-line' }}>
-                        {legend.pedestalEulogy}
+                            return (
+                              <div 
+                                key={idx} 
+                                style={{
+                                  background: '#0a080c',
+                                  border: '2px solid',
+                                  borderImage: cardBorder,
+                                  padding: '1.2rem',
+                                  boxShadow: cardShadow,
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '0.8rem'
+                                }}
+                              >
+                                <div style={{ borderBottom: '1px solid ' + (isStained ? '#5c1a1a' : '#4a3e31'), paddingBottom: '0.6rem' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span style={{ fontSize: '1.2rem' }}>{icon}</span>
+                                    <span style={{ fontSize: '0.7rem', color: titleColor, fontFamily: 'var(--font-rpg)', fontWeight: 'bold' }}>{label}</span>
+                                  </div>
+                                  <h3 className="gothic-title" style={{ fontSize: '1.15rem', color: titleColor, marginTop: '4px', margin: 0 }}>
+                                    {legend.name}
+                                  </h3>
+                                  {legend.nickname && (
+                                    <div style={{ fontSize: '0.68rem', color: 'var(--color-bone-dim)', fontStyle: 'italic', marginTop: '1px' }}>
+                                      «{legend.nickname}»
+                                    </div>
+                                  )}
+                                  <div style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginTop: '4px' }}>
+                                    {legend.race} • {legend.class} • <b>Уровень {legend.level}</b>
+                                  </div>
+                                </div>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.4rem', fontSize: '0.7rem', color: 'var(--color-bone-dim)', background: 'rgba(0,0,0,0.3)', padding: '6px', border: '1px solid var(--color-iron-light)', textAlign: 'left' }}>
+                                  <div>📜 Квесты: <b>{legend.completedTasksCount || 0} шт</b></div>
+                                  <div>👹 Боссы: <b>{legend.completedSiegesCount || 0} шт</b></div>
+                                  <div>🪙 Золото: <b>{legend.totalGoldEarned || 0}</b></div>
+                                  <div>🔮 Ур: <b>{legend.level || 1}</b></div>
+                                </div>
+
+                                <div style={{ background: scrollBg, border: '1px solid ' + scrollBorder, padding: '0.8rem', color: scrollText, textAlign: 'left' }}>
+                                  <h4 style={{ fontSize: '0.75rem', fontFamily: 'var(--font-rpg)', borderBottom: '1px solid ' + (isStained ? '#441414' : '#33281e'), paddingBottom: '3px', marginBottom: '6px', color: scrollTitleColor, textTransform: 'uppercase', margin: 0 }}>
+                                    {scrollTitle}
+                                  </h4>
+                                  <div style={{ fontSize: '0.7rem', lineHeight: '1.35', overflowY: 'auto', maxHeight: '100px', textAlign: 'justify', whiteSpace: 'pre-line' }} className="rpg-scrollbar">
+                                    {legend.pedestalEulogy}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 );
-              })}
+              })()}
             </div>
           ) : (
-
-
             <div style={{ border: '1px dashed #4a3e31', padding: '3rem', textAlign: 'center', background: 'rgba(0,0,0,0.2)', maxWidth: '500px', margin: '0 auto' }}>
               <Skull size={32} style={{ color: 'var(--color-iron-light)', marginBottom: '0.8rem' }} />
               <p style={{ fontSize: '0.9rem', color: 'var(--color-bone-dim)', fontStyle: 'italic' }}>
