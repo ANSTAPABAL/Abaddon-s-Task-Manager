@@ -1534,7 +1534,7 @@ export default function App() {
                       }
                     }}
                   >
-                    👍 ДА, ВЫПОЛНЕНО
+                    🏹 ДА, ВЫПОЛНЕНО
                   </button>
                   
                    <button 
@@ -1637,11 +1637,67 @@ export default function App() {
 
       {/* ARPG Status Globes */}
       <div className="arpg-globes-container" style={{ pointerEvents: 'none' }}>
-        {/* Left: Mana & Stamina Globe */}
+        {/* Left: HP Globe */}
         <div style={{
           position: 'fixed',
           bottom: '25px',
           left: '25px',
+          width: '100px',
+          height: '100px',
+          borderRadius: '50%',
+          background: 'rgba(10, 5, 5, 0.8)',
+          border: '3px solid var(--color-iron-light)',
+          boxShadow: '0 0 20px rgba(0,0,0,0.8), inset 0 0 15px rgba(255,255,255,0.05)',
+          overflow: 'hidden',
+          zIndex: 900,
+          pointerEvents: 'auto'
+        }} title={`Здоровье (HP): ${Math.round(character.hp)}/${character.maxHp}`}>
+          {/* Liquid Fill */}
+          <div style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: `${Math.min(100, Math.max(0, (character.hp / character.maxHp) * 100))}%`,
+            background: 'linear-gradient(to top, #5c0000 0%, #e74c3c 100%)',
+            boxShadow: '0 0 15px rgba(231, 76, 60, 0.6)',
+            transition: 'height 0.5s ease',
+            width: '100%'
+          }}>
+            <div style={{
+              position: 'absolute',
+              top: '-5px',
+              left: 0,
+              right: 0,
+              height: '10px',
+              background: 'rgba(255,255,255,0.15)',
+              borderRadius: '50%',
+              filter: 'blur(1px)'
+            }} />
+          </div>
+          <div style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            color: '#fff',
+            fontFamily: 'var(--font-rpg)',
+            fontSize: '0.78rem',
+            textShadow: '2px 2px 4px #000',
+            fontWeight: 'bold',
+            textAlign: 'center',
+            pointerEvents: 'none'
+          }}>
+            <div>{Math.round(character.hp)}</div>
+            <div style={{ fontSize: '0.55rem', opacity: 0.8 }}>HP</div>
+          </div>
+        </div>
+
+        {/* Right: Mana & Stamina Globe */}
+        <div style={{
+          position: 'fixed',
+          bottom: '25px',
+          right: characterDrawerOpen ? '705px' : '25px',
           width: '100px',
           height: '100px',
           borderRadius: '50%',
@@ -1650,7 +1706,8 @@ export default function App() {
           boxShadow: '0 0 20px rgba(0,0,0,0.8), inset 0 0 15px rgba(255,255,255,0.05)',
           overflow: 'hidden',
           zIndex: 900,
-          pointerEvents: 'auto'
+          pointerEvents: 'auto',
+          transition: 'right 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)'
         }} title={`Ресурс и Выносливость: ${Math.round(character.mana)}/${character.maxMana} RP • Усталость: ${Math.floor(character.dailyWorkMinutes || 0)}/300 мин`}>
           {/* Liquid Fill */}
           <div style={{
@@ -1692,63 +1749,6 @@ export default function App() {
             <div>{Math.round(character.mana)}</div>
             <div style={{ fontSize: '0.55rem', opacity: 0.8 }}>RP (⚡)</div>
             <div style={{ fontSize: '0.55rem', color: '#ffb813' }}>{Math.floor(character.dailyWorkMinutes || 0)}м</div>
-          </div>
-        </div>
-
-        {/* Right: HP Globe */}
-        <div style={{
-          position: 'fixed',
-          bottom: '25px',
-          right: characterDrawerOpen ? '705px' : '25px',
-          width: '100px',
-          height: '100px',
-          borderRadius: '50%',
-          background: 'rgba(10, 5, 5, 0.8)',
-          border: '3px solid var(--color-iron-light)',
-          boxShadow: '0 0 20px rgba(0,0,0,0.8), inset 0 0 15px rgba(255,255,255,0.05)',
-          overflow: 'hidden',
-          zIndex: 900,
-          pointerEvents: 'auto',
-          transition: 'right 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)'
-        }} title={`Здоровье (HP): ${Math.round(character.hp)}/${character.maxHp}`}>
-          {/* Liquid Fill */}
-          <div style={{
-            position: 'absolute',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height: `${Math.min(100, Math.max(0, (character.hp / character.maxHp) * 100))}%`,
-            background: 'linear-gradient(to top, #5c0000 0%, #e74c3c 100%)',
-            boxShadow: '0 0 15px rgba(231, 76, 60, 0.6)',
-            transition: 'height 0.5s ease',
-            width: '100%'
-          }}>
-            <div style={{
-              position: 'absolute',
-              top: '-5px',
-              left: 0,
-              right: 0,
-              height: '10px',
-              background: 'rgba(255,255,255,0.15)',
-              borderRadius: '50%',
-              filter: 'blur(1px)'
-            }} />
-          </div>
-          <div style={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            color: '#fff',
-            fontFamily: 'var(--font-rpg)',
-            fontSize: '0.78rem',
-            textShadow: '2px 2px 4px #000',
-            fontWeight: 'bold',
-            textAlign: 'center',
-            pointerEvents: 'none'
-          }}>
-            <div>{Math.round(character.hp)}</div>
-            <div style={{ fontSize: '0.55rem', opacity: 0.8 }}>HP</div>
           </div>
         </div>
       </div>

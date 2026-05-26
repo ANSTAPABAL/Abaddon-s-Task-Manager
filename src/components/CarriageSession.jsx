@@ -303,6 +303,11 @@ export default function CarriageSession({
   const [setupStage, setSetupStage] = useState('lore'); 
   const [parsedList, setParsedList] = useState([]);
   const [reviewIndex, setReviewIndex] = useState(0);
+  const [reviewGuidedQuestions, setReviewGuidedQuestions] = useState([]);
+  const [reviewGuidedAnswers, setReviewGuidedAnswers] = useState({});
+  const [reviewGuidedActive, setReviewGuidedActive] = useState(false);
+  const [reviewAiEditPrompt, setReviewAiEditPrompt] = useState('');
+  const [reviewAiEditActive, setReviewAiEditActive] = useState(false);
   
   // "Write to Survive" States
   const [survivalInput, setSurvivalInput] = useState('');
@@ -985,56 +990,84 @@ ${legacyPromptContext}
     setNpcNewTaskTitle('');
     playClick();
 
-    // Check if it looks like a chaos dump: long text or contains newlines, or multiple clauses
-    const isChaosDump = rawText.length > 50 || rawText.includes('\n') || rawText.includes(';') || rawText.includes(',');
+    setLoadingAI(true);
+    setSetupStage('review');
+    setReviewIndex(0);
+    setReviewGuidedActive(false);
+    setReviewGuidedQuestions([]);
+    setReviewGuidedAnswers({});
+    setReviewAiEditActive(false);
+    setReviewAiEditPrompt('');
+    
+    // Put a placeholder card so the UI doesn't crash while parsing
+    setParsedList([{
+      title: rawText,
+      type: 'hunt',
+      estimatedTime: 25,
+      toxicity: 'standard',
+      isLongJourney: false,
+      steps: [],
+      intent: '',
+      deadline: '',
+      executionMode: 'ask_later'
+    }]);
 
-    if (isChaosDump && parseMessyTasks) {
-      setResolutionLoading(true);
-      try {
-        const result = await parseMessyTasks(rawText);
-        if (result && Array.isArray(result) && result.length > 0) {
-          const todayDateStr = new Date().toISOString().split('T')[0];
-          const newTasks = result.map((t, idx) => {
-            const initialType = t.type || 'hunt';
-            return {
-              id: 'task-' + Date.now() + '-' + idx,
-              title: t.title,
-              type: initialType,
-              status: 'active',
-              date: todayDateStr, 
-              pomodoroTime: t.estimatedTime || (initialType === 'siege' ? 50 : 25),
-              pomodoroSpent: 0,
-              toxicity: t.toxicity || 'standard',
-              barrierType: null,
-              curseLevel: 0,
-              isLongJourney: t.isLongJourney || false,
-              createdAt: Date.now(),
-              steps: t.steps ? t.steps.map((s, sIdx) => ({ id: 'step-' + sIdx + '-' + Date.now(), title: s, completed: false })) : generateLocalSteps(t.title, initialType).map((s, sIdx) => ({ id: 'step-' + sIdx + '-' + Date.now(), title: s, completed: false })),
-              intent: t.intent || '',
-              deadline: t.deadline || '',
-              combatLore: {
-                enemyName: t.enemyName || "Безымянный Ужас Бездны",
-                visualType: t.visualType || initialType,
-                weakPoints: t.weakPoints || ["Монстр боится конкретики.", "Разбейте на микро-действия!"],
-                randomEvent: t.randomEvent || "Бой протекает при поддержке Бездны."
-              }
-            };
-          });
-          setTasks(prev => [...prev, ...newTasks]);
-          // Immediately start combat session for the first parsed task
-          handleStartCombatSession(newTasks[0]);
-          playSuccess();
-        } else {
-          createSingleTaskLocally(rawText);
-        }
-      } catch (err) {
-        console.warn("Failed to parse messy task from NPC, falling back to single task creation:", err);
-        createSingleTaskLocally(rawText);
-      } finally {
-        setResolutionLoading(false);
+    try {
+      let result = null;
+      if (parseMessyTasks) {
+        result = await parseMessyTasks(rawText);
       }
-    } else {
-      createSingleTaskLocally(rawText);
+      
+      if (result && Array.isArray(result) && result.length > 0) {
+        const mapped = result.map(t => {
+          const initialType = t.type || 'hunt';
+          return {
+            title: t.title,
+            type: initialType,
+            estimatedTime: t.estimatedTime || (initialType === 'siege' ? 50 : 25),
+            toxicity: t.toxicity || 'standard',
+            isLongJourney: t.isLongJourney || false,
+            steps: t.steps || generateLocalSteps(t.title, initialType),
+            intent: t.intent || '',
+            deadline: t.deadline || '',
+            executionMode: t.executionMode || 'ask_later'
+          };
+        });
+        setParsedList(mapped);
+      } else {
+        // Fallback for single task
+        const initialType = classifyLocally(rawText);
+        const steps = generateLocalSteps(rawText, initialType);
+        setParsedList([{
+          title: rawText,
+          type: initialType,
+          estimatedTime: initialType === 'siege' ? 50 : 25,
+          toxicity: 'standard',
+          isLongJourney: false,
+          steps: steps,
+          intent: '',
+          deadline: '',
+          executionMode: 'ask_later'
+        }]);
+      }
+      playSuccess();
+    } catch (err) {
+      console.warn("Failed to parse messy task from NPC, falling back to local single task:", err);
+      const initialType = classifyLocally(rawText);
+      const steps = generateLocalSteps(rawText, initialType);
+      setParsedList([{
+        title: rawText,
+        type: initialType,
+        estimatedTime: initialType === 'siege' ? 50 : 25,
+        toxicity: 'standard',
+        isLongJourney: false,
+        steps: steps,
+        intent: '',
+        deadline: '',
+        executionMode: 'ask_later'
+      }]);
+    } finally {
+      setLoadingAI(false);
     }
   };
 
@@ -1471,6 +1504,127 @@ const handleWinActiveSession = (task) => {
       setSetupStage('review');
     } catch (e) {
       alert("Не удалось связаться с Бездной (AI Tunnel): " + e.message);
+    } finally {
+      setLoadingAI(false);
+    }
+  };
+
+  const handleRequestReviewQuestions = async () => {
+    if (!parsedList[reviewIndex]) return;
+    const currentCard = parsedList[reviewIndex];
+    setLoadingAI(true);
+    playClick();
+    try {
+      const prompt = `Ты — Бездна во вселенной Абаддона (grim-dark RPG фэнтези дух). Твоя цель — расспросить Изгнанника о деталях по планируемому контракту: «${currentCard.title}». Шаги прорыва: ${currentCard.steps ? currentCard.steps.join(', ') : 'нет'}.
+Задай 3-4 простых, приземленных и крайне конкретных уточняющих вопроса о технических/физических мелочах этой задачи (например, "Какой файл откроешь первым?", "Каким инструментом воспользуешься?"). Формулируй их кратко и атмосферно в стиле темного фэнтези.
+Ответ выведи СТРОГО в формате JSON:
+{
+  "questions": ["Вопрос 1", "Вопрос 2", "Вопрос 3"]
+}`;
+      const response = await fetch('http://localhost:3001/api/ai/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: [{ role: 'user', content: prompt }] })
+      });
+      if (!response.ok) throw new Error('AI Tunnel offline');
+      const data = await response.json();
+      let cleanedText = data.choices[0].message.content.trim();
+      if (cleanedText.startsWith("```json")) cleanedText = cleanedText.slice(7);
+      if (cleanedText.endsWith("```")) cleanedText = cleanedText.slice(0, -3);
+      const parsed = JSON.parse(cleanedText.trim());
+      if (parsed.questions) {
+        setReviewGuidedQuestions(parsed.questions);
+        setReviewGuidedAnswers({});
+        setReviewGuidedActive(true);
+        playSuccess();
+      }
+    } catch (e) {
+      alert("Не удалось запросить вопросы от Бездны: " + e.message);
+    } finally {
+      setLoadingAI(false);
+    }
+  };
+
+  const handleReviewAnswerSubmit = async () => {
+    if (!parsedList[reviewIndex]) return;
+    const currentCard = parsedList[reviewIndex];
+    setLoadingAI(true);
+    playClick();
+    try {
+      const qaText = reviewGuidedQuestions.map((q, idx) => `Вопрос: ${q}\nОтвет: ${reviewGuidedAnswers[idx] || ''}`).join('\n');
+      const prompt = `Пользователь планирует задачу: «${currentCard.title}». Исходные шаги: ${currentCard.steps ? currentCard.steps.join(', ') : 'нет'}.
+Вот ответы пользователя на уточняющие вопросы:
+${qaText}
+Используя эту информацию, перепиши и максимально подробно деконструируй задачу на 6-10 понятных, простейших физических микро-шагов, чтобы снизить когнитивную нагрузку. Выведи ответ строго в формате JSON:
+{
+  "title": "Уточненное название задачи",
+  "steps": ["микро-шаг 1", "микро-шаг 2", ...]
+}`;
+      const response = await fetch('http://localhost:3001/api/ai/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: [{ role: 'user', content: prompt }] })
+      });
+      if (!response.ok) throw new Error('AI Tunnel offline');
+      const data = await response.json();
+      let cleanedText = data.choices[0].message.content.trim();
+      if (cleanedText.startsWith("```json")) cleanedText = cleanedText.slice(7);
+      if (cleanedText.endsWith("```")) cleanedText = cleanedText.slice(0, -3);
+      const parsed = JSON.parse(cleanedText.trim());
+      if (parsed.steps) {
+        setParsedList(prev => prev.map((item, idx) => idx === reviewIndex ? { 
+          ...item, 
+          title: parsed.title || item.title, 
+          steps: parsed.steps 
+        } : item));
+        setReviewGuidedActive(false);
+        setReviewGuidedQuestions([]);
+        setReviewGuidedAnswers({});
+        playSuccess();
+      }
+    } catch (e) {
+      alert("Не удалось завершить разбор через ИИ: " + e.message);
+    } finally {
+      setLoadingAI(false);
+    }
+  };
+
+  const handleReviewAiEditSubmit = async () => {
+    if (!parsedList[reviewIndex] || !reviewAiEditPrompt.trim()) return;
+    const currentCard = parsedList[reviewIndex];
+    setLoadingAI(true);
+    playClick();
+    try {
+      const prompt = `Пользователь хочет скорректировать задачу: «${currentCard.title}» с текущими шагами: ${currentCard.steps ? currentCard.steps.join(', ') : 'нет'}.
+Инструкция пользователя по изменению: «${reviewAiEditPrompt}».
+Перепиши название задачи и её шаги на основе этой инструкции. Выведи ответ строго в формате JSON:
+{
+  "title": "Новое название задачи",
+  "steps": ["шаг 1", "шаг 2", ...]
+}`;
+      const response = await fetch('http://localhost:3001/api/ai/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: [{ role: 'user', content: prompt }] })
+      });
+      if (!response.ok) throw new Error('AI Tunnel offline');
+      const data = await response.json();
+      let cleanedText = data.choices[0].message.content.trim();
+      if (cleanedText.startsWith("```json")) cleanedText = cleanedText.slice(7);
+      if (cleanedText.endsWith("```")) cleanedText = cleanedText.slice(0, -3);
+      const parsed = JSON.parse(cleanedText.trim());
+      if (parsed.steps) {
+        setParsedList(prev => prev.map((item, idx) => idx === reviewIndex ? { 
+          ...item, 
+          title: parsed.title || item.title, 
+          steps: parsed.steps 
+        } : item));
+        setReviewAiEditActive(false);
+        setReviewAiEditPrompt('');
+        playSuccess();
+      }
+    } catch (e) {
+      alert("Не удалось отредактировать через ИИ: " + e.message);
     } finally {
       setLoadingAI(false);
     }
@@ -3080,9 +3234,6 @@ if (setupStage === 'resolution') {
             <h2 className="gothic-title" style={{ fontSize: '1.5rem', color: 'var(--color-relic-glow)' }}>
               ⚜️ Походный Штаб Путешествия
             </h2>
-            <span style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)' }}>
-              Класс: <b style={{ color: '#fff' }}>{character.class}</b> • Уровень: <b style={{ color: '#fff' }}>{character.level}</b>
-            </span>
           </div>
           
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -3239,17 +3390,6 @@ if (setupStage === 'resolution') {
                     {/* Row 1: В бой and Выполнено */}
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                       <button 
-                        className="rpg-btn rpg-btn-blood"
-                        style={{ flex: 1, padding: '0.4rem 0', fontSize: '0.8rem', fontWeight: 'bold' }}
-                        onClick={() => {
-                          playClick();
-                          handleStartCombatSession(task);
-                        }}
-                      >
-                        {task.timeLeft !== undefined ? `⚔️ В БОЙ (${Math.ceil(task.timeLeft / 60)}м)` : '⚔️ В БОЙ'}
-                      </button>
-                      
-                      <button 
                         className="rpg-btn"
                         style={{ 
                           flex: 1, 
@@ -3264,7 +3404,18 @@ if (setupStage === 'resolution') {
                           handleInstantCompleteTask(task);
                         }}
                       >
-                        👍 ВЫПОЛНИЛ
+                        🏹 ВЫПОЛНИЛ
+                      </button>
+
+                      <button 
+                        className="rpg-btn rpg-btn-blood"
+                        style={{ flex: 1, padding: '0.4rem 0', fontSize: '0.8rem', fontWeight: 'bold' }}
+                        onClick={() => {
+                          playClick();
+                          handleStartCombatSession(task);
+                        }}
+                      >
+                        {task.timeLeft !== undefined ? `⚔️ В БОЙ (${Math.ceil(task.timeLeft / 60)}м)` : '⚔️ В БОЙ'}
                       </button>
                     </div>
 
