@@ -546,6 +546,45 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
     setEditingTask(null);
   };
 
+  const handleAddToBacklog = () => {
+    playClick();
+    setTasks(prev => prev.map(t => {
+      if (t.id === editingTask.id) {
+        return {
+          ...t,
+          date: null,
+          status: 'active'
+        };
+      }
+      return t;
+    }));
+    playSuccess();
+    setRitualMessage(`🔮 Контракт «${editingTask.title}» отправлен в Бэклог.`);
+    setTimeout(() => setRitualMessage(''), 5000);
+    setEditingTask(null);
+  };
+
+  const handleExileTask = () => {
+    playBoneCrack();
+    setTasks(prev => prev.map(t => {
+      if (t.id === editingTask.id) {
+        return {
+          ...t,
+          status: 'buried'
+        };
+      }
+      return t;
+    }));
+    setCharacter(prev => ({
+      ...prev,
+      hp: Math.max(1, prev.hp - 15),
+      totalHpSacrificed: (prev.totalHpSacrificed || 0) + 15
+    }));
+    setRitualMessage(`💀 Контракт «${editingTask.title}» изгнан во тьму! Потеряно 15 HP.`);
+    setTimeout(() => setRitualMessage(''), 5000);
+    setEditingTask(null);
+  };
+
   const handleAddStepManual = () => {
     if (!newStepText.trim()) return;
     playClick();
@@ -1500,20 +1539,13 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
 
       {/* TASK EDITING PARCHMENT MODAL */}
       {editingTask && (
-        <div className="gothic-modal-overlay">
-          <div className="gothic-modal-content" style={{ maxWidth: '680px', width: '90%', maxHeight: '90vh', overflowY: 'auto' }}>
+        <div className="gothic-modal-overlay" onClick={() => setEditingTask(null)}>
+          <div className="gothic-modal-content" style={{ maxWidth: '680px', width: '90%', maxHeight: '90vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
             
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-iron-light)', paddingBottom: '0.8rem', marginBottom: '1.2rem' }}>
               <h3 className="gothic-title" style={{ fontSize: '1.2rem', color: 'var(--color-relic-glow)' }}>
                 ⚔ Свиток Контракта: {editingTask.title.slice(0, 30)}...
               </h3>
-              <button 
-                className="rpg-btn" 
-                style={{ padding: '3px 8px' }} 
-                onClick={() => setEditingTask(null)}
-              >
-                Отмена
-              </button>
             </div>
 
             {/* Past Advice from Rune of Return */}
@@ -1771,13 +1803,23 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
                 </div>
 
                 {/* Footer Controls */}
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', borderTop: '1px solid var(--color-iron-light)', paddingTop: '1rem', marginTop: '0.5rem' }}>
-                  <button className="rpg-btn" onClick={() => setEditingTask(null)}>
-                    ОТМЕНИТЬ
-                  </button>
-                  <button className="rpg-btn rpg-btn-blood" onClick={handleSaveEdits}>
-                    СОХРАНИТЬ КОНТРАКТ В БАЗУ
-                  </button>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--color-iron-light)', paddingTop: '1rem', marginTop: '0.5rem' }}>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button className="rpg-btn" onClick={handleAddToBacklog}>
+                      🗄️ Добавить в бэклог
+                    </button>
+                    <button className="rpg-btn rpg-btn-blood" onClick={handleExileTask}>
+                      💀 Изгнать задачу (15 HP)
+                    </button>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button className="rpg-btn" onClick={() => setEditingTask(null)}>
+                      ЗАКРЫТЬ
+                    </button>
+                    <button className="rpg-btn rpg-btn-blood" onClick={handleSaveEdits}>
+                      СОХРАНИТЬ КОНТРАКТ В БАЗУ
+                    </button>
+                  </div>
                 </div>
 
               </div>

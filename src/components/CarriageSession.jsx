@@ -705,6 +705,44 @@ export default function CarriageSession({
     setGuidedAnswers({});
   };
 
+  const handleAddToBacklog = () => {
+    playClick();
+    setTasks(prev => prev.map(t => {
+      if (t.id === editingTask.id) {
+        return {
+          ...t,
+          date: null,
+          status: 'active'
+        };
+      }
+      return t;
+    }));
+    playSuccess();
+    spawnFloater("В бэклоге", "heal-hp");
+    setEditingTask(null);
+  };
+
+  const handleExileTask = () => {
+    playBoneCrack();
+    setTasks(prev => prev.map(t => {
+      if (t.id === editingTask.id) {
+        return {
+          ...t,
+          status: 'buried'
+        };
+      }
+      return t;
+    }));
+    setCharacter(prev => ({
+      ...prev,
+      hp: Math.max(10, prev.hp - 15),
+      totalHpSacrificed: (prev.totalHpSacrificed || 0) + 15
+    }));
+    triggerFlash('blood');
+    spawnFloater("-15 HP!", "enemy-strike");
+    setEditingTask(null);
+  };
+
   const handleDetailedDeconstructInEdit = async () => {
     if (!editTitle.trim()) return;
     playClick();
@@ -1980,20 +2018,13 @@ const handleWinActiveSession = (task) => {
   const renderEditTaskModal = () => {
     if (!editingTask) return null;
     return (
-      <div className="gothic-modal-overlay" style={{ zIndex: 99999 }}>
-        <div className="gothic-modal-content" style={{ maxWidth: '1300px', width: '98%', maxHeight: '98vh', overflowY: 'auto', padding: '1.25rem 2.5rem' }}>
+      <div className="gothic-modal-overlay" style={{ zIndex: 99999 }} onClick={() => setEditingTask(null)}>
+        <div className="gothic-modal-content" style={{ maxWidth: '1300px', width: '98%', maxHeight: '98vh', overflowY: 'auto', padding: '1.25rem 2.5rem' }} onClick={(e) => e.stopPropagation()}>
           
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-iron-light)', paddingBottom: '0.6rem', marginBottom: '0.8rem' }}>
             <h3 className="gothic-title" style={{ fontSize: '1.25rem', color: 'var(--color-relic-glow)' }}>
               ⚔ Свиток Контракта: {editingTask.title.slice(0, 55)}...
             </h3>
-            <button 
-              className="rpg-btn" 
-              style={{ padding: '3px 8px' }} 
-              onClick={() => setEditingTask(null)}
-            >
-              Отмена
-            </button>
           </div>
 
           {editDeconstructLoading && guidedStep === 0 && (
@@ -2244,13 +2275,23 @@ const handleWinActiveSession = (task) => {
               </div>
 
               {/* Footer Controls */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', borderTop: '1px solid var(--color-iron-light)', paddingTop: '0.8rem', marginTop: '0.4rem' }}>
-                <button className="rpg-btn" onClick={() => setEditingTask(null)}>
-                  ОТМЕНИТЬ
-                </button>
-                <button className="rpg-btn rpg-btn-blood" onClick={handleSaveEdit}>
-                  СОХРАНИТЬ КОНТРАКТ В БАЗУ
-                </button>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--color-iron-light)', paddingTop: '0.8rem', marginTop: '0.4rem' }}>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button className="rpg-btn" onClick={handleAddToBacklog}>
+                    🗄️ Добавить в бэклог
+                  </button>
+                  <button className="rpg-btn rpg-btn-blood" onClick={handleExileTask}>
+                    💀 Изгнать задачу (15 HP)
+                  </button>
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button className="rpg-btn" onClick={() => setEditingTask(null)}>
+                    ЗАКРЫТЬ
+                  </button>
+                  <button className="rpg-btn rpg-btn-blood" onClick={handleSaveEdit}>
+                    СОХРАНИТЬ КОНТРАКТ В БАЗУ
+                  </button>
+                </div>
               </div>
 
             </div>
