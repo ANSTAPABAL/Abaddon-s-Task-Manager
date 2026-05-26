@@ -100,7 +100,7 @@ export default function RuneOfReturnModal({ task, onConfirm, onCancel }) {
           {/* Question 3 */}
           <div>
             <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-relic-glow)', marginBottom: '4px', fontFamily: 'var(--font-rpg)' }}>
-              3. Почему начали или не начали делать её сегодня?
+              3. Почему начали или не начали делать её в период дедлайна?
             </label>
             <textarea 
               className="rpg-input"
