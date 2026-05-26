@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Skull, Pin, Trash2, Shield, Calendar, Sparkles, CheckSquare, Plus, ArrowRight, UserCheck, Flame, RefreshCw } from 'lucide-react';
 import { useAudio } from '../hooks/useAudio';
 
@@ -66,6 +66,19 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
   const [chaosDumpOpen, setChaosDumpOpen] = useState(false);
   const [chaosText, setChaosText] = useState('');
   const [chaosLoading, setChaosLoading] = useState(false);
+
+  // Auto-resize task input textareas vertically to fit content instead of sliding right
+  useEffect(() => {
+    const textareas = document.querySelectorAll('textarea.rpg-input-auto');
+    textareas.forEach(ta => {
+      if (ta.value === '') {
+        ta.style.height = ta.classList.contains('kanban-input') ? '35px' : '40px';
+      } else {
+        ta.style.height = 'auto';
+        ta.style.height = `${ta.scrollHeight}px`;
+      }
+    });
+  }, [newTaskTitle, editTitle]);
 
   const getTaskDateOptions = () => {
     const options = [];
@@ -931,15 +944,26 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
       <div className="rpg-panel" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', background: '#09080a', borderColor: '#3a2d21' }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center' }}>
           <div style={{ flex: '2', minWidth: '250px' }}>
-            <input 
-              type="text" 
-              className="rpg-input" 
-              style={{ width: '100%', fontSize: '1.1rem' }} 
+            <textarea 
+              className="rpg-input rpg-input-auto rpg-scrollbar" 
+              style={{ 
+                width: '100%', 
+                fontSize: '1.1rem',
+                minHeight: '40px',
+                height: '40px',
+                resize: 'none',
+                overflowY: 'auto',
+                paddingTop: '8px',
+                paddingBottom: '8px',
+                lineHeight: '1.3',
+                display: 'block'
+              }} 
               placeholder="Вбейте задачу..." 
               value={newTaskTitle}
               onChange={(e) => setNewTaskTitle(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
                   const targetDate = taskDateOption === 'backlog' ? null : (taskDateOption === 'custom' ? customDateValue.trim() || null : taskDateOption);
                   handleCreateTask(targetDate);
                 }
@@ -1437,14 +1461,29 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
 
             {/* Quick add within Kanban day */}
             <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1.5rem', borderTop: '1px solid var(--color-iron-light)', paddingTop: '1rem' }}>
-              <input 
-                type="text" 
-                className="rpg-input" 
-                style={{ flex: 1, fontSize: '0.85rem' }} 
+              <textarea 
+                className="rpg-input rpg-input-auto kanban-input rpg-scrollbar" 
+                style={{ 
+                  flex: 1, 
+                  fontSize: '0.85rem',
+                  minHeight: '35px',
+                  height: '35px',
+                  resize: 'none',
+                  overflowY: 'auto',
+                  paddingTop: '6px',
+                  paddingBottom: '6px',
+                  lineHeight: '1.3',
+                  display: 'block'
+                }} 
                 placeholder="Быстрый контракт на этот день..."
                 value={newTaskTitle}
                 onChange={(e) => setNewTaskTitle(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleCreateTask(activeKanbanDay)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleCreateTask(activeKanbanDay);
+                  }
+                }}
               />
               <button 
                 className="rpg-btn rpg-btn-mana" 
@@ -1552,10 +1591,20 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
                 <div style={{ display: 'grid', gridTemplateColumns: '2.5fr 1fr 1fr', gap: '0.8rem' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginBottom: '4px' }}>НАЗВАНИЕ КОНТРАКТА</label>
-                    <input 
-                      type="text" 
-                      className="rpg-input" 
-                      style={{ width: '100%', fontSize: '0.95rem' }} 
+                    <textarea 
+                      className="rpg-input rpg-input-auto rpg-scrollbar" 
+                      style={{ 
+                        width: '100%', 
+                        fontSize: '0.95rem',
+                        minHeight: '40px',
+                        height: '40px',
+                        resize: 'none',
+                        overflowY: 'auto',
+                        paddingTop: '8px',
+                        paddingBottom: '8px',
+                        lineHeight: '1.3',
+                        display: 'block'
+                      }} 
                       value={editTitle}
                       onChange={(e) => setEditTitle(e.target.value)}
                     />
