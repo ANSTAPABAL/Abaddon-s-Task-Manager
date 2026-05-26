@@ -1803,11 +1803,11 @@ const handleWinActiveSession = (task) => {
     if (!editingTask) return null;
     return (
       <div className="gothic-modal-overlay" style={{ zIndex: 99999 }}>
-        <div className="gothic-modal-content" style={{ maxWidth: '680px', width: '90%', maxHeight: '90vh', overflowY: 'auto' }}>
+        <div className="gothic-modal-content" style={{ maxWidth: '850px', width: '95%', maxHeight: '96vh', overflowY: 'auto', padding: '1.25rem 2rem' }}>
           
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-iron-light)', paddingBottom: '0.8rem', marginBottom: '1.2rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-iron-light)', paddingBottom: '0.6rem', marginBottom: '0.8rem' }}>
             <h3 className="gothic-title" style={{ fontSize: '1.2rem', color: 'var(--color-relic-glow)' }}>
-              ⚔ Свиток Контракта: {editingTask.title.slice(0, 30)}...
+              ⚔ Свиток Контракта: {editingTask.title.slice(0, 45)}...
             </h3>
             <button 
               className="rpg-btn" 
@@ -1818,7 +1818,7 @@ const handleWinActiveSession = (task) => {
             </button>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', marginBottom: '1.2rem' }}>
             
             {/* 1. Title, Type, and Time */}
             <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '0.8rem' }}>
@@ -1914,7 +1914,7 @@ const handleWinActiveSession = (task) => {
               </label>
               <textarea 
                 className="rpg-input" 
-                style={{ width: '100%', minHeight: '55px', fontSize: '0.85rem', resize: 'vertical' }}
+                style={{ width: '100%', minHeight: '45px', fontSize: '0.85rem', resize: 'vertical' }}
                 placeholder="Например: Чтобы сдать проект и получить деньги..."
                 value={editIntent}
                 onChange={(e) => setEditIntent(e.target.value)}
@@ -1922,11 +1922,11 @@ const handleWinActiveSession = (task) => {
             </div>
 
             {/* 3. AI Deconstructor Panel */}
-            <div style={{ background: 'rgba(0,0,0,0.3)', padding: '1rem', border: '1px solid var(--color-iron-light)' }}>
-              <h4 style={{ fontSize: '0.85rem', color: 'var(--color-mana-glow)', marginBottom: '5px', fontFamily: 'var(--font-rpg)' }}>
+            <div style={{ background: 'rgba(0,0,0,0.3)', padding: '0.8rem', border: '1px solid var(--color-iron-light)' }}>
+              <h4 style={{ fontSize: '0.85rem', color: 'var(--color-mana-glow)', marginBottom: '4px', fontFamily: 'var(--font-rpg)' }}>
                 🔮 Авто-настройка шагов ИИ (Контекст Бездны)
               </h4>
-              <p style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginBottom: '10px' }}>
+              <p style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginBottom: '8px' }}>
                 ИИ автоматически перестроит структуру шагов, используя отредактированное название и намерение выше.
               </p>
               
@@ -1942,11 +1942,11 @@ const handleWinActiveSession = (task) => {
 
             {/* 4. Manual steps manipulation */}
             <div>
-              <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-bone)', marginBottom: '6px', fontFamily: 'var(--font-rpg)' }}>
+              <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-bone)', marginBottom: '4px', fontFamily: 'var(--font-rpg)' }}>
                 СПИСОК ШАГОВ (ЖМИТЕ НА ТЕКСТ ДЛЯ РЕДАКТИРОВАНИЯ ИЛИ ДОБАВЬТЕ/УДАЛИТЕ):
               </label>
               
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '180px', overflowY: 'auto', marginBottom: '0.8rem' }} className="rpg-scrollbar">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '160px', overflowY: 'auto', marginBottom: '0.6rem' }} className="rpg-scrollbar">
                 {editSteps.map(s => (
                   <div 
                     key={s.id} 
@@ -2017,7 +2017,7 @@ const handleWinActiveSession = (task) => {
           </div>
 
           {/* Footer Controls */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', borderTop: '1px solid var(--color-iron-light)', paddingTop: '1rem', marginTop: '0.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', borderTop: '1px solid var(--color-iron-light)', paddingTop: '0.8rem', marginTop: '0.4rem' }}>
             <button className="rpg-btn" onClick={() => setEditingTask(null)}>
               ОТМЕНИТЬ
             </button>
