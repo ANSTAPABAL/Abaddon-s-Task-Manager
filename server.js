@@ -316,7 +316,7 @@ app.use('/races', express.static(path.join(__dirname, 'races')));
 
 // Serve local atmospheric MP3 files
 app.get('/tracks/fear_and_hunger.mp3', (req, res) => {
-  const filePath = path.join(__dirname, 'The Perfect Being｜Fear and Hunger Atmospheric Playlist.mp3');
+  const filePath = path.join(__dirname, 'The Perfect Being|Fear and Hunger Atmospheric Playlist.mp3');
   if (fs.existsSync(filePath)) {
     res.sendFile(filePath);
   } else {
