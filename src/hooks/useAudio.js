@@ -17,6 +17,8 @@ class AudioSynthesizer {
     this.localDoublePlayer1 = null;
     this.localDoublePlayer2 = null;
     this.useLocalDoublePlaylist = localStorage.getItem('use_local_double_playlist') === 'true';
+    this.localMusicVolume = localStorage.getItem('default_music_volume') !== null ? Number(localStorage.getItem('default_music_volume')) : 0.5;
+    this.localNoiseVolume = localStorage.getItem('default_noise_volume') !== null ? Number(localStorage.getItem('default_noise_volume')) : 0.4;
   }
 
   init() {
@@ -89,6 +91,16 @@ class AudioSynthesizer {
     this.updateAmbientVolume();
   }
 
+  setLocalMusicVolume(vol) {
+    this.localMusicVolume = Math.max(0, Math.min(1, vol));
+    this.updateLocalDoubleVolume();
+  }
+
+  setLocalNoiseVolume(vol) {
+    this.localNoiseVolume = Math.max(0, Math.min(1, vol));
+    this.updateLocalDoubleVolume();
+  }
+
   updateDroneVolume() {
     if (!this.droneGain || !this.ctx) return;
     const t = this.ctx.currentTime;
@@ -130,11 +142,11 @@ class AudioSynthesizer {
     
     this.localDoublePlayer1 = new Audio(track1Url);
     this.localDoublePlayer1.loop = true;
-    this.localDoublePlayer1.volume = this.volume;
+    this.localDoublePlayer1.volume = this.localMusicVolume;
     
     this.localDoublePlayer2 = new Audio(track2Url);
     this.localDoublePlayer2.loop = true;
-    this.localDoublePlayer2.volume = this.volume * 0.8;
+    this.localDoublePlayer2.volume = this.localNoiseVolume;
 
     const setRandomTime = (player) => {
       if (player.duration) {
@@ -179,17 +191,17 @@ class AudioSynthesizer {
   updateLocalDoubleVolume() {
     const isSilenced = this.isMuted || this.spotifyPlaying || !this.useLocalDoublePlaylist;
     if (this.localDoublePlayer1) {
-      this.localDoublePlayer1.volume = isSilenced ? 0 : this.volume;
+      this.localDoublePlayer1.volume = isSilenced ? 0 : this.localMusicVolume;
     }
     if (this.localDoublePlayer2) {
-      this.localDoublePlayer2.volume = isSilenced ? 0 : this.volume * 0.8;
+      this.localDoublePlayer2.volume = isSilenced ? 0 : this.localNoiseVolume;
     }
     if (this.fhSynthGain && this.ctx) {
-      const vol = isSilenced ? 0 : this.volume * 0.6;
+      const vol = isSilenced ? 0 : this.localMusicVolume * 0.6;
       this.fhSynthGain.gain.setTargetAtTime(vol, this.ctx.currentTime, 0.2);
     }
     if (this.brownNoiseGain && this.ctx) {
-      const vol = isSilenced ? 0 : this.volume * 0.8;
+      const vol = isSilenced ? 0 : this.localNoiseVolume * 0.8;
       this.brownNoiseGain.gain.setTargetAtTime(vol, this.ctx.currentTime, 0.2);
     }
   }
@@ -1057,6 +1069,8 @@ export function useAudio() {
   const stopHeartbeat = () => synth.stopHeartbeat();
   const setSpotifyPlaying = (isPlaying) => synth.setSpotifyPlaying(isPlaying);
   const setUseLocalDoublePlaylist = (useDouble) => synth.setUseLocalDoublePlaylist(useDouble);
+  const setLocalMusicVolume = (vol) => synth.setLocalMusicVolume(vol);
+  const setLocalNoiseVolume = (vol) => synth.setLocalNoiseVolume(vol);
 
   const setAmbientLayerActive = (layerId, isActive) => {
     synth.setAmbientLayerActive(layerId, isActive);
@@ -1078,6 +1092,8 @@ export function useAudio() {
     stopHeartbeat,
     setSpotifyPlaying,
     setUseLocalDoublePlaylist,
+    setLocalMusicVolume,
+    setLocalNoiseVolume,
     setAmbientLayerActive,
     restartActiveLayers,
     synthInstance: synth

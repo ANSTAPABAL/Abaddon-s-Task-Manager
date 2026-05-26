@@ -35,7 +35,7 @@ function parseDeadline(deadlineStr, taskDateStr) {
 }
 
 export default function App() {
-  const { initAudio, setAtmosphereMood, playClick, playSuccess, setMuted, setVolume, setUseLocalDoublePlaylist, setAmbientLayerActive, restartActiveLayers, synthInstance } = useAudio();
+  const { initAudio, setAtmosphereMood, playClick, playSuccess, setMuted, setVolume, setUseLocalDoublePlaylist, setLocalMusicVolume, setLocalNoiseVolume, setAmbientLayerActive, restartActiveLayers, synthInstance } = useAudio();
   
   // App States
   const [activeTab, setActiveTab] = useState('escape'); // escape, character, planner, recovery
@@ -335,6 +335,8 @@ export default function App() {
   // Audio State
   const [audioMuted, setAudioMuted] = useState(() => localStorage.getItem('default_muted') === 'true');
   const [audioVolume, setAudioVolume] = useState(() => localStorage.getItem('default_volume') !== null ? Number(localStorage.getItem('default_volume')) : 0.5);
+  const [musicVolume, setMusicVolume] = useState(() => localStorage.getItem('default_music_volume') !== null ? Number(localStorage.getItem('default_music_volume')) : 0.5);
+  const [noiseVolume, setNoiseVolume] = useState(() => localStorage.getItem('default_noise_volume') !== null ? Number(localStorage.getItem('default_noise_volume')) : 0.4);
   const [useLocalDoublePlaylist, setUseLocalDoublePlaylistState] = useState(() => localStorage.getItem('use_local_double_playlist') === 'true');
 
   const handleToggleLocalDoublePlaylist = (val) => {
@@ -419,6 +421,18 @@ export default function App() {
     const val = Number(e.target.value);
     setAudioVolume(val);
     setVolume(val);
+  };
+
+  const handleMusicVolumeChange = (e) => {
+    const val = Number(e.target.value);
+    setMusicVolume(val);
+    setLocalMusicVolume(val);
+  };
+
+  const handleNoiseVolumeChange = (e) => {
+    const val = Number(e.target.value);
+    setNoiseVolume(val);
+    setLocalNoiseVolume(val);
   };
 
   const handleRerollCharacter = () => {
@@ -869,18 +883,52 @@ export default function App() {
                 </button>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <span style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)', minWidth: '70px' }}>Громкость:</span>
-                <input 
-                  type="range" 
-                  min="0" 
-                  max="1" 
-                  step="0.05"
-                  value={audioVolume}
-                  onChange={handleVolumeChange}
-                  style={{ flex: 1, accentColor: 'var(--color-blood)' }}
-                />
-                <span style={{ fontSize: '0.8rem', minWidth: '35px', textAlign: 'right' }}>{Math.round(audioVolume * 100)}%</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', marginTop: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)', minWidth: '200px' }}>🔊 Эффекты и общая громкость:</span>
+                  <input 
+                    type="range" 
+                    min="0" 
+                    max="1" 
+                    step="0.05"
+                    value={audioVolume}
+                    onChange={handleVolumeChange}
+                    style={{ flex: 1, accentColor: 'var(--color-blood)' }}
+                  />
+                  <span style={{ fontSize: '0.8rem', minWidth: '35px', textAlign: 'right' }}>{Math.round(audioVolume * 100)}%</span>
+                </div>
+
+                {useLocalDoublePlaylist && (
+                  <>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)', minWidth: '200px' }}>🎻 Громкость Fear & Hunger:</span>
+                      <input 
+                        type="range" 
+                        min="0" 
+                        max="1" 
+                        step="0.05"
+                        value={musicVolume}
+                        onChange={handleMusicVolumeChange}
+                        style={{ flex: 1, accentColor: 'var(--color-relic-glow)' }}
+                      />
+                      <span style={{ fontSize: '0.8rem', minWidth: '35px', textAlign: 'right' }}>{Math.round(musicVolume * 100)}%</span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)', minWidth: '200px' }}>🟫 Громкость Бурого шума:</span>
+                      <input 
+                        type="range" 
+                        min="0" 
+                        max="1" 
+                        step="0.05"
+                        value={noiseVolume}
+                        onChange={handleNoiseVolumeChange}
+                        style={{ flex: 1, accentColor: 'var(--color-mana-glow)' }}
+                      />
+                      <span style={{ fontSize: '0.8rem', minWidth: '35px', textAlign: 'right' }}>{Math.round(noiseVolume * 100)}%</span>
+                    </div>
+                  </>
+                )}
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', marginTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem' }}>
@@ -945,6 +993,8 @@ export default function App() {
                     playSuccess();
                     localStorage.setItem('default_muted', audioMuted ? 'true' : 'false');
                     localStorage.setItem('default_volume', String(audioVolume));
+                    localStorage.setItem('default_music_volume', String(musicVolume));
+                    localStorage.setItem('default_noise_volume', String(noiseVolume));
                     localStorage.setItem('default_ambience', synthInstance?.currentMood || 'quiet_focus');
                     localStorage.setItem('use_local_double_playlist', useLocalDoublePlaylist ? 'true' : 'false');
                     
