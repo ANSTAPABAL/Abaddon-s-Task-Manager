@@ -152,8 +152,14 @@ class AudioSynthesizer {
     setRandomTime(this.localDoublePlayer2);
     
     if (!this.isMuted && !this.spotifyPlaying && this.useLocalDoublePlaylist) {
-      this.localDoublePlayer1.play().catch(e => console.warn("Could not play F&H track:", e));
-      this.localDoublePlayer2.play().catch(e => console.warn("Could not play Brown Noise track:", e));
+      this.localDoublePlayer1.play().catch(e => {
+        console.warn("Could not play F&H track, starting synth fallback:", e);
+        this.startFHSynth();
+      });
+      this.localDoublePlayer2.play().catch(e => {
+        console.warn("Could not play Brown Noise track, starting synth fallback:", e);
+        this.startBrownNoiseSynth();
+      });
     }
   }
   
@@ -166,14 +172,148 @@ class AudioSynthesizer {
       this.localDoublePlayer2.pause();
       this.localDoublePlayer2 = null;
     }
+    this.stopFHSynth();
+    this.stopBrownNoiseSynth();
   }
   
   updateLocalDoubleVolume() {
+    const isSilenced = this.isMuted || this.spotifyPlaying || !this.useLocalDoublePlaylist;
     if (this.localDoublePlayer1) {
-      this.localDoublePlayer1.volume = (this.isMuted || this.spotifyPlaying || !this.useLocalDoublePlaylist) ? 0 : this.volume;
+      this.localDoublePlayer1.volume = isSilenced ? 0 : this.volume;
     }
     if (this.localDoublePlayer2) {
-      this.localDoublePlayer2.volume = (this.isMuted || this.spotifyPlaying || !this.useLocalDoublePlaylist) ? 0 : this.volume * 0.8;
+      this.localDoublePlayer2.volume = isSilenced ? 0 : this.volume * 0.8;
+    }
+    if (this.fhSynthGain && this.ctx) {
+      const vol = isSilenced ? 0 : this.volume * 0.6;
+      this.fhSynthGain.gain.setTargetAtTime(vol, this.ctx.currentTime, 0.2);
+    }
+    if (this.brownNoiseGain && this.ctx) {
+      const vol = isSilenced ? 0 : this.volume * 0.8;
+      this.brownNoiseGain.gain.setTargetAtTime(vol, this.ctx.currentTime, 0.2);
+    }
+  }
+
+  startFHSynth() {
+    if (!this.ctx || this.isMuted || this.spotifyPlaying) return;
+    this.stopFHSynth();
+    
+    try {
+      this.fhSynthGain = this.ctx.createGain();
+      const vol = this.volume * 0.6;
+      this.fhSynthGain.gain.setValueAtTime(vol, this.ctx.currentTime);
+      this.fhSynthGain.connect(this.getDestinationNode());
+      
+      this.fhSynthFilter = this.ctx.createBiquadFilter();
+      this.fhSynthFilter.type = 'lowpass';
+      this.fhSynthFilter.frequency.setValueAtTime(180, this.ctx.currentTime);
+      this.fhSynthFilter.Q.setValueAtTime(4, this.ctx.currentTime);
+      this.fhSynthFilter.connect(this.fhSynthGain);
+      
+      this.fhSynthLfo = this.ctx.createOscillator();
+      this.fhSynthLfo.frequency.setValueAtTime(0.08, this.ctx.currentTime);
+      this.fhSynthLfoGain = this.ctx.createGain();
+      this.fhSynthLfoGain.gain.setValueAtTime(60, this.ctx.currentTime);
+      
+      this.fhSynthLfo.connect(this.fhSynthLfoGain);
+      this.fhSynthLfoGain.connect(this.fhSynthFilter.frequency);
+      this.fhSynthLfo.start();
+      
+      this.fhSynthOsc1 = this.ctx.createOscillator();
+      this.fhSynthOsc1.type = 'sawtooth';
+      this.fhSynthOsc1.frequency.setValueAtTime(65.41, this.ctx.currentTime);
+      this.fhSynthOsc1.connect(this.fhSynthFilter);
+      
+      this.fhSynthOsc2 = this.ctx.createOscillator();
+      this.fhSynthOsc2.type = 'triangle';
+      this.fhSynthOsc2.frequency.setValueAtTime(48.99, this.ctx.currentTime);
+      this.fhSynthOsc2.connect(this.fhSynthFilter);
+      
+      this.fhSynthOsc1.start();
+      this.fhSynthOsc2.start();
+    } catch (e) {
+      console.warn("Could not start FH synth drone fallback:", e);
+    }
+  }
+
+  stopFHSynth() {
+    if (this.fhSynthOsc1) {
+      try { this.fhSynthOsc1.stop(); } catch(e) {}
+      try { this.fhSynthOsc1.disconnect(); } catch(e) {}
+      this.fhSynthOsc1 = null;
+    }
+    if (this.fhSynthOsc2) {
+      try { this.fhSynthOsc2.stop(); } catch(e) {}
+      try { this.fhSynthOsc2.disconnect(); } catch(e) {}
+      this.fhSynthOsc2 = null;
+    }
+    if (this.fhSynthLfo) {
+      try { this.fhSynthLfo.stop(); } catch(e) {}
+      try { this.fhSynthLfo.disconnect(); } catch(e) {}
+      this.fhSynthLfo = null;
+    }
+    if (this.fhSynthLfoGain) {
+      try { this.fhSynthLfoGain.disconnect(); } catch(e) {}
+      this.fhSynthLfoGain = null;
+    }
+    if (this.fhSynthFilter) {
+      try { this.fhSynthFilter.disconnect(); } catch(e) {}
+      this.fhSynthFilter = null;
+    }
+    if (this.fhSynthGain) {
+      try { this.fhSynthGain.disconnect(); } catch(e) {}
+      this.fhSynthGain = null;
+    }
+  }
+
+  startBrownNoiseSynth() {
+    if (!this.ctx || this.isMuted || this.spotifyPlaying) return;
+    this.stopBrownNoiseSynth();
+    
+    const bufferSize = this.ctx.sampleRate * 2;
+    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    
+    let lastOut = 0.0;
+    for (let i = 0; i < bufferSize; i++) {
+      const white = Math.random() * 2 - 1;
+      data[i] = (lastOut + (0.02 * white)) / 1.02;
+      lastOut = data[i];
+      data[i] *= 3.5;
+    }
+    
+    this.brownNoiseSource = this.ctx.createBufferSource();
+    this.brownNoiseSource.buffer = buffer;
+    this.brownNoiseSource.loop = true;
+    
+    this.brownNoiseFilter = this.ctx.createBiquadFilter();
+    this.brownNoiseFilter.type = 'lowpass';
+    this.brownNoiseFilter.frequency.setValueAtTime(400, this.ctx.currentTime);
+    
+    this.brownNoiseGain = this.ctx.createGain();
+    const vol = this.volume * 0.8;
+    this.brownNoiseGain.gain.setValueAtTime(vol, this.ctx.currentTime);
+    
+    this.brownNoiseSource.connect(this.brownNoiseFilter);
+    this.brownNoiseFilter.connect(this.brownNoiseGain);
+    this.brownNoiseGain.connect(this.getDestinationNode());
+    
+    this.brownNoiseSource.start();
+  }
+
+  stopBrownNoiseSynth() {
+    if (this.brownNoiseSource) {
+      try { this.brownNoiseSource.stop(); } catch(e) {}
+      try { this.brownNoiseSource.disconnect(); } catch(e) {}
+      this.brownNoiseSource = null;
+    }
+    if (this.brownNoiseFilter) {
+      try { this.brownNoiseFilter.disconnect(); } catch(e) {}
+      this.brownNoiseFilter = null;
+    }
+    if (this.brownNoiseGain) {
+      try { this.brownNoiseGain.disconnect(); } catch(e) {}
+      this.brownNoiseGain = null;
     }
   }
   

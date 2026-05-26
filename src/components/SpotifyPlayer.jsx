@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Music, RefreshCw, Key, Power, Play, Pause, SkipForward, Radio } from 'lucide-react';
+import { Music, RefreshCw, Key, Power, Play, Pause, SkipForward, Radio, Activity } from 'lucide-react';
 import { useAudio } from '../hooks/useAudio';
 
 export default function SpotifyPlayer({ 
@@ -18,6 +18,44 @@ export default function SpotifyPlayer({
   const [isPlaying, setIsPlaying] = useState(false);
   const [sdkLoaded, setSdkLoaded] = useState(false);
   const exchangeInProgress = useRef(false);
+  const [diagnosticsLog, setDiagnosticsLog] = useState(null);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
+  const [devices, setDevices] = useState([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState('');
+
+  const fetchDevices = async () => {
+    if (!spotifyToken) return;
+    try {
+      const res = await fetch('https://api.spotify.com/v1/me/player/devices', {
+        headers: { 'Authorization': `Bearer ${spotifyToken}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const foundDevices = data.devices || [];
+        setDevices(foundDevices);
+        
+        // Auto-select active device or local device if nothing is selected
+        setSelectedDeviceId(prev => {
+          if (prev && foundDevices.some(d => d.id === prev)) return prev;
+          const activeDev = foundDevices.find(d => d.is_active);
+          if (activeDev) return activeDev.id;
+          if (deviceId) return deviceId;
+          if (foundDevices.length > 0) return foundDevices[0].id;
+          return '';
+        });
+      }
+    } catch (e) {
+      console.warn("Failed to fetch available devices:", e);
+    }
+  };
+
+  useEffect(() => {
+    if (spotifyToken) {
+      fetchDevices();
+      const interval = setInterval(fetchDevices, 10000);
+      return () => clearInterval(interval);
+    }
+  }, [spotifyToken, deviceId]);
 
   // Sync isPlaying to synth drone muting
   useEffect(() => {
@@ -41,12 +79,12 @@ export default function SpotifyPlayer({
 
   // Focus playlists custom state (user can paste their own Spotify URI links!)
   const [playlists, setPlaylists] = useState({
-    escape: 'spotify:playlist:4lGv8NnJpX8v7CqL8JpDgu', // Atrium Carceri & Swans Dark Ambient Mix
-    hunt: 'spotify:playlist:37i9dQZF1E8O7qZfQ4x14d', // Marcel Gidote's Holy Crab Radio & Cozy Psych-Jazz
-    siege: 'spotify:playlist:0P6hI9y2dshZ3zP52G0i1G', // Swans & Atrium Carceri Heavy Intense Focus
-    deconstruct: 'spotify:playlist:37i9dQZF1DX8TZZiO5Fr7i', // Cozy Psychedelic Rock / Radio
-    recovery: 'spotify:playlist:37i9dQZF1DX8NTLI297vKT', // Soft Medieval Lutes & Cozy Chill
-    quiet_focus: 'spotify:playlist:37i9dQZF1DWZFIeFvl6H5v' // Quiet focus, low drones
+    escape: 'spotify:playlist:37i9dQZF1DX1YQO4sw348m', // Dark Ambient (Verified Public)
+    hunt: 'spotify:playlist:37i9dQZF1DWWQRwui0EXPn', // Atmospheric Sci-Fi Focus (Verified Public)
+    siege: 'spotify:playlist:37i9dQZF1DX5cZuGC1e3tn', // Industrial / Heavy Electronic Focus (Verified Public)
+    deconstruct: 'spotify:playlist:37i9dQZF1DXb4nC925ve47', // Psychedelic Chill (Verified Public)
+    recovery: 'spotify:playlist:37i9dQZF1DX8NTLI297vKT', // Soft Medieval Lutes & Cozy Chill (Verified Public)
+    quiet_focus: 'spotify:playlist:37i9dQZF1DWZeKFBTSLg3N' // Deep Focus Drones / Ambient (Verified Public)
   });
 
   // --- CRYPTO HELPER METHODS FOR PKCE ---
@@ -177,17 +215,29 @@ export default function SpotifyPlayer({
     newPlayer.addListener('ready', ({ device_id }) => {
       console.log('Spotify Device Ready: ', device_id);
       setDeviceId(device_id);
+      setSelectedDeviceId(prev => prev || device_id);
       setIsPlayerActive(true);
       
-      // Auto-transfer playback to this browser device
-      fetch('https://api.spotify.com/v1/me/player', {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${spotifyToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ device_ids: [device_id], play: false })
-      }).catch(e => console.warn("Could not transfer playback device automatically:", e));
+      // Auto-transfer playback to this browser device with a delay to prevent race conditions
+      setTimeout(async () => {
+        try {
+          const res = await fetch('https://api.spotify.com/v1/me/player', {
+            method: 'PUT',
+            headers: {
+              'Authorization': `Bearer ${spotifyToken}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ device_ids: [device_id], play: false })
+          });
+          if (res.ok) {
+            console.log("Successfully transferred playback device automatically.");
+          } else {
+            console.warn(`Playback transfer failed with status: ${res.status}`);
+          }
+        } catch (e) {
+          console.warn("Could not transfer playback device automatically:", e);
+        }
+      }, 1500);
     });
 
     newPlayer.addListener('player_state_changed', state => {
@@ -234,80 +284,306 @@ export default function SpotifyPlayer({
 
   // --- SYNC AUDIO PLAYBACK WITH STATE COGNITION ---
   const handlePlayAtmosphere = async (mood) => {
-    if (!spotifyToken || !deviceId) {
-      setSpotifyError("Устройство Focus Vessel еще регистрируется. Подождите пару секунд...");
+    if (!spotifyToken || !selectedDeviceId) {
+      setSpotifyError("Устройство Focus Vessel или выбранный плеер еще не готовы...");
       setTimeout(() => setSpotifyError(''), 6000);
       return;
     }
 
     const playlistUri = playlists[mood] || playlists.quiet_focus;
+    const playlistId = playlistUri.split(':').pop();
+
+    const makePlayRequest = async (targetDeviceId = null, useTracks = false, trackUris = null) => {
+      const url = targetDeviceId 
+        ? `https://api.spotify.com/v1/me/player/play?device_id=${targetDeviceId}`
+        : `https://api.spotify.com/v1/me/player/play`;
+        
+      const body = useTracks && trackUris && trackUris.length > 0
+        ? { uris: trackUris }
+        : { context_uri: playlistUri };
+
+      const res = await fetch(url, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${spotifyToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+      });
+      
+      if (!res.ok) {
+        let errMessage = `HTTP error ${res.status}`;
+        try {
+          const errData = await res.json();
+          if (errData && errData.error && errData.error.message) {
+            errMessage = errData.error.message;
+          }
+        } catch (_) {}
+        const error = new Error(errMessage);
+        error.status = res.status;
+        throw error;
+      }
+    };
+
+    const fetchPlaylistTracks = async () => {
+      try {
+        const res = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}/items?limit=100`, {
+          headers: {
+            'Authorization': `Bearer ${spotifyToken}`
+          }
+        });
+        if (!res.ok) {
+          console.warn(`Failed to fetch playlist items: HTTP ${res.status}`);
+          return null;
+        }
+        const data = await res.json();
+        if (!data || !data.items) {
+          console.warn("Playlist items request returned empty or invalid data:", data);
+          return null;
+        }
+        
+        // Extract valid track URIs (ignoring local files or invalid tracks)
+        const uris = data.items
+          .map(item => item?.track?.uri)
+          .filter(uri => uri && uri.startsWith('spotify:track:'));
+          
+        if (uris.length === 0) return null;
+        
+        // Shuffle the tracks to start with a fresh random song each time
+        const shuffled = [...uris];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        return shuffled;
+      } catch (e) {
+        console.warn("Failed to fetch playlist tracks for bypass:", e);
+        return null;
+      }
+    };
+
+    // Helper to ensure target device is registered and active in Spotify Connect
+    const ensureDeviceActive = async (targetDeviceId) => {
+      try {
+        console.log(`Checking if device ${targetDeviceId} is active in Spotify Connect...`);
+        const res = await fetch('https://api.spotify.com/v1/me/player/devices', {
+          headers: { 'Authorization': `Bearer ${spotifyToken}` }
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const device = data.devices?.find(d => d.id === targetDeviceId);
+        
+        if (!device || !device.is_active) {
+          console.log(`Target device ${targetDeviceId} is not active or not registered. Forcing active playback transfer...`);
+          await fetch('https://api.spotify.com/v1/me/player', {
+            method: 'PUT',
+            headers: {
+              'Authorization': `Bearer ${spotifyToken}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ device_ids: [targetDeviceId], play: false })
+          });
+          // Wait 1200ms for backend synchronization
+          await new Promise(resolve => setTimeout(resolve, 1200));
+        } else {
+          console.log("Target device is already registered and active.");
+        }
+      } catch (err) {
+        console.warn("Self-healing device transfer failed:", err);
+      }
+    };
 
     try {
-      const response = await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${deviceId}`, {
+      // 1. Self-heal device status (ensure it is registered and active in Spotify Connect)
+      await ensureDeviceActive(selectedDeviceId);
+
+      try {
+        // Attempt 1: Native Playlist Playback (Directly send context_uri to selected device)
+        // This is 100% reliable for Premium, fast, preserves shuffle/repeat, doesn't load network
+        await makePlayRequest(selectedDeviceId, false, null);
+        setIsPlaying(true);
+        setSpotifyError('');
+      } catch (e) {
+        console.warn("Direct native context_uri play attempt failed, trying track URIs bypass...", e.message);
+        
+        try {
+          // Attempt 2: Fetch tracks to bypass standard restrictions if native play failed
+          const trackUris = await fetchPlaylistTracks();
+          if (!trackUris) throw new Error("Could not fetch playlist track URIs");
+          
+          await makePlayRequest(selectedDeviceId, true, trackUris);
+          setIsPlaying(true);
+          setSpotifyError('');
+        } catch (retryError) {
+          console.warn("Track URIs bypass play attempt failed, trying active device fallback...", retryError.message);
+          
+          try {
+            // Attempt 3: Try playing without specifying a device ID (targets active device in Spotify Connect)
+            await makePlayRequest(null, false, null);
+            setIsPlaying(true);
+            setSpotifyError('');
+          } catch (finalError) {
+            const status = finalError.status;
+            const msg = finalError.message ? finalError.message.toLowerCase() : "";
+            
+            if (status === 403 || msg.includes("restriction") || msg.includes("premium")) {
+              console.warn("Spotify Playback blocked (Premium restriction or Dev access missing):", finalError.message);
+            } else {
+              console.error("Spotify Playback Error after recovery:", finalError);
+            }
+            
+            let userFriendlyError = "Не удалось запустить трек. Запустите Spotify Premium на ПК/телефоне и попробуйте снова!";
+            
+            if (status === 401 || msg.includes("token expired") || msg.includes("401")) {
+              userFriendlyError = "Срок действия токена Spotify истек. Пожалуйста, переподключите аккаунт!";
+              setSpotifyToken(''); // Clear the expired token so user can connect again
+            } else if (status === 403 || msg.includes("premium") || msg.includes("403") || msg.includes("restriction")) {
+              if (msg.includes("restriction")) {
+                userFriendlyError = `Ошибка 403 (Ограничение): Плеер не активен или требуется Premium. Пожалуйста, откройте официальное приложение Spotify на телефоне/ПК, запустите любой трек и переключите устройство вывода на "Abaddon's Focus Vessel". (Детали: "${finalError.message}").`;
+              } else {
+                userFriendlyError = `Ошибка 403 (Ограничение): Требуется подписка Spotify Premium ИЛИ ваш аккаунт должен быть добавлен в список 'Users and Access' в настройках приложения на Spotify Dashboard. (Детали: "${finalError.message}"). Автоматический запуск треков отключен.`;
+              }
+              setDisableAutoPlay(true);
+            } else if (status === 404 || msg.includes("device") || msg.includes("404")) {
+              userFriendlyError = "Устройство Focus Vessel не найдено или не готово. Убедитесь, что Spotify Premium запущен на ПК или телефоне!";
+            } else if (finalError.message) {
+              userFriendlyError = `Ошибка Spotify: ${finalError.message}. Откройте плеер на ПК/телефоне и попробуйте снова.`;
+            }
+            
+            setSpotifyError(userFriendlyError);
+            setTimeout(() => setSpotifyError(''), 10000);
+          }
+        }
+      }
+    } catch (outerError) {
+      console.error("Outer play atmosphere error:", outerError);
+    }
+  };
+
+  const runDiagnostics = async () => {
+    setDiagnosticsLog("Запуск диагностики...\n");
+    setShowDiagnostics(true);
+    
+    let log = "=== ОТЛАДКА SPOTIFY CONNECT ===\n";
+    try {
+      log += "1. Получение профиля пользователя (GET /v1/me)...\n";
+      const meRes = await fetch('https://api.spotify.com/v1/me', {
+        headers: { 'Authorization': `Bearer ${spotifyToken}` }
+      });
+      if (!meRes.ok) throw new Error(`Ошибка GET /me: ${meRes.status}`);
+      const meData = await meRes.json();
+      log += `   > Имя: ${meData.display_name}\n`;
+      log += `   > Страна: ${meData.country}\n`;
+      log += `   > Подписка (Product): "${meData.product}"\n`;
+      if (meData.product !== 'premium') {
+        log += "   ⚠️ ВНИМАНИЕ: Ваш аккаунт не является Premium. Spotify Web API требует Premium для управления воспроизведением!\n";
+      }
+      
+      log += "2. Проверка токена...\n";
+      log += `   > Длина токена: ${spotifyToken ? spotifyToken.length : 0} символов\n`;
+      
+      log += "3. Получение списка активных устройств (GET /v1/me/player/devices)...\n";
+      const devRes = await fetch('https://api.spotify.com/v1/me/player/devices', {
+        headers: { 'Authorization': `Bearer ${spotifyToken}` }
+      });
+      if (!devRes.ok) throw new Error(`Ошибка GET /me/player/devices: ${devRes.status}`);
+      const devData = await devRes.json();
+      log += `   > Найдено устройств: ${devData.devices ? devData.devices.length : 0}\n`;
+      if (devData.devices && devData.devices.length > 0) {
+        devData.devices.forEach((dev, index) => {
+          log += `     [${index + 1}] Имя: "${dev.name}"\n`;
+          log += `         ID: ${dev.id}\n`;
+          log += `         Тип: ${dev.type}\n`;
+          log += `         Активно: ${dev.is_active}\n`;
+          log += `         Громкость: ${dev.volume_percent}%\n`;
+          log += `         Ограничено (is_restricted): ${dev.is_restricted}\n`;
+        });
+      } else {
+        log += "   ⚠️ ВНИМАНИЕ: Список устройств пуст! Spotify Connect не видит ни одного активного устройства. Убедитесь, что официальный клиент Spotify запущен на ПК/телефоне.\n";
+      }
+      
+      log += "4. Локальный статус SDK-плеера...\n";
+      log += `   > Локальный device_id: ${deviceId ? deviceId : "НЕ ЗАРЕГИСТРИРОВАН"}\n`;
+      log += `   > SDK загружен: ${sdkLoaded ? "Да" : "Нет"}\n`;
+      log += `   > Плеер активен: ${isPlayerActive ? "Да" : "Нет"}\n`;
+      
+      setDiagnosticsLog(log);
+    } catch (err) {
+      log += `\n❌ ОШИБКА ДИАГНОСТИКИ: ${err.message}\n`;
+      setDiagnosticsLog(log);
+    }
+  };
+
+  const runTestPlayback = async () => {
+    let log = diagnosticsLog ? diagnosticsLog + "\n\n" : "";
+    log += "=== ТЕСТОВЫЙ ЗАПУСК ТРЕКА ===\n";
+    setDiagnosticsLog(log);
+    
+    const targetId = selectedDeviceId || deviceId;
+    if (!targetId) {
+      log += "❌ Ошибка: Устройство воспроизведения не выбрано и локальный плеер не готов.\n";
+      setDiagnosticsLog(log);
+      return;
+    }
+    
+    try {
+      log += `Выбранное устройство: ${targetId === deviceId ? "Встроенный плеер" : "Внешнее устройство (" + targetId + ")"}\n`;
+      
+      // Force active playback transfer before testing to avoid 404 Device Not Found race conditions
+      log += `Перенос активного вещания на ${targetId} (PUT /v1/me/player)...\n`;
+      setDiagnosticsLog(log);
+      
+      const transferRes = await fetch('https://api.spotify.com/v1/me/player', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${spotifyToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ device_ids: [targetId], play: false })
+      });
+      
+      log += `Ответ переноса: ${transferRes.status} (${transferRes.statusText})\n`;
+      setDiagnosticsLog(log);
+      
+      // Wait 1200ms
+      log += "Ожидание 1.2с для синхронизации серверов...\n";
+      setDiagnosticsLog(log);
+      await new Promise(resolve => setTimeout(resolve, 1200));
+
+      const url = `https://api.spotify.com/v1/me/player/play?device_id=${targetId}`;
+      log += `Отправка PUT-запроса на ${url}...\n`;
+      setDiagnosticsLog(log);
+      
+      const res = await fetch(url, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${spotifyToken}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          context_uri: playlistUri
+          uris: ["spotify:track:4iV5W9uof0tUzsSHRfJrb4"]
         })
       });
-
-      if (!response.ok) {
-        let errMessage = `HTTP error ${response.status}`;
-        try {
-          const errData = await response.json();
-          if (errData && errData.error && errData.error.message) {
-            errMessage = errData.error.message;
-          }
-        } catch (_) {}
-        
-        const error = new Error(errMessage);
-        error.status = response.status;
-        throw error;
-      }
-      setIsPlaying(true);
-      setSpotifyError('');
-    } catch (e) {
-      const status = e.status;
-      const msg = e.message ? e.message.toLowerCase() : "";
       
-      // Log expected Premium / Dev access restrictions as a warning rather than a red console error
-      if (status === 403 || msg.includes("restriction") || msg.includes("premium")) {
-        console.warn("Spotify Playback blocked (Premium restriction or Dev access missing):", e.message);
+      log += `Код ответа: ${res.status} (${res.statusText})\n`;
+      if (res.ok) {
+        log += "✅ УСПЕХ: Трек успешно отправлен на воспроизведение!\n";
       } else {
-        console.error("Spotify Playback Error:", e);
+        const errBody = await res.text();
+        log += `❌ ОШИБКА ОТ SPOTIFY API:\n${errBody}\n`;
       }
-      
-      let userFriendlyError = "Не удалось запустить трек. Запустите Spotify Premium на ПК/телефоне и попробуйте снова!";
-      
-      if (status === 401 || msg.includes("token expired") || msg.includes("401")) {
-        userFriendlyError = "Срок действия токена Spotify истек. Пожалуйста, переподключите аккаунт!";
-        setSpotifyToken(''); // Clear the expired token so user can connect again
-      } else if (status === 403 || msg.includes("premium") || msg.includes("403") || msg.includes("restriction")) {
-        if (msg.includes("restriction")) {
-          userFriendlyError = `Ошибка 403 (Ограничение): Плеер не активен или требуется Premium. Пожалуйста, откройте официальное приложение Spotify на телефоне/ПК, запустите любой трек и переключите устройство вывода на "Abaddon's Focus Vessel". (Детали: "${e.message}").`;
-        } else {
-          userFriendlyError = `Ошибка 403 (Ограничение): Требуется подписка Spotify Premium ИЛИ ваш аккаунт должен быть добавлен в список 'Users and Access' в настройках приложения на Spotify Dashboard. (Детали: "${e.message}"). Автоматический запуск треков отключен.`;
-        }
-        setDisableAutoPlay(true);
-      } else if (status === 404 || msg.includes("device") || msg.includes("404")) {
-        userFriendlyError = "Устройство Focus Vessel не найдено или не готово. Убедитесь, что Spotify Premium запущен на ПК или телефоне!";
-      } else if (e.message) {
-        userFriendlyError = `Ошибка Spotify: ${e.message}. Откройте плеер на ПК/телефоне и попробуйте снова.`;
-      }
-      
-      setSpotifyError(userFriendlyError);
-      setTimeout(() => setSpotifyError(''), 10000);
+      setDiagnosticsLog(log);
+    } catch (err) {
+      log += `❌ ИСКЛЮЧЕНИЕ: ${err.message}\n`;
+      setDiagnosticsLog(log);
     }
   };
 
   useEffect(() => {
-    if (activeSessionType && deviceId && spotifyToken && !disableAutoPlay) {
+    if (activeSessionType && selectedDeviceId && spotifyToken && !disableAutoPlay) {
       handlePlayAtmosphere(activeSessionType);
     }
-  }, [activeSessionType, deviceId, spotifyToken, disableAutoPlay]);
+  }, [activeSessionType, selectedDeviceId, spotifyToken, disableAutoPlay]);
 
   const handleTogglePlayback = () => {
     if (player) {
@@ -317,6 +593,21 @@ export default function SpotifyPlayer({
 
   const handleNextTrack = () => {
     if (player) player.nextTrack();
+  };
+
+  const handleDisconnectSpotify = () => {
+    localStorage.removeItem('spotify_token');
+    localStorage.removeItem('spotify_token_created_at');
+    setSpotifyToken('');
+    setDeviceId(null);
+    setIsPlayerActive(false);
+    setIsPlaying(false);
+    setCurrentTrack(null);
+    setSpotifyPlaying(false);
+    if (player) {
+      player.disconnect();
+      setPlayer(null);
+    }
   };
 
   return (
@@ -402,16 +693,64 @@ export default function SpotifyPlayer({
             </div>
 
             {/* Controls */}
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button className="rpg-btn" style={{ padding: '4px 10px' }} onClick={handleTogglePlayback}>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <button className="rpg-btn" style={{ padding: '4px 10px' }} onClick={handleTogglePlayback} title="Воспроизведение / Пауза">
                 {isPlaying ? <Pause size={14} /> : <Play size={14} />}
               </button>
-              <button className="rpg-btn" style={{ padding: '4px 10px' }} onClick={handleNextTrack}>
+              <button className="rpg-btn" style={{ padding: '4px 10px' }} onClick={handleNextTrack} title="Следующий трек">
                 <SkipForward size={14} />
+              </button>
+              <button 
+                className="rpg-btn" 
+                style={{ padding: '4px 10px', borderColor: '#1db954', color: '#1db954' }} 
+                onClick={runDiagnostics}
+                title="Диагностика подключения"
+              >
+                <Activity size={14} />
+              </button>
+              <button 
+                className="rpg-btn" 
+                style={{ padding: '4px 10px', borderColor: 'var(--color-blood-glow)', color: 'var(--color-blood-glow)' }} 
+                onClick={handleDisconnectSpotify}
+                title="Отключить Spotify и сбросить сессию"
+              >
+                <Power size={14} />
               </button>
             </div>
           </div>
 
+          {/* Target Device Selector */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0.8rem 0', background: 'rgba(0,0,0,0.2)', padding: '6px 12px', border: '1px solid var(--color-iron-light)', borderRadius: '3px' }}>
+            <span style={{ fontSize: '0.72rem', color: 'var(--color-bone-dim)', fontFamily: 'var(--font-rpg)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Вывод звука (Spotify Connect):
+            </span>
+            <select 
+              value={selectedDeviceId} 
+              onChange={(e) => setSelectedDeviceId(e.target.value)}
+              className="rpg-input"
+              style={{ flex: 1, padding: '2px 6px', fontSize: '0.75rem', height: '24px', borderColor: '#1db954', color: '#fff', background: '#000' }}
+            >
+              {devices.map(d => (
+                <option key={d.id} value={d.id}>
+                  {d.name} {d.is_active ? '🟢 (Активно)' : ''} {d.id === deviceId ? '💻 (Встроенный)' : ''}
+                </option>
+              ))}
+              {devices.length === 0 && deviceId && (
+                <option value={deviceId}>
+                  Abaddon's Focus Vessel 💻 (Встроенный)
+                </option>
+              )}
+            </select>
+            <button 
+              className="rpg-btn" 
+              style={{ padding: '2px 8px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} 
+              onClick={fetchDevices} 
+              title="Обновить список устройств"
+            >
+              <RefreshCw size={11} />
+            </button>
+          </div>
+ 
           {/* Preset Soundscape Selectors */}
           <div style={{ marginTop: '1rem' }}>
             <h4 style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', fontFamily: 'var(--font-rpg)', marginBottom: '5px', textTransform: 'uppercase' }}>
@@ -438,6 +777,41 @@ export default function SpotifyPlayer({
               </button>
             </div>
           </div>
+
+          {/* Real-time Diagnostics Console */}
+          {showDiagnostics && (
+            <div style={{ 
+              marginTop: '1rem', 
+              background: '#000', 
+              border: '1px solid var(--color-iron-light)', 
+              padding: '0.8rem', 
+              fontFamily: 'monospace', 
+              fontSize: '0.75rem', 
+              color: '#1db954',
+              whiteSpace: 'pre-wrap',
+              maxHeight: '300px',
+              overflowY: 'auto'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', borderBottom: '1px solid #1db954', paddingBottom: '0.3rem' }}>
+                <span style={{ fontWeight: 'bold' }}>📡 КОНСОЛЬ ОТЛАДКИ SPOTIFY</span>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button 
+                    onClick={runTestPlayback} 
+                    style={{ background: 'transparent', border: '1px solid #1db954', color: '#1db954', fontSize: '0.65rem', padding: '1px 5px', cursor: 'pointer' }}
+                  >
+                    ТЕСТ ТРЕКА
+                  </button>
+                  <button 
+                    onClick={() => setShowDiagnostics(false)} 
+                    style={{ background: 'transparent', border: '1px solid #ff4d4d', color: '#ff4d4d', fontSize: '0.65rem', padding: '1px 5px', cursor: 'pointer' }}
+                  >
+                    ЗАКРЫТЬ
+                  </button>
+                </div>
+              </div>
+              <div style={{ lineHeight: '1.4' }}>{diagnosticsLog}</div>
+            </div>
+          )}
         </div>
       )}
     </div>

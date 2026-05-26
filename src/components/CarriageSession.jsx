@@ -5,6 +5,7 @@ import {
   Timer, Award, Compass, Eye, BookOpen, Volume2 
 } from 'lucide-react';
 import { useAudio } from '../hooks/useAudio';
+import { rollStartingCharacter } from '../utils/characterUtils';
 
 // Список 50 уникальных вариаций когнитивной борьбы Бездны (ADHD-аспекты)
 const COMBAT_VARIATIONS = [
@@ -426,12 +427,24 @@ export default function CarriageSession({
     const isLargeQuest = task?.pomodoroTime >= 50 || task?.type === 'siege';
     const hpContext = character.hp <= 30 ? `Герой истощен, едва держится на ногах (критический уровень здоровья HP: ${character.hp})` : `Герой крепок и полон сил (здоровье HP: ${character.hp})`;
     
+    const lastLegend = pedestals && pedestals.length > 0 ? pedestals[pedestals.length - 1] : null;
+    let legacyPromptContext = "";
+    if (lastLegend) {
+      if (lastLegend.legacyStatus === 'stained') {
+        legacyPromptContext = `\n⚠️ НАСЛЕДИЕ РОДОСЛОВНОЙ: Предыдущий герой пользователя (${lastLegend.name}, класс ${lastLegend.class}) трагически пал/потерпел позорное поражение, и его имя ЗАПЯТНАНО. Текущий герой (${character.name}) с прозвищем "${character.nickname}" несет груз стыда предка ${lastLegend.name} и отчаянно пытается искупить этот позор. Вплети это кратко в текст летописи.`;
+      } else if (lastLegend.legacyStatus === 'sanctified') {
+        legacyPromptContext = `\n⚠️ НАСЛЕДИЕ РОДОСЛОВНОЙ: Предыдущий герой пользователя (${lastLegend.name}, класс ${lastLegend.class}) совершил великий триумф, одолев Скверну Абаддона, и его имя ОСВЯЩЕНО. Текущий герой (${character.name}) с прозвищем "${character.nickname}" овеян славой предка ${lastLegend.name} и стремится соответствовать его величию. Вплети это кратко в текст летописи.`;
+      }
+    }
+
     let prompt = '';
     if (type === 'victory') {
       prompt = `Ты — Летописец Бездны во вселенной Абаддона. Опиши короткую, суровую и грязную летопись-эпитафию в стиле Джо Аберкромби (темное фэнтези, реализм, цинизм, кровь, пот и грязь).
 Герой одержал победу в фокус-сессии над когнитивной тварью: «${enemy}» (задача: "${task?.title || ''}").
+${legacyPromptContext}
 
 ТЕХНИЧЕСКИЙ КОНТЕКСТ ГЕРОЯ:
+- Имя и Прозвище: ${character.name} (${character.nickname})
 - Раса: ${character.race}
 - Класс: ${character.class}
 - Текущее состояние здоровья: ${hpContext}
@@ -469,8 +482,10 @@ export default function CarriageSession({
     } else if (type === 'death') {
       prompt = `Ты — Летописец Бездны во вселенной Абаддона. Опиши короткую, суровую летопись в стиле Джо Аберкромби (запах сырой земли, хруст костей, темнота, горькая ирония).
 Герой пал в бою с тварью: «${enemy}» (задача: "${task?.title || ''}"). Его здоровье на критическом минимуме (10 HP), разум сломлен.
+${legacyPromptContext}
 
 ТЕХНИЧЕСКИЙ КОНТЕКСТ ГЕРОЯ:
+- Имя и Прозвище: ${character.name} (${character.nickname})
 - Раса: ${character.race}
 - Класс: ${character.class}
 - Время контракта: ${task?.pomodoroTime || 25} минут
@@ -495,14 +510,27 @@ export default function CarriageSession({
       setResolutionText(data.choices[0].message.content.trim());
       playSuccess();
     } catch (e) {
+      const lastLegend = pedestals && pedestals.length > 0 ? pedestals[pedestals.length - 1] : null;
+      let heritageVictoryLine = "";
+      let heritageDeathLine = "";
+      if (lastLegend) {
+        if (lastLegend.legacyStatus === 'stained') {
+          heritageVictoryLine = ` Вы искупили позор ${lastLegend.name}, очистив родословную от скверны!`;
+          heritageDeathLine = ` Вы пали в ту же грязь, повторив позорную кончину вашего предка ${lastLegend.name}...`;
+        } else if (lastLegend.legacyStatus === 'sanctified') {
+          heritageVictoryLine = ` Освященное имя предка ${lastLegend.name} направляло ваш клинок.`;
+          heritageDeathLine = ` Вы опозорили священное имя предка ${lastLegend.name}, захлебнувшись кровью в этой бездне...`;
+        }
+      }
+
       const fallbacks = {
-        victory: `Удар пришелся точно в цель. Зазубренное лезвие вошло по самую рукоять, и эта сука «${enemy}» наконец-то испустила дух, захлебнувшись собственной когнитивной желчью. Твой клинок дымится, а вокруг оседает вонючая тень.
+        victory: `Удар пришелся точно в цель. Зазубренное лезвие вошло по самую рукоять, и эта сука «${enemy}» наконец-то испустила дух, захлебнувшись собственной когнитивной желчью. Твой клинок дымится, а вокруг оседает вонючая тень.${heritageVictoryLine}
 
 Ты стоишь по колено в грязи, тяжело дыша, но оковы спали. Голова чиста от дерьма и страхов. ${isLargeQuest || isPastDebt ? 'Этот чертов триумф заставляет тебя вновь поверить в себя, ублюдок, после всей этой бесконечной череды провалов!' : 'Ты победил эту тварь, а значит, и весь остальной мир подождет, пока ты вытираешь кровь с лица.'}`,
         flee: `Пришлось улепетывать. Тварь «${enemy}» оказалась слишком проворной, а ноги вязли в липкой жиже Бездны. Привкус поражения горчит во рту, как протухший эль.
 
 Но хрен там плавал — ты все еще жив. Спрячься в лагере, залижи раны, погрей задницу у костра и возвращайся. Следующий раунд будет за нами, ублюдок.`,
-        death: `Лицо встретилось с холодной грязью. Хруст костей, гогот «${enemy}» над ухом и темнота. Твой разум расколот на куски, а костлявая уже тянет свои лапы.
+        death: `Лицо встретилось с холодной грязью. Хруст костей, гогот «${enemy}» над ухом и темнота. Твой разум расколот на куски, а костлявая уже тянет свои лапы.${heritageDeathLine}
 
 Но сдохнуть сегодня не получилось. Ты очнулся у костра в лагере. Голова трещит, все тело ноет, но ты дышишь. Поднимайся из дерьма, Изгнанник. Нам еще нужно отплатить этой твари.`
       };
@@ -565,8 +593,19 @@ export default function CarriageSession({
     try {
       const needsSteps = !task.steps || task.steps.length === 0;
       
+      const lastLegend = pedestals && pedestals.length > 0 ? pedestals[pedestals.length - 1] : null;
+      let legacyPromptContext = "";
+      if (lastLegend && Math.random() < 0.45) { // 45% chance to refer to the legacy, maintaining high variance!
+        if (lastLegend.legacyStatus === 'stained') {
+          legacyPromptContext = "\n⚠️ ЛЕГЕНДА ПРОШЛОГО (Используй ТОЛЬКО для тонкого намека или редкой издевки, не зацикливайся!): Предыдущий герой (" + lastLegend.name + ", класс " + lastLegend.class + ") погиб в канавах Абаддона, и его имя ЗАПЯТНАНО. Если уместно, пусть враг в своем появлении (\"loreDescription\") мимоходом поглумится над этим позором рода текущего героя (например: \"Я чую запах гнилой крови " + lastLegend.name + " на тебе...\"). Но сохраняй уникальную самобытность текущего врага!";
+        } else if (lastLegend.legacyStatus === 'sanctified') {
+          legacyPromptContext = "\n⚠️ ЛЕГЕНДА ПРОШЛОГО (Используй ТОЛЬКО для тонкого намека, не зацикливайся!): Предыдущий герой (" + lastLegend.name + ", класс " + lastLegend.class + ") совершил великий триумф, и его имя ОСВЯЩЕНО. Если уместно, пусть враг в своем появлении (\"loreDescription\") выразит ярость или опаску относительно этого благородного рода (например: \"Слава твоего предка " + lastLegend.name + " не спасет тебя от моих когтей...\"). Но сохраняй уникальную самобытность текущего врага!";
+        }
+      }
+
       const systemPrompt = `Ты — Древний Летописец Бездны во вселенной Абаддона (grim-dark RPG).
 Твоя задача — проанализировать задачу пользователя и вернуть JSON с геймификацией и деконструкцией.
+${legacyPromptContext}
 
 1. Классифицируй задачу по типу ("type"):
    - "siege" (осада): крупные проекты, сложные отчеты, курсовые, дипломные, написание большого объема кода/текста.
@@ -1059,6 +1098,7 @@ const handleWinActiveSession = (task) => {
     
     const newLegend = {
       name: character.name || "Безымянный Герой",
+      nickname: character.nickname || "Первый Изгнанник",
       race: character.race || "Человек",
       class: character.class || "Воин",
       level: character.level || 1,
@@ -1069,6 +1109,7 @@ const handleWinActiveSession = (task) => {
       totalHpSacrificed: character.totalHpSacrificed || 0,
       potionsDrunk: character.potionsDrunk || 0,
       meditationsCount: character.meditationsCount || 0,
+      legacyStatus: 'sanctified',
       pedestalEulogy: redemptionEulogyText || "Его воля спасла Бездну..."
     };
 
@@ -1087,31 +1128,54 @@ const handleWinActiveSession = (task) => {
     const updatedPedestals = [...pedestals, newLegend];
     savePedestals(updatedPedestals);
 
-    // Reset character
-    setCharacter({
-      name: "Изгнанник",
-      race: "Каргахаулец",
-      class: "Химомансер (Маг крови)",
-      level: 1,
-      xp: 0,
-      hp: 100,
-      maxHp: 100,
-      mana: 50,
-      maxMana: 50,
-      gold: 0,
-      equipped: { weapon: null, shield: null, armor: null, ring: null },
-      inventory: [],
-      perks: ["Сгусток крови"],
-      shacklesBroken: false,
-      intensity: "grim",
-      completedTasksCount: 0,
-      completedSiegesCount: 0,
-      totalGoldEarned: 0,
-      totalManaSpent: 0,
-      totalHpSacrificed: 0,
-      potionsDrunk: 0,
-      meditationsCount: 0
-    });
+    // Reset character using the centralized percentage-based drop utility passing updatedPedestals
+    const newChar = rollStartingCharacter(updatedPedestals);
+    newChar.intensity = character.intensity || "grim";
+    setCharacter(newChar);
+
+    setSetupStage('lore');
+    setAtmosphereMood('escape');
+  };
+
+  const handleAcceptDeathAndStainName = () => {
+    playBoneCrack();
+    
+    const newLegend = {
+      name: character.name || "Безымянный Падший",
+      nickname: character.nickname || "Первый Изгнанник",
+      race: character.race || "Человек",
+      class: character.class || "Воин",
+      level: character.level || 1,
+      completedTasksCount: character.completedTasksCount || 0,
+      completedSiegesCount: character.completedSiegesCount || 0,
+      totalGoldEarned: character.totalGoldEarned || 0,
+      totalManaSpent: character.totalManaSpent || 0,
+      totalHpSacrificed: character.totalHpSacrificed || 0,
+      potionsDrunk: character.potionsDrunk || 0,
+      meditationsCount: character.meditationsCount || 0,
+      legacyStatus: 'stained',
+      pedestalEulogy: resolutionText || "Его когнитивные силы иссякли, разум сдался Бездне..."
+    };
+
+    // Convert active tasks to "corpse" (Труп прошлого / Debt) and increase curse
+    setTasks(prev => prev.map(t => {
+      if (t.status === 'active') {
+        return {
+          ...t,
+          type: 'corpse',
+          curseLevel: Math.min(5, (t.curseLevel || 0) + 1)
+        };
+      }
+      return t;
+    }));
+
+    const updatedPedestals = [...pedestals, newLegend];
+    savePedestals(updatedPedestals);
+
+    // Roll new character with legacy array
+    const newChar = rollStartingCharacter(updatedPedestals);
+    newChar.intensity = character.intensity || "grim";
+    setCharacter(newChar);
 
     setSetupStage('lore');
     setAtmosphereMood('escape');
@@ -1244,66 +1308,12 @@ const handleWinActiveSession = (task) => {
     }, 1200);
   };
 
-  // Core random initialization of character
+  // Core random initialization of character using the centralized percentage drop utility
   const generateRandomCharacter = () => {
     playClick();
-    const classes = [
-      "Маг огня", "Маг земли", "Маг камня", "Маг молнии",
-      "Маг огня и камня (Мультикласс)", "Маг молнии и земли (Мультикласс)",
-      "Некромант", "Рунный маг", "Маг света", "Маг тьмы", "Маг бездны",
-      "Дикий Рыцарь", "Наемник Военной Банды", "Бывший Рыцарь", "Рыцарь-Убийца",
-      "Рыцарь Чумной Стали", "Отреченный Паладин",
-      "Мятежник Изгоев (Бандит)", "Головорез Чумных Земель (Бандит)",
-      "Каратель Багрового Ордена", "Храмовник Пепла",
-      "Маг меток (Сфрагист) [РЕДКОЕ]",
-      "Химомансер (Маг крови) [РЕДКОЕ]",
-      "Ментальный Суверен (Телекинетик) [УЛЬТРА-РЕДКОЕ]",
-      "Плазмомансер (Эфирный ткач) [УЛЬТРА-РЕДКОЕ]"
-    ];
-    const races = ["Человек", "Эльф", "Нежить", "Тролль", "Каргахаулец (Бледный гигант)"];
-    const startingPerks = {
-      "Маг огня": ["Огненный щит", "Вспышка страсти"],
-      "Маг земли": ["Каменное упорство", "Заземление тревоги"],
-      "Маг камня": ["Руна защиты", "Нерушимый фокус"],
-      "Маг молнии": ["Грозовой разряд", "Цепная молния"],
-      "Маг огня и камня (Мультикласс)": ["Лавовая струя", "Метеоритный барьер"],
-      "Маг молнии и земли (Мультикласс)": ["Грозовой щит", "Сейсмический шок"],
-      "Некромант": ["Воскрешение зомби-помощника", "Стрела тьмы"],
-      "Рунный маг": ["Начертание рун", "Магический барьер"],
-      "Маг света": ["Вспышка озарения", "Световой барьер"],
-      "Маг тьмы": ["Покров теней", "Сгущение тьмы"],
-      "Маг бездны": ["Зов Бездны", "Щит Забвения"],
-      "Дикий Рыцарь": ["Ярость зверя", "Удар топора"],
-      "Наемник Военной Банды": ["Круговой замах", "Боевой клич"],
-      "Бывший Рыцарь": ["Забытая присяга", "Парирование клинком"],
-      "Рыцарь-Убийца": ["Смертельный выпад", "Яд на лезвии"],
-      "Рыцарь Чумной Стали": ["Ржавый замах", "Сгнивший барьер"],
-      "Отреченный Паладин": ["Оскверненная клятва", "Слепое неистовство"],
-      "Мятежник Изгоев (Бандит)": ["Нож в спину", "Коварная уловка"],
-      "Головорез Чумных Земель (Бандит)": ["Чумной клинок", "Грабёж допамина"],
-      "Каратель Багрового Ордена": ["Багровый допрос", "Священная плеть"],
-      "Храмовник Пепла": ["Карающий пепел", "Завеса пепла"],
-      "Маг меток (Сфрагист) [РЕДКОЕ]": ["Метка слабости", "Печать отсечения"],
-      "Химомансер (Маг крови) [РЕДКОЕ]": ["Жертва крови (HP -> Мгновенный шаг)", "Сгущение скверны"],
-      "Ментальный Суверен (Телекинетик) [УЛЬТРА-РЕДКОЕ]": ["Телекинетический щит", "Подчинение воли", "Голос принуждения"],
-      "Плазмомансер (Эфирный ткач) [УЛЬТРА-РЕДКОЕ]": ["Клинки эфира (Ближний бой)", "Искажение пространства (Mid-range)"]
-    };
-
-    const randClass = classes[Math.floor(Math.random() * classes.length)];
-    const randRace = races[Math.floor(Math.random() * races.length)];
-    
-    setCharacter(prev => ({
-      ...prev,
-      race: randRace,
-      class: randClass,
-      perks: startingPerks[randClass] || ["Случайная стойкость"],
-      shacklesBroken: false,
-      hp: 100,
-      maxHp: 100,
-      mana: 50,
-      maxMana: 50,
-      dailyWorkMinutes: 0
-    }));
+    const newChar = rollStartingCharacter(pedestals);
+    newChar.intensity = character?.intensity || "grim";
+    setCharacter(newChar);
     setSetupStage('hub');
   };
 
@@ -2538,7 +2548,17 @@ if (setupStage === 'resolution') {
                   </p>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'center', marginTop: '0.5rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginTop: '0.5rem', width: '100%' }}>
+                  {isDeath && (
+                    <button 
+                      className="rpg-btn rpg-btn-blood" 
+                      style={{ padding: '0.8rem 2.5rem', fontSize: '1.05rem', borderColor: 'var(--color-blood)', width: '100%', fontWeight: 'bold' }}
+                      onClick={handleAcceptDeathAndStainName}
+                    >
+                      ☠️ ПРИНЯТЬ ГИБЕЛЬ И ЗАПЯТНАТЬ ИМЯ
+                    </button>
+                  )}
+                  
                   <button 
                     className="rpg-btn" 
                     style={{ padding: '0.8rem 2.5rem', fontSize: '1rem', borderColor, width: '100%' }}
@@ -2554,7 +2574,7 @@ if (setupStage === 'resolution') {
                       }
                     }}
                   >
-                    {isVictory ? '☀️ ВЕРНУТЬСЯ В ШТАБ' : isFlee ? '⛺ УЙТИ В ЛАГЕРЬ' : '🔥 ВОССТАТЬ ИЗ ПЕПЛА'}
+                    {isVictory ? '☀️ ВЕРНУТЬСЯ В ШТАБ' : isFlee ? '⛺ УЙТИ В ЛАГЕРЬ' : '🔥 ОТКУПИТЬСЯ ОТ СМЕРТИ (ВСТАТЬ)'}
                   </button>
                 </div>
               </div>

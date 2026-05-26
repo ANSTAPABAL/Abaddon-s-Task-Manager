@@ -3,6 +3,83 @@ import { Skull, HelpCircle, Sparkles, RefreshCw, Send, ArrowLeft } from 'lucide-
 import { useAudio } from '../hooks/useAudio';
 import { getVirtualTodayStr } from '../utils/dateUtils';
 
+const renderFormattedContent = (content) => {
+  if (!content) return null;
+
+  const paragraphs = content.split('\n');
+
+  return paragraphs.map((para, pIdx) => {
+    let text = para;
+    
+    const isListItem = /^\d+\.\s+/.test(text) || /^[-*]\s+/.test(text);
+    if (isListItem) {
+      text = text.replace(/^\d+\.\s+/, '').replace(/^[-*]\s+/, '');
+    }
+
+    const parts = [];
+    let currentIdx = 0;
+    
+    const formatRegex = /(\*\*|(\*))([^*]+?)\1/g;
+    let match;
+    
+    while ((match = formatRegex.exec(text)) !== null) {
+      if (match.index > currentIdx) {
+        parts.push(text.slice(currentIdx, match.index));
+      }
+      
+      const isBold = match[1] === '**';
+      const innerText = match[3];
+      
+      if (isBold) {
+        parts.push(<strong key={match.index} style={{ color: '#fff', fontWeight: 'bold' }}>{innerText}</strong>);
+      } else {
+        parts.push(<em key={match.index} style={{ opacity: 0.9 }}>{innerText}</em>);
+      }
+      
+      currentIdx = formatRegex.lastIndex;
+    }
+    
+    if (currentIdx < text.length) {
+      parts.push(text.slice(currentIdx));
+    }
+
+    if (para.trim() === '') {
+      return <div key={pIdx} style={{ height: '0.6rem' }} />;
+    }
+
+    const elementStyle = {
+      margin: '0.4rem 0',
+      textIndent: isListItem ? '0' : '0.5rem',
+      paddingLeft: isListItem ? '1.2rem' : '0',
+      position: isListItem ? 'relative' : 'static'
+    };
+
+    if (isListItem) {
+      return (
+        <div key={pIdx} style={elementStyle}>
+          <span style={{ position: 'absolute', left: 0, color: 'var(--color-mana-glow)' }}>•</span>
+          {parts}
+        </div>
+      );
+    }
+
+    const isAction = para.trim().startsWith('*') && para.trim().endsWith('*');
+    if (isAction) {
+      return (
+        <p key={pIdx} style={{ ...elementStyle, color: 'var(--color-bone-dim)', fontStyle: 'italic', opacity: 0.8 }}>
+          {parts}
+        </p>
+      );
+    }
+
+    return (
+      <p key={pIdx} style={elementStyle}>
+        {parts}
+      </p>
+    );
+  });
+};
+
 export default function RecoveryScreen({ 
   character, 
   setCharacter, 
@@ -193,7 +270,7 @@ ${backlogTasks.length > 0 ? backlogTasks.map(t => `- [${t.type}] "${t.title}" (�
                   <div style={{ fontSize: '0.75rem', color: isOracle ? 'var(--color-mana-glow)' : 'var(--color-relic-glow)', fontWeight: 'bold', marginBottom: '4px', fontFamily: 'var(--font-rpg)', fontStyle: 'normal' }}>
                     {isOracle ? '🔮 ОРАКУЛ БЕЗДНЫ' : '🕯️ ИСПОВЕДЬ ИЗГНАННИКА'}
                   </div>
-                  <div style={{ whiteSpace: 'pre-line' }}>{msg.content}</div>
+                  <div>{renderFormattedContent(msg.content)}</div>
                 </div>
               );
             })}

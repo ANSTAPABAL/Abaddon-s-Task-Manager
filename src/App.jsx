@@ -9,6 +9,7 @@ import RuneOfReturnModal from './components/RuneOfReturnModal';
 import { useAudio } from './hooks/useAudio';
 import { Settings as SettingsIcon, Volume2, VolumeX, Sliders } from 'lucide-react';
 import { getVirtualTodayStr, getVirtualTomorrowStr } from './utils/dateUtils';
+import { rollStartingCharacter } from './utils/characterUtils';
 
 export default function App() {
   const { initAudio, setAtmosphereMood, playClick, playSuccess, setMuted, setVolume, setUseLocalDoublePlaylist, setAmbientLayerActive, restartActiveLayers, synthInstance } = useAudio();
@@ -16,31 +17,8 @@ export default function App() {
   // App States
   const [activeTab, setActiveTab] = useState('escape'); // escape, character, planner, recovery
   const [tasks, setTasks] = useState([]);
-  const [character, setCharacter] = useState({
-    name: "Изгнанник",
-    race: "Каргахаулец",
-    class: "Химомансер (Маг крови)",
-    level: 1,
-    xp: 0,
-    hp: 100,
-    maxHp: 100,
-    mana: 50,
-    maxMana: 50,
-    equipped: { weapon: null, shield: null, armor: null, ring: null },
-    inventory: [],
-    perks: ["Сгусток крови"],
-    shacklesBroken: false,
-    intensity: "grim", // grim, soft_grim, quiet_focus
-    
-    // Новые счетчики СДВГ-статистики (Win Condition & Legacy)
-    completedTasksCount: 0,
-    completedSiegesCount: 0,
-    totalGoldEarned: 0,
-    totalManaSpent: 0,
-    totalHpSacrificed: 0,
-    potionsDrunk: 0,
-    meditationsCount: 0
-  });
+  const [character, setCharacter] = useState(rollStartingCharacter);
+  const [characterLoaded, setCharacterLoaded] = useState(false);
 
   const [pedestals, setPedestals] = useState([]);
 
@@ -358,76 +336,8 @@ export default function App() {
   const handleRerollCharacter = () => {
     playClick();
     if (window.confirm("Вы уверены, что хотите стереть текущего героя и сгенерировать нового? Все ваши активные задачи будут перенесены как Долг прошлого (Труп прошлого).")) {
-      const classes = [
-        "Маг огня", "Маг земли", "Маг камня", "Маг молнии",
-        "Маг огня и камня (Мультикласс)", "Маг молнии и земли (Мультикласс)",
-        "Некромант", "Рунный маг", "Маг света", "Маг тьмы", "Маг бездны",
-        "Дикий Рыцарь", "Наемник Военной Банды", "Бывший Рыцарь", "Рыцарь-Убийца",
-        "Рыцарь Чумной Стали", "Отреченный Паладин",
-        "Мятежник Изгоев (Бандит)", "Головорез Чумных Земель (Бандит)",
-        "Каратель Багрового Ордена", "Храмовник Пепла",
-        "Маг меток (Сфрагист) [РЕДКОЕ]",
-        "Химомансер (Маг крови) [РЕДКОЕ]",
-        "Ментальный Суверен (Телекинетик) [УЛЬТРА-РЕДКОЕ]",
-        "Плазмомансер (Эфирный ткач) [УЛЬТРА-РЕДКОЕ]"
-      ];
-      const races = ["Человек", "Эльф", "Нежить", "Тролль", "Каргахаулец (Бледный гигант)"];
-      const startingPerks = {
-        "Маг огня": ["Огненный щит", "Вспышка страсти"],
-        "Маг земли": ["Каменное упорство", "Заземление тревоги"],
-        "Маг камня": ["Руна защиты", "Нерушимый фокус"],
-        "Маг молнии": ["Грозовой разряд", "Цепная молния"],
-        "Маг огня и камня (Мультикласс)": ["Лавовая струя", "Метеоритный барьер"],
-        "Маг молнии и земли (Мультикласс)": ["Грозовой щит", "Сейсмический шок"],
-        "Некромант": ["Воскрешение зомби-помощника", "Стрела тьмы"],
-        "Рунный маг": ["Начертание рун", "Магический барьер"],
-        "Маг света": ["Вспышка озарения", "Световой барьер"],
-        "Маг тьмы": ["Покров теней", "Сгущение тьмы"],
-        "Маг бездны": ["Зов Бездны", "Щит Забвения"],
-        "Дикий Рыцарь": ["Ярость зверя", "Удар топора"],
-        "Наемник Военной Банды": ["Круговой замах", "Боевой клич"],
-        "Бывший Рыцарь": ["Забытая присяга", "Парирование клинком"],
-        "Рыцарь-Убийца": ["Смертельный выпад", "Яд на лезвии"],
-        "Рыцарь Чумной Стали": ["Ржавый замах", "Сгнивший барьер"],
-        "Отреченный Паладин": ["Оскверненная клятва", "Слепое неистовство"],
-        "Мятежник Изгоев (Бандит)": ["Нож в спину", "Коварная уловка"],
-        "Головорез Чумных Земель (Бандит)": ["Чумной клинок", "Грабёж допамина"],
-        "Каратель Багрового Ордена": ["Багровый допрос", "Священная плеть"],
-        "Храмовник Пепла": ["Карающий пепел", "Завеса пепла"],
-        "Маг меток (Сфрагист) [РЕДКОЕ]": ["Метка слабости", "Печать отсечения"],
-        "Химомансер (Маг крови) [РЕДКОЕ]": ["Жертва крови (HP -> Мгновенный шаг)", "Сгущение скверны"],
-        "Ментальный Суверен (Телекинетик) [УЛЬТРА-РЕДКОЕ]": ["Телекинетический щит", "Подчинение воли", "Голос принуждения"],
-        "Плазмомансер (Эфирный ткач) [УЛЬТРА-РЕДКОЕ]": ["Клинки эфира (Ближний бой)", "Искажение пространства (Mid-range)"]
-      };
-
-      const randClass = classes[Math.floor(Math.random() * classes.length)];
-      const randRace = races[Math.floor(Math.random() * races.length)];
-      
-      const newChar = {
-        name: "Изгнанник",
-        race: randRace,
-        class: randClass,
-        level: 1,
-        xp: 0,
-        hp: 100,
-        maxHp: 100,
-        mana: 50,
-        maxMana: 50,
-        equipped: { weapon: null, shield: null, armor: null, ring: null },
-        inventory: [],
-        perks: startingPerks[randClass] || ["Случайная стойкость"],
-        shacklesBroken: false,
-        intensity: character.intensity || "grim",
-        completedTasksCount: 0,
-        completedSiegesCount: 0,
-        totalGoldEarned: 0,
-        totalManaSpent: 0,
-        totalHpSacrificed: 0,
-        potionsDrunk: 0,
-        meditationsCount: 0,
-        gold: 0
-      };
-
+      const newChar = rollStartingCharacter(pedestals);
+      newChar.intensity = character.intensity || "grim";
       setCharacter(newChar);
 
       // Convert active tasks to "corpse" (Труп прошлого / Debt)
@@ -436,7 +346,7 @@ export default function App() {
           return {
             ...t,
             type: 'corpse',
-            curseLevel: Math.min(5, t.curseLevel + 1)
+            curseLevel: Math.min(5, (t.curseLevel || 0) + 1)
           };
         }
         return t;
@@ -446,6 +356,9 @@ export default function App() {
       setActiveTab('escape');
     }
   };
+
+
+
 
   // Auto-switch music/atmosphere when activeTab changes
   useEffect(() => {
@@ -579,8 +492,16 @@ export default function App() {
         if (!res.ok) throw new Error("Backend offline");
         return res.json();
       })
-      .then(data => setCharacter(data))
-      .catch(err => console.warn("Using in-memory character (Backend server offline)"));
+      .then(data => {
+        if (data && data.race && data.class) {
+          setCharacter(data);
+        }
+        setCharacterLoaded(true);
+      })
+      .catch(err => {
+        console.warn("Using in-memory character (Backend server offline)");
+        setCharacterLoaded(true);
+      });
 
     // 3. Load pedestals hall
     fetch('http://localhost:3001/api/pedestals')
@@ -604,12 +525,13 @@ export default function App() {
 
   // Save character on stat change
   useEffect(() => {
+    if (!characterLoaded || !character || !character.race) return;
     fetch('http://localhost:3001/api/character', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(character)
     }).catch(err => console.warn("Could not save character to backend"));
-  }, [character]);
+  }, [character, characterLoaded]);
 
   // Save pedestals when modified
   const savePedestals = (updatedPedestals) => {
@@ -767,6 +689,30 @@ export default function App() {
   const playActiveSessionTrack = (mood) => {
     setActiveSessionType(mood);
   };
+
+  if (!characterLoaded) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        flexDirection: 'column', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        height: '100vh', 
+        background: '#0a0a0a', 
+        color: '#1db954', 
+        fontFamily: 'monospace',
+        textAlign: 'center',
+        padding: '20px'
+      }}>
+        <div className="heartbeat-pulse" style={{ fontSize: '1.4rem', marginBottom: '1rem', letterSpacing: '2px', fontWeight: 'bold' }}>
+          👁️ СОПРЯЖЕНИЕ С БЕЗДНОЙ...
+        </div>
+        <div style={{ fontSize: '0.85rem', color: 'var(--color-bone-dim)', letterSpacing: '0.5px' }}>
+          Загрузка когнитивного сосуда Изгнанника...
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="app-container">

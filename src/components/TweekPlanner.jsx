@@ -67,6 +67,17 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
   const [chaosText, setChaosText] = useState('');
   const [chaosLoading, setChaosLoading] = useState(false);
 
+  // --- TASK EDITING STATE ---
+  const [editingTask, setEditingTask] = useState(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editType, setEditType] = useState('hunt');
+  const [editTime, setEditTime] = useState(25);
+  const [editIntent, setEditIntent] = useState('');
+  const [editSteps, setEditSteps] = useState([]);
+  const [newStepText, setNewStepText] = useState('');
+  const [editNature, setEditNature] = useState('external');
+  const [editExecutionMode, setEditExecutionMode] = useState('ask_later');
+
   const newTaskTitleRef = useRef(null);
   const kanbanNewTaskTitleRef = useRef(null);
   const editTitleRef = useRef(null);
@@ -261,16 +272,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
     return classifyLocally(title);
   };
 
-  // --- TASK EDITING STATE ---
-  const [editingTask, setEditingTask] = useState(null);
-  const [editTitle, setEditTitle] = useState('');
-  const [editType, setEditType] = useState('hunt');
-  const [editTime, setEditTime] = useState(25);
-  const [editIntent, setEditIntent] = useState('');
-  const [editSteps, setEditSteps] = useState([]);
-  const [newStepText, setNewStepText] = useState('');
-  const [editNature, setEditNature] = useState('external');
-  const [editExecutionMode, setEditExecutionMode] = useState('ask_later');
+
 
   // AI Inside Editor States
   const [editDeconstructLoading, setEditDeconstructLoading] = useState(false);

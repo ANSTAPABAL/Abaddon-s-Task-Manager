@@ -867,57 +867,96 @@ export default function CharacterSheet({ character, setCharacter, tasks, setTask
             и с триумфом покинули мрачные границы Абаддона, обретя новые благородные цели.»
           </p>
 
+          {/* Legend stats header badges */}
+          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginBottom: '2.5rem', flexWrap: 'wrap' }}>
+            <span style={{ background: 'rgba(212,175,55,0.06)', border: '1px solid rgba(212,175,55,0.35)', padding: '6px 16px', fontSize: '0.85rem', color: '#ffb813', borderRadius: '3px', fontFamily: 'var(--font-rpg)', letterSpacing: '0.5px' }}>
+              ☀️ ОСВЯЩЕННЫЕ ДУШИ: <b>{pedestals.filter(p => p.legacyStatus !== 'stained').length}</b>
+            </span>
+            <span style={{ background: 'rgba(207,20,43,0.06)', border: '1px solid rgba(207,20,43,0.35)', padding: '6px 16px', fontSize: '0.85rem', color: '#ff4d4d', borderRadius: '3px', fontFamily: 'var(--font-rpg)', letterSpacing: '0.5px' }}>
+              💀 ЗАПЯТНАННЫЕ ИМЕНА: <b>{pedestals.filter(p => p.legacyStatus === 'stained').length}</b>
+            </span>
+          </div>
+
           {pedestals.length > 0 ? (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '1.5rem' }}>
-              {pedestals.map((legend, idx) => (
-                <div 
-                  key={idx} 
-                  style={{
-                    background: '#0a080c',
-                    border: '2px solid #d4af37',
-                    borderImage: 'linear-gradient(to bottom, #d4af37, #aa820a, #1a1505) 1',
-                    padding: '1.5rem',
-                    boxShadow: '0 10px 25px rgba(0,0,0,0.8), inset 0 0 15px rgba(212,175,55,0.05)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '1rem'
-                  }}
-                >
-                  <div style={{ borderBottom: '1px solid #4a3e31', paddingBottom: '0.8rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '1.5rem' }}>☀️</span>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--color-relic-glow)', fontFamily: 'var(--font-rpg)' }}>ЛЕГЕНДА #{idx + 1}</span>
-                    </div>
-                    <h3 className="gothic-title" style={{ fontSize: '1.3rem', color: '#ffb813', marginTop: '4px' }}>{legend.name}</h3>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)', marginTop: '2px' }}>
-                      {legend.race} • {legend.class} • <b>Уровень {legend.level}</b>
-                    </div>
-                  </div>
+              {pedestals.map((legend, idx) => {
+                const isStained = legend.legacyStatus === 'stained';
+                const cardBorder = isStained 
+                  ? 'linear-gradient(to bottom, #cf142b, #8b0000, #220000) 1'
+                  : 'linear-gradient(to bottom, #d4af37, #aa820a, #1a1505) 1';
+                const cardShadow = isStained
+                  ? '0 10px 25px rgba(139,0,0,0.5), inset 0 0 15px rgba(139,0,0,0.1)'
+                  : '0 10px 25px rgba(0,0,0,0.8), inset 0 0 15px rgba(212,175,55,0.05)';
+                const icon = isStained ? '☠️' : '☀️';
+                const label = isStained ? 'ЗАПЯТНАННОЕ ИМЯ' : `ЛЕГЕНДА #${idx + 1}`;
+                const titleColor = isStained ? '#ff4d4d' : '#ffb813';
+                const scrollBg = isStained
+                  ? 'radial-gradient(circle, #1c0e0e 0%, #0d0505 100%)'
+                  : 'radial-gradient(circle, #1a1613 0%, #0d0b09 100%)';
+                const scrollBorder = isStained ? '#5c1a1a' : '#4a3e31';
+                const scrollText = isStained ? '#dfc5c5' : '#cbbba5';
+                const scrollTitleColor = isStained ? '#ff4d4d' : '#ffb813';
+                const scrollTitle = isStained ? '📜 Печать Тлена / Летопись Падения:' : '📜 Летопись Искупления ИИ:';
 
-                  {/* Eulogy stats grid */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem', fontSize: '0.75rem', color: 'var(--color-bone-dim)', background: 'rgba(0,0,0,0.3)', padding: '8px', border: '1px solid var(--color-iron-light)', textAlign: 'left' }}>
-                    <div>📜 Квесты: <b>{legend.completedTasksCount || 0} шт</b></div>
-                    <div>👹 Боссы: <b>{legend.completedSiegesCount || 0} шт</b></div>
-                    <div>🪙 Золото: <b>{legend.totalGoldEarned || 0}</b></div>
-                    <div>🔮 Мана: <b>{legend.totalManaSpent || 0} MP</b></div>
-                    <div>🧪 Зелья: <b>{legend.potionsDrunk || 0} шт</b></div>
-                    <div>🎪 Медитации: <b>{legend.meditationsCount || 0}</b></div>
-                    <div style={{ gridColumn: 'span 2' }}>🩸 Пролито здоровья: <b>{legend.totalHpSacrificed || 0} HP</b></div>
-                  </div>
+                return (
+                  <div 
+                    key={idx} 
+                    style={{
+                      background: '#0a080c',
+                      border: '2px solid',
+                      borderImage: cardBorder,
+                      padding: '1.5rem',
+                      boxShadow: cardShadow,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '1rem'
+                    }}
+                  >
+                    <div style={{ borderBottom: '1px solid ' + (isStained ? '#5c1a1a' : '#4a3e31'), paddingBottom: '0.8rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '1.5rem' }}>{icon}</span>
+                        <span style={{ fontSize: '0.75rem', color: titleColor, fontFamily: 'var(--font-rpg)', fontWeight: 'bold' }}>{label}</span>
+                      </div>
+                      <h3 className="gothic-title" style={{ fontSize: '1.3rem', color: titleColor, marginTop: '4px' }}>
+                        {legend.name}
+                      </h3>
+                      {legend.nickname && (
+                        <div style={{ fontSize: '0.72rem', color: 'var(--color-bone-dim)', fontStyle: 'italic', marginTop: '-3px' }}>
+                          «{legend.nickname}»
+                        </div>
+                      )}
+                      <div style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)', marginTop: '4px' }}>
+                        {legend.race} • {legend.class} • <b>Уровень {legend.level}</b>
+                      </div>
+                    </div>
 
-                  {/* Unfolding AI Scroll */}
-                  <div style={{ background: 'radial-gradient(circle, #1a1613 0%, #0d0b09 100%)', border: '1px solid #4a3e31', padding: '1rem', color: '#cbbba5', textAlign: 'left' }}>
-                    <h4 style={{ fontSize: '0.78rem', fontFamily: 'var(--font-rpg)', borderBottom: '1px solid #33281e', paddingBottom: '3px', marginBottom: '8px', color: '#ffb813', textTransform: 'uppercase' }}>
-                      📜 Летопись Искупления ИИ:
-                    </h4>
-                    <div style={{ fontSize: '0.75rem', lineHeight: '1.4', overflowY: 'auto', maxHeight: '180px', textAlign: 'justify', whiteSpace: 'pre-line' }}>
-                      {legend.pedestalEulogy}
+                    {/* Eulogy stats grid */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem', fontSize: '0.75rem', color: 'var(--color-bone-dim)', background: 'rgba(0,0,0,0.3)', padding: '8px', border: '1px solid var(--color-iron-light)', textAlign: 'left' }}>
+                      <div>📜 Квесты: <b>{legend.completedTasksCount || 0} шт</b></div>
+                      <div>👹 Боссы: <b>{legend.completedSiegesCount || 0} шт</b></div>
+                      <div>🪙 Золото: <b>{legend.totalGoldEarned || 0}</b></div>
+                      <div>🔮 Мана: <b>{legend.totalManaSpent || 0} MP</b></div>
+                      <div>🧪 Зелья: <b>{legend.potionsDrunk || 0} шт</b></div>
+                      <div>🎪 Медитации: <b>{legend.meditationsCount || 0}</b></div>
+                      <div style={{ gridColumn: 'span 2' }}>🩸 Пролито здоровья: <b>{legend.totalHpSacrificed || 0} HP</b></div>
+                    </div>
+
+                    {/* Unfolding AI Scroll */}
+                    <div style={{ background: scrollBg, border: '1px solid ' + scrollBorder, padding: '1rem', color: scrollText, textAlign: 'left' }}>
+                      <h4 style={{ fontSize: '0.78rem', fontFamily: 'var(--font-rpg)', borderBottom: '1px solid ' + (isStained ? '#441414' : '#33281e'), paddingBottom: '3px', marginBottom: '8px', color: scrollTitleColor, textTransform: 'uppercase' }}>
+                        {scrollTitle}
+                      </h4>
+                      <div style={{ fontSize: '0.75rem', lineHeight: '1.4', overflowY: 'auto', maxHeight: '180px', textAlign: 'justify', whiteSpace: 'pre-line' }}>
+                        {legend.pedestalEulogy}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
+
+
             <div style={{ border: '1px dashed #4a3e31', padding: '3rem', textAlign: 'center', background: 'rgba(0,0,0,0.2)', maxWidth: '500px', margin: '0 auto' }}>
               <Skull size={32} style={{ color: 'var(--color-iron-light)', marginBottom: '0.8rem' }} />
               <p style={{ fontSize: '0.9rem', color: 'var(--color-bone-dim)', fontStyle: 'italic' }}>
