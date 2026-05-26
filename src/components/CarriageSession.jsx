@@ -379,6 +379,7 @@ export default function CarriageSession({
   const timeLeftRef = useRef(timeLeft);
   const setupStageRef = useRef(setupStage);
   const lastTickTimeRef = useRef(Date.now());
+  const resolutionTriggeredRef = useRef(false);
 
   useEffect(() => {
     activeTaskRef.current = activeTask;
@@ -407,19 +408,70 @@ export default function CarriageSession({
   const [resolutionLoading, setResolutionLoading] = useState(false);
 
   const handleGenerateResolutionChronicle = async (type, task, enemy) => {
+    if (resolutionLoading) return;
     setResolutionLoading(true);
     setResolutionText('');
+
+    const isPastDebt = task?.type === 'corpse' || (task?.curseLevel && task.curseLevel > 0);
+    const isLargeQuest = task?.pomodoroTime >= 50 || task?.type === 'siege';
+    const hpContext = character.hp <= 30 ? `Герой истощен, едва держится на ногах (критический уровень здоровья HP: ${character.hp})` : `Герой крепок и полон сил (здоровье HP: ${character.hp})`;
     
     let prompt = '';
     if (type === 'victory') {
-      prompt = `Ты — Летописец Бездны во вселенной Абаддона. Герой (класс: ${character.class}, раса: ${character.race}, ур.${character.level}) одержал великую победу в фокус-сессии над когнитивным монстром: «${enemy}» (квест: "${task?.title}"). 
-Опиши в мрачном фэнтезийном стиле финальный удар героя, смерть павшего врага, гордость за победу, преодоление страха перед поражением и обретение когнитивной силы. Сделай текст воодушевляющим для человека с СДВГ. 3-4 предложения.`;
+      prompt = `Ты — Летописец Бездны во вселенной Абаддона. Опиши короткую, суровую и грязную летопись-эпитафию в стиле Джо Аберкромби (темное фэнтези, реализм, цинизм, кровь, пот и грязь).
+Герой одержал победу в фокус-сессии над когнитивной тварью: «${enemy}» (задача: "${task?.title || ''}").
+
+ТЕХНИЧЕСКИЙ КОНТЕКСТ ГЕРОЯ:
+- Раса: ${character.race}
+- Класс: ${character.class}
+- Текущее состояние здоровья: ${hpContext}
+- Время контракта: ${task?.pomodoroTime || 25} минут
+- Срок (дедлайн): ${task?.deadline || 'без жесткого дедлайна'}
+- Характер задачи: ${isLargeQuest ? 'КРУПНОЕ СРАЖЕНИЕ (Осада/Большой квест)' : 'НЕБОЛЬШАЯ СХВАТКА'}
+- Статус просрочки: ${isPastDebt ? 'ПРОСРОЧЕННЫЙ ДОЛГ / ПРОКЛЯТАЯ ЗАДАЧА (труп прошлого / высокий уровень скверны)' : 'Свежий своевременный контракт'}
+
+ТРЕБОВАНИЯ К ОПИСАНИЮ:
+1. Используй неподражаемый циничный писательский стиль Джо Аберкромби (темное фэнтези, кровь в грязи, тяжелое дыхание, грубые фразы, суровый реализм).
+2. Опиши финальный безжалостный удар с использованием классовых фишек героя (если класс — Химомансер/Маг крови, упомяни использование алой крови, шипов, вен; если класс — Пси-Телекинетик/Psi-Telekinetic/Mental Sovereign, упомяни использование ментального взрыва/Kopfplatzen; если класс — Плазмамансер, упомяни клинки эфира или искривление пространства; если другой класс — обыграй его особенности).
+3. Обыграй состояние здоровья (если HP мало — покажи, что герой победил на грани сил, сплевывая кровь; если HP много — что он двигался уверенно).
+4. Обыграй размер задачи и статус просрочки:
+   - Если это КРУПНЫЙ квест или ПРОСРОЧЕННЫЙ долг, покажи, что этот триумф возвращает герою веру в себя после кучи провалов и прокрастинации ("ты вновь чертовски веришь в себя, ублюдок, после всего этого дерьма").
+   - Если это мелкий квест — покажи, что это быстрая и уверенная победа, приближающая нас к цели.
+5. Текст должен быть коротким (до 90 слов), разделенным ровно на 2-3 коротких абзаца. Разрешены уместные крепкие словечки (маты вроде "сука", "ублюдок", "дерьмо") для придания грязи и атмосферы.`;
     } else if (type === 'flee') {
-      prompt = `Ты — Летописец Бездны во вселенной Абаддона. Герой (класс: ${character.class}, раса: ${character.race}, ур.${character.level}) был вынужден отступить и бежать с поля боя с монстром: «${enemy}» (квест: "${task?.title}"). 
-Опиши в стиле темного фэнтези горечь отступления, тени Бездны, страх поражения, но подчеркни, что это лишь тактическое отступление, передышка, и воля героя не сломлена окончательно — он вернется сильнее. 3-4 предложения.`;
+      prompt = `Ты — Летописец Бездны во вселенной Абаддона. Опиши короткую, суровую и грязную летопись-эпитафию в стиле Джо Аберкромби (темное фэнтези, реализм, цинизм, грязь, холодный дождь).
+Герой отступил и сбежал с поля боя от когнитивной тварью: «${enemy}» (задача: "${task?.title || ''}").
+
+ТЕХНИЧЕСКИЙ КОНТЕКСТ ГЕРОЯ:
+- Раса: ${character.race}
+- Класс: ${character.class}
+- Текущее состояние здоровья: ${hpContext}
+- Время контракта: ${task?.pomodoroTime || 25} минут
+- Срок (дедлайн): ${task?.deadline || 'без жесткого дедлайна'}
+- Характер задачи: ${isLargeQuest ? 'КРУПНОЕ СРАЖЕНИЕ (Осада)' : 'НЕБОЛЬШАЯ СХВАТКА'}
+
+ТРЕБОВАНИЯ К ОПИСАНИЮ:
+1. Используй циничный писательский стиль Джо Аберкромби (грязь, дождь, разочарование, хмурое утро).
+2. Обыграй бегство с учетом класса героя (например, Химомансер убегает, оставляя алый след, или укрываясь барьером).
+3. Обыграй HP (если HP мало — он едва уполз в жиже; если много — отступил расчетливо).
+4. Покажи, что бегство — это чертовски обидно, но это не конец. Нужно вернуться в лагерь, зализать раны, сплюнуть кровь и подготовить реванш.
+5. Текст должен быть коротким (до 80 слов), разделенным ровно на 2 коротких абзаца. Разрешены крепкие выражения к месту.`;
     } else if (type === 'death') {
-      prompt = `Ты — Летописец Бездны во вселенной Абаддона. Герой (класс: ${character.class}, раса: ${character.race}, ур.${character.level}) пал в бою с монстром: «${enemy}» (квест: "${task?.title}"). Его здоровье разума снизилось до критического минимума (10 HP).
-Опиши в стиле темного фэнтези момент падения героя в грязь, холодные кандалы Бездны, торжество монстра, но укажи, что духи предков или остатки воли дают ему шанс очнуться в лагере и зализать раны. 3-4 предложения.`;
+      prompt = `Ты — Летописец Бездны во вселенной Абаддона. Опиши короткую, суровую летопись в стиле Джо Аберкромби (запах сырой земли, хруст костей, темнота, горькая ирония).
+Герой пал в бою с тварью: «${enemy}» (задача: "${task?.title || ''}"). Его здоровье на критическом минимуме (10 HP), разум сломлен.
+
+ТЕХНИЧЕСКИЙ КОНТЕКСТ ГЕРОЯ:
+- Раса: ${character.race}
+- Класс: ${character.class}
+- Время контракта: ${task?.pomodoroTime || 25} минут
+- Срок (дедлайн): ${task?.deadline || 'без жесткого дедлайна'}
+- Характер задачи: ${isLargeQuest ? 'КРУПНОЕ СРАЖЕНИЕ' : 'НЕБОЛЬШАЯ СХВАТКА'}
+
+ТРЕБОВАНИЯ К ОПИСАНИЮ:
+1. Стиль Джо Аберкромби (реалистичное падение лицом в жижу, хруст, тяжелые раны, циничная надежда).
+2. Обыграй падение с использованием класса.
+3. Покажи, что костлявая сегодня осталась голодной. Герой очнется у теплого костра в лагере, чтобы подняться из этого дерьма и отомстить.
+4. Текст должен быть коротким (до 80 слов), разделенным на 2 коротких абзаца. Разрешены уместные маты.`;
     }
 
     try {
@@ -434,9 +486,15 @@ export default function CarriageSession({
       playSuccess();
     } catch (e) {
       const fallbacks = {
-        victory: `«Враг ${enemy} пал, рассыпавшись прахом»\n\nТвоя стальная воля разорвала оковы прокрастинации. Страх перед поражением, сковывавший твои члены, рассеялся как утренний туман. Ты стоишь над телом поверженного чудовища, чувствуя гордость и прилив когнитивных сил. Битва выиграна!`,
-        flee: `«Ты растворяешься в тенях Бездны, убегая от когтей ${enemy}»\n\nГоречь отступления жжет твое сердце. Но ты жив, а значит — бой не окончен. Это не поражение, а передышка. Залижи раны в лагере и возвращайся, чтобы нанести сокрушительный ответный удар.`,
-        death: `«Твое зрение меркнет, ты падаешь на холодные камни»\n\n${enemy} празднует победу, пока ты лежишь без сил. Но Бездна не принимает тебя сегодня — искра жизни все еще теплится в твоей груди. Восстанови силы у костра лагеря и попытайся снова.`
+        victory: `Удар пришелся точно в цель. Зазубренное лезвие вошло по самую рукоять, и эта сука «${enemy}» наконец-то испустила дух, захлебнувшись собственной когнитивной желчью. Твой клинок дымится, а вокруг оседает вонючая тень.
+
+Ты стоишь по колено в грязи, тяжело дыша, но оковы спали. Голова чиста от дерьма и страхов. ${isLargeQuest || isPastDebt ? 'Этот чертов триумф заставляет тебя вновь поверить в себя, ублюдок, после всей этой бесконечной череды провалов!' : 'Ты победил эту тварь, а значит, и весь остальной мир подождет, пока ты вытираешь кровь с лица.'}`,
+        flee: `Пришлось улепетывать. Тварь «${enemy}» оказалась слишком проворной, а ноги вязли в липкой жиже Бездны. Привкус поражения горчит во рту, как протухший эль.
+
+Но хрен там плавал — ты все еще жив. Спрячься в лагере, залижи раны, погрей задницу у костра и возвращайся. Следующий раунд будет за нами, ублюдок.`,
+        death: `Лицо встретилось с холодной грязью. Хруст костей, гогот «${enemy}» над ухом и темнота. Твой разум расколот на куски, а костлявая уже тянет свои лапы.
+
+Но сдохнуть сегодня не получилось. Ты очнулся у костра в лагере. Голова трещит, все тело ноет, но ты дышишь. Поднимайся из дерьма, Изгнанник. Нам еще нужно отплатить этой твари.`
       };
       setResolutionText(fallbacks[type] || fallbacks.victory);
     } finally {
@@ -749,6 +807,7 @@ export default function CarriageSession({
   };
 
   const handleStartCombatSession = (task) => {
+    resolutionTriggeredRef.current = false;
     const runStart = (mode) => {
       setActiveTask(task);
       const initialTime = task.timeLeft !== undefined ? task.timeLeft : task.pomodoroTime * 60;
@@ -784,48 +843,104 @@ export default function CarriageSession({
     }
   };
 
-  const handleCreateAndStartTaskFromNpc = async () => {
-    if (!npcNewTaskTitle.trim()) return;
-    const title = npcNewTaskTitle;
-    setNpcNewTaskTitle('');
-    playClick();
-    
-    // Local classify
+  const createSingleTaskLocally = (title) => {
     let initialType = 'hunt';
     const lower = title.toLowerCase();
     if (lower.includes('прочитать') || lower.includes('изучить') || lower.includes('почитать') || lower.includes('нарисовать')) {
       initialType = 'relic';
-    } else if (lower.includes('проект') || lower.includes('сложн') || lower.includes('сдать') || lower.includes('курсов') || lower.includes('диплом') || lower.includes('написать')) {
+    } else if (lower.includes('уборка') || lower.includes('помыть') || lower.includes('очистить')) {
       initialType = 'siege';
     } else if (lower.includes('хвост') || lower.includes('долг') || lower.includes('старый') || lower.includes('разобрать')) {
       initialType = 'corpse';
     }
-
-    const taskId = `task-${Date.now()}`;
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayDateStr = new Date().toISOString().split('T')[0];
     const newTask = {
-      id: taskId,
-      title: title,
+      id: 'task-' + Date.now(),
+      title,
       type: initialType,
       status: 'active',
-      date: todayStr, 
+      date: todayDateStr,
       pomodoroTime: initialType === 'siege' ? 50 : 25,
       pomodoroSpent: 0,
       toxicity: 'standard',
       barrierType: null,
       curseLevel: 0,
-      steps: generateLocalSteps(title, initialType).map((s, sIdx) => ({ id: `step-${sIdx}-${Date.now()}`, title: s, completed: false })),
+      steps: generateLocalSteps(title, initialType).map((s, sIdx) => ({ id: 'step-' + sIdx + '-' + Date.now(), title: s, completed: false })),
       intent: '',
-      isLongJourney: false
+      deadline: '',
+      combatLore: {
+        enemyName: "Безымянный Ужас Бездны",
+        visualType: initialType,
+        weakPoints: ["Монстр боится конкретики.", "Разбейте на микро-действия!"],
+        randomEvent: "Бой протекает при поддержке Бездны."
+      }
     };
-
     setTasks(prev => [...prev, newTask]);
     handleStartCombatSession(newTask);
     playSuccess();
+  };
 
+  const handleCreateAndStartTaskFromNpc = async () => {
+    if (!npcNewTaskTitle.trim()) return;
+    const rawText = npcNewTaskTitle.trim();
+    setNpcNewTaskTitle('');
+    playClick();
+
+    // Check if it looks like a chaos dump: long text or contains newlines, or multiple clauses
+    const isChaosDump = rawText.length > 50 || rawText.includes('\n') || rawText.includes(';') || rawText.includes(',');
+
+    if (isChaosDump && parseMessyTasks) {
+      setResolutionLoading(true);
+      try {
+        const result = await parseMessyTasks(rawText);
+        if (result && Array.isArray(result) && result.length > 0) {
+          const todayDateStr = new Date().toISOString().split('T')[0];
+          const newTasks = result.map((t, idx) => {
+            const initialType = t.type || 'hunt';
+            return {
+              id: 'task-' + Date.now() + '-' + idx,
+              title: t.title,
+              type: initialType,
+              status: 'active',
+              date: todayDateStr, 
+              pomodoroTime: t.estimatedTime || (initialType === 'siege' ? 50 : 25),
+              pomodoroSpent: 0,
+              toxicity: t.toxicity || 'standard',
+              barrierType: null,
+              curseLevel: 0,
+              isLongJourney: t.isLongJourney || false,
+              steps: t.steps ? t.steps.map((s, sIdx) => ({ id: 'step-' + sIdx + '-' + Date.now(), title: s, completed: false })) : generateLocalSteps(t.title, initialType).map((s, sIdx) => ({ id: 'step-' + sIdx + '-' + Date.now(), title: s, completed: false })),
+              intent: t.intent || '',
+              deadline: t.deadline || '',
+              combatLore: {
+                enemyName: t.enemyName || "Безымянный Ужас Бездны",
+                visualType: t.visualType || initialType,
+                weakPoints: t.weakPoints || ["Монстр боится конкретики.", "Разбейте на микро-действия!"],
+                randomEvent: t.randomEvent || "Бой протекает при поддержке Бездны."
+              }
+            };
+          });
+          setTasks(prev => [...prev, ...newTasks]);
+          // Immediately start combat session for the first parsed task
+          handleStartCombatSession(newTasks[0]);
+          playSuccess();
+        } else {
+          createSingleTaskLocally(rawText);
+        }
+      } catch (err) {
+        console.warn("Failed to parse messy task from NPC, falling back to single task creation:", err);
+        createSingleTaskLocally(rawText);
+      } finally {
+        setResolutionLoading(false);
+      }
+    } else {
+      createSingleTaskLocally(rawText);
+    }
   };
 
 const handleWinActiveSession = (task) => {
+    if (resolutionTriggeredRef.current) return;
+    resolutionTriggeredRef.current = true;
     setIsRunning(false);
     playSuccess();
     
@@ -1402,6 +1517,8 @@ const handleWinActiveSession = (task) => {
             ]);
 
             if (died) {
+              if (resolutionTriggeredRef.current) return;
+              resolutionTriggeredRef.current = true;
               setIsRunning(false);
               setSetupStage('resolution');
               setResolutionType('death');
@@ -1660,6 +1777,8 @@ const handleWinActiveSession = (task) => {
   };
 
   const handleFlee = () => {
+    if (resolutionTriggeredRef.current) return;
+    resolutionTriggeredRef.current = true;
     playClick();
     setIsRunning(false);
     setCharacter(prev => ({ ...prev, hp: Math.max(10, prev.hp - 15) }));
@@ -2328,7 +2447,7 @@ const handleWinActiveSession = (task) => {
 
   // --- RENDERING: BATTLE RESOLUTION SCREEN ---
     // --- RENDERING: BATTLE RESOLUTION SCREEN ---
-  if (setupStage === 'resolution') {
+if (setupStage === 'resolution') {
     const isVictory = resolutionType === 'victory';
     const isFlee = resolutionType === 'flee';
     const isDeath = resolutionType === 'death';
@@ -2336,64 +2455,93 @@ const handleWinActiveSession = (task) => {
     const title = isVictory ? '🏆 Триумф Воли' : isFlee ? '🌫️ Бегство в Тени' : '💀 Падение Изгнанника';
     
     const activeTasksToOffer = tasks.filter(t => t.status === 'active');
+    const hasNpc = isVictory && resolutionNpc;
+    const cardWidth = hasNpc ? '1100px' : '650px';
 
     return (
-      <div className="break-event-overlay animate-fade-in">
-        <div className="break-event-card" style={{ borderColor, maxWidth: '650px', padding: '2.5rem' }}>
-          <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-            <span style={{ fontSize: '3.5rem' }}>{isVictory ? '🏆' : isFlee ? '🌫️' : '💀'}</span>
-            <h1 className="gothic-title" style={{ fontSize: '2.2rem', color: borderColor, marginTop: '0.5rem' }}>{title}</h1>
-            <p style={{ fontSize: '0.85rem', color: 'var(--color-bone-dim)', fontStyle: 'italic', marginTop: '0.3rem' }}>
+      <div className="break-event-overlay animate-fade-in" style={{ zIndex: 99999 }}>
+        <div className="break-event-card rpg-scrollbar" style={{ borderColor, maxWidth: cardWidth, width: '95%', padding: '2rem', maxHeight: '95vh', overflowY: 'auto' }}>
+          <div style={{ textAlign: 'center', marginBottom: '1.2rem' }}>
+            <span style={{ fontSize: '3rem' }}>{isVictory ? '🏆' : isFlee ? '🌫️' : '💀'}</span>
+            <h1 className="gothic-title" style={{ fontSize: '2rem', color: borderColor, marginTop: '0.3rem' }}>{title}</h1>
+            <p style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)', fontStyle: 'italic', marginTop: '0.2rem' }}>
               Хроники Абаддона • Запись Летописца
             </p>
           </div>
 
           {resolutionLoading ? (
-            <div style={{ textAlign: 'center', padding: '2rem' }}>
+            <div style={{ textAlign: 'center', padding: '3rem' }}>
               <RefreshCw className="heartbeat-pulse fast" style={{ color: borderColor, marginBottom: '0.8rem' }} size={32} />
               <p style={{ fontStyle: 'italic', fontSize: '0.9rem', color: 'var(--color-bone-dim)' }}>
                 Летописец Бездны записывает исход битвы в фолиант...
               </p>
             </div>
           ) : (
-            <div>
-              <div style={{ background: 'rgba(0,0,0,0.5)', border: `1px solid ${borderColor}44`, borderLeft: `3px solid ${borderColor}`, padding: '1.5rem', marginBottom: '1.5rem', borderRadius: '4px' }}>
-                <p style={{ fontSize: '1rem', color: '#e6dfd3', lineHeight: '1.7', fontFamily: 'Georgia, serif', whiteSpace: 'pre-line', textAlign: 'justify' }}>
-                  {resolutionText}
-                </p>
+            <div style={{ display: 'grid', gridTemplateColumns: hasNpc ? '1.1fr 1fr' : '1fr', gap: '1.5rem', alignItems: 'start' }}>
+              
+              {/* Left Column: Chronicle & Return Button */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid ' + borderColor + '44', borderLeft: '3px solid ' + borderColor, padding: '1.25rem', borderRadius: '4px' }}>
+                  <p style={{ fontSize: '0.95rem', color: '#e6dfd3', lineHeight: '1.6', fontFamily: 'Georgia, serif', whiteSpace: 'pre-line', textAlign: 'justify', margin: 0 }}>
+                    {resolutionText}
+                  </p>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'center', marginTop: '0.5rem' }}>
+                  <button 
+                    className="rpg-btn" 
+                    style={{ padding: '0.8rem 2.5rem', fontSize: '1rem', borderColor, width: '100%' }}
+                    onClick={() => {
+                      playClick();
+                      const willQualify = (character.completedTasksCount || 0) >= 15 && 
+                                          (character.completedSiegesCount || 0) >= 3;
+                      if (isVictory && willQualify) {
+                        setSetupStage('redemption');
+                        handleTriggerRedemptionCeremony();
+                      } else {
+                        setSetupStage('hub');
+                      }
+                    }}
+                  >
+                    {isVictory ? '☀️ ВЕРНУТЬСЯ В ШТАБ' : isFlee ? '⛺ УЙТИ В ЛАГЕРЬ' : '🔥 ВОССТАТЬ ИЗ ПЕПЛА'}
+                  </button>
+                </div>
               </div>
 
-              {isVictory && resolutionNpc && (
+              {/* Right Column: NPC Card */}
+              {hasNpc && (
                 <div style={{ 
                   background: 'rgba(25, 20, 30, 0.75)', 
                   border: '1px solid rgba(255, 184, 19, 0.25)', 
                   borderRadius: '6px', 
                   padding: '1.2rem', 
-                  marginBottom: '1.5rem',
-                  boxShadow: '0 4px 15px rgba(0,0,0,0.5)'
+                  boxShadow: '0 4px 15px rgba(0,0,0,0.5)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.8rem'
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <span style={{ fontSize: '1.5rem' }}>{resolutionNpc.icon}</span>
                     <h3 className="gothic-title" style={{ fontSize: '1.1rem', color: 'var(--color-relic-glow)', margin: 0 }}>
                       {resolutionNpc.name}
                     </h3>
                   </div>
-                  <p style={{ fontSize: '0.88rem', color: '#e6dfd3', fontStyle: 'italic', marginBottom: '1rem', lineHeight: '1.4' }}>
+                  <p style={{ fontSize: '0.85rem', color: '#e6dfd3', fontStyle: 'italic', margin: 0, lineHeight: '1.3' }}>
                     «Вы одолели угрозу, Изгнанник. Но тени сгущаются. Какой контракт мы запечатаем следующим?»
                   </p>
 
                   {/* Offer existing contracts */}
                   {activeTasksToOffer.length > 0 && (
-                    <div style={{ marginBottom: '1rem' }}>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: 'var(--font-rpg)' }}>
+                    <div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--color-bone-dim)', textTransform: 'uppercase', marginBottom: '4px', fontFamily: 'var(--font-rpg)' }}>
                         📜 Выбрать существующий контракт:
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                         {activeTasksToOffer.slice(0, 3).map(t => (
                           <button 
                             key={t.id}
                             className="rpg-btn"
-                            style={{ display: 'block', width: '100%', padding: '6px 12px', fontSize: '0.82rem', textAlign: 'left', borderColor: 'rgba(255,255,255,0.1)' }}
+                            style={{ display: 'block', width: '100%', padding: '5px 10px', fontSize: '0.8rem', textAlign: 'left', borderColor: 'rgba(255,255,255,0.1)' }}
                             onClick={() => {
                               playClick();
                               handleStartCombatSession(t);
@@ -2406,57 +2554,44 @@ const handleWinActiveSession = (task) => {
                     </div>
                   )}
 
-                  {/* Create and start a new contract */}
-                  <div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', textTransform: 'uppercase', marginBottom: '6px', fontFamily: 'var(--font-rpg)' }}>
-                      ✍️ Записать новый контракт:
+                  {/* Create and start a new contract (Auto-expanding Textarea Chaos Dump) */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--color-bone-dim)', textTransform: 'uppercase', fontFamily: 'var(--font-rpg)' }}>
+                      ✍️ Записать новый контракт (Омут Хаоса):
                     </div>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <input 
-                        type="text" 
-                        placeholder="Суть нового соглашения..." 
-                        className="rpg-input" 
-                        value={npcNewTaskTitle}
-                        onChange={(e) => setNpcNewTaskTitle(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleCreateAndStartTaskFromNpc();
-                        }}
-                        style={{ flex: 1, fontSize: '0.82rem', height: '32px' }}
-                      />
-                      <button 
-                        className="rpg-btn rpg-btn-blood"
-                        onClick={handleCreateAndStartTaskFromNpc}
-                        disabled={!npcNewTaskTitle.trim()}
-                        style={{ fontSize: '0.78rem', padding: '0 12px', height: '32px' }}
-                      >
-                        🔮 В бой
-                      </button>
-                    </div>
+                    <textarea 
+                      placeholder="Опишите новый контракт или излейте хаос мыслей..." 
+                      className="rpg-input rpg-scrollbar" 
+                      value={npcNewTaskTitle}
+                      onChange={(e) => setNpcNewTaskTitle(e.target.value)}
+                      style={{ 
+                        width: '100%', 
+                        minHeight: '60px', 
+                        maxHeight: '180px', 
+                        fontSize: '0.82rem', 
+                        lineHeight: '1.3',
+                        padding: '6px 10px',
+                        resize: 'vertical',
+                        background: 'rgba(0,0,0,0.35)',
+                        border: '1px solid var(--color-iron-light)',
+                        borderRadius: '4px',
+                        color: '#fff'
+                      }}
+                    />
+                    <button 
+                      className="rpg-btn rpg-btn-blood"
+                      onClick={handleCreateAndStartTaskFromNpc}
+                      disabled={!npcNewTaskTitle.trim()}
+                      style={{ fontSize: '0.8rem', padding: '6px 0', width: '100%' }}
+                    >
+                      🔮 В БОЙ
+                    </button>
                   </div>
                 </div>
               )}
+
             </div>
           )}
-
-          <div style={{ display: 'flex', justifyContent: 'center' }}>
-            <button 
-              className="rpg-btn" 
-              style={{ padding: '0.8rem 2.5rem', fontSize: '1rem', borderColor }}
-              onClick={() => {
-                playClick();
-                const willQualify = (character.completedTasksCount || 0) >= 15 && 
-                                    (character.completedSiegesCount || 0) >= 3;
-                if (isVictory && willQualify) {
-                  setSetupStage('redemption');
-                  handleTriggerRedemptionCeremony();
-                } else {
-                  setSetupStage('hub');
-                }
-              }}
-            >
-              {isVictory ? '☀️ ВЕРНУТЬСЯ В ШТАБ' : isFlee ? '⛺ УЙТИ В ЛАГЕРЬ' : '🔥 ВОССТАТЬ ИЗ ПЕПЛА'}
-            </button>
-          </div>
         </div>
       </div>
     );
