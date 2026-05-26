@@ -260,10 +260,10 @@ const generateEnrichedEnemyDescription = (enemyName, taskTitle, toxicity, variat
     "Он расправляет свои плечи и яростно бьет оружием о щит, требуя идеальности каждого вашего шага."
   ];
 
-  const cls = classes[hash % classes.length];
-  const app = appearances[(hash >> 2) % appearances.length];
-  const wpn = weapons[(hash >> 4) % weapons.length];
-  const beh = behaviors[(hash >> 6) % behaviors.length];
+  const cls = classes[hash % classes.length] || "ослепший паладин Бездны";
+  const app = appearances[Math.floor(hash / 2) % appearances.length] || "в бледных костяных доспехах";
+  const wpn = weapons[Math.floor(hash / 4) % weapons.length] || "с зазубренным двуручным мечом";
+  const beh = behaviors[Math.floor(hash / 8) % behaviors.length] || "Он хрипло дышит, высматривая вашу слабину.";
 
   const intro = `Из сырого мрака грота, волоча за собой тяжелый могильный холод, медленно выходит ${cls}, ${app}, ${wpn}. ${beh}`;
 
@@ -284,6 +284,7 @@ export default function CarriageSession({
   tasks, 
   setTasks, 
   parseMessyTasks,
+  requestDeconstruction,
   playActiveSessionTrack,
   generateRedemptionEulogy,
   pedestals = [],
@@ -315,6 +316,19 @@ export default function CarriageSession({
 
   const [resolutionNpc, setResolutionNpc] = useState(null);
   const [npcNewTaskTitle, setNpcNewTaskTitle] = useState('');
+
+  // Editing Task modal states in CarriageSession
+  const [editingTask, setEditingTask] = useState(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editType, setEditType] = useState('hunt');
+  const [editTime, setEditTime] = useState(25);
+  const [editIntent, setEditIntent] = useState('');
+  const [editSteps, setEditSteps] = useState([]);
+  const [newStepText, setNewStepText] = useState('');
+  const [editDeadline, setEditDeadline] = useState('');
+  const [editNature, setEditNature] = useState('external');
+  const [editExecutionMode, setEditExecutionMode] = useState('ask_later');
+  const [editDeconstructLoading, setEditDeconstructLoading] = useState(false);
 
   // Sync state to parent layout
   useEffect(() => {
@@ -586,6 +600,95 @@ export default function CarriageSession({
     }
   };
 
+  // --- CARRIAGE TASK EDITING LOGIC ---
+  const handleOpenEdit = (task) => {
+    playClick();
+    setEditingTask(task);
+    setEditTitle(task.title);
+    setEditType(task.type || 'hunt');
+    setEditTime(task.pomodoroTime || 25);
+    setEditIntent(task.intent || '');
+    setEditSteps(task.steps ? [...task.steps] : []);
+    setNewStepText('');
+    setEditDeadline(task.deadline || '');
+    setEditNature(task.nature || 'external');
+    setEditExecutionMode(task.executionMode || 'ask_later');
+  };
+
+  const handleSaveEdit = () => {
+    playClick();
+    if (!editTitle.trim()) return;
+    setTasks(prev => prev.map(t => {
+      if (t.id === editingTask.id) {
+        return {
+          ...t,
+          title: editTitle,
+          type: editType,
+          pomodoroTime: parseInt(editTime) || 25,
+          intent: editIntent,
+          steps: editSteps,
+          deadline: editDeadline,
+          nature: editNature,
+          executionMode: editExecutionMode
+        };
+      }
+      return t;
+    }));
+    playSuccess();
+    setEditingTask(null);
+  };
+
+  const handleDetailedDeconstructInEdit = async () => {
+    if (!requestDeconstruction) return;
+    playClick();
+    setEditDeconstructLoading(true);
+    try {
+      const tempTask = {
+        title: editTitle,
+        intent: editIntent,
+        steps: editSteps.map(s => s.title)
+      };
+      const response = await requestDeconstruction(tempTask, 'instant');
+      if (response && response.steps) {
+        const generated = response.steps.map((s, idx) => ({
+          id: `step-${idx}-${Date.now()}`,
+          title: s,
+          completed: false
+        }));
+        setEditSteps(generated);
+        playSuccess();
+      }
+    } catch (e) {
+      alert("Не удалось переразбить задачу: " + e.message);
+    } finally {
+      setEditDeconstructLoading(false);
+    }
+  };
+
+  const handleAddEditStep = () => {
+    if (!newStepText.trim()) return;
+    playClick();
+    setEditSteps(prev => [
+      ...prev,
+      { id: `step-${Date.now()}`, title: newStepText.trim(), completed: false }
+    ]);
+    setNewStepText('');
+  };
+
+  const handleRemoveEditStep = (stepId) => {
+    playClick();
+    setEditSteps(prev => prev.filter(s => s.id !== stepId));
+  };
+
+  const handleToggleEditStep = (stepId) => {
+    playClick();
+    setEditSteps(prev => prev.map(s => s.id === stepId ? { ...s, completed: !s.completed } : s));
+  };
+
+  const handleUpdateEditStepText = (stepId, text) => {
+    setEditSteps(prev => prev.map(s => s.id === stepId ? { ...s, title: text } : s));
+  };
+
   const handleStartCombatSession = (task) => {
     const runStart = (mode) => {
       setActiveTask(task);
@@ -807,12 +910,13 @@ const handleWinActiveSession = (task) => {
         setSetupStage('active');
         generateCombatEncounter(activeTaskInTasks);
         
-        // Start running immediately!
+        // Start running immediately if timer mode!
+        const isTimer = activeTaskInTasks.executionMode !== 'day';
         localStorage.setItem('combat_timer_start_time', Date.now());
         localStorage.setItem('combat_timer_start_value', storedTime);
-        localStorage.setItem('combat_is_running', 'true');
+        localStorage.setItem('combat_is_running', isTimer ? 'true' : 'false');
         setDeadlineDmgApplied(storedTime <= 0);
-        setIsRunning(true);
+        setIsRunning(isTimer);
       } else {
         setSetupStage('hub'); // Directly load Tasks Hub
       }
@@ -1036,7 +1140,7 @@ const handleWinActiveSession = (task) => {
     }
   };
 
-  const handleStartCrashSequence = (listToUse = null) => {
+  const handleStartCrashSequence = (listToUse = null, skipCombat = false) => {
     playClick();
     const todayStr = new Date().toISOString().split('T')[0];
     const sourceList = listToUse || parsedList;
@@ -1050,6 +1154,28 @@ const handleWinActiveSession = (task) => {
       }
       hash = Math.abs(hash);
       const variation = COMBAT_VARIATIONS[hash % COMBAT_VARIATIONS.length];
+
+      // Procedural rich ADHD weakness insights
+      const allWeakPoints = [
+        ["Монстр боится правила 5 минут: первый физический шаг разрушит его броню.", "Враг неповоротлив: начните с самого простого действия, чтобы войти в его слепую зону."],
+        ["Слабость врага: Боится расщепления. Разбейте первый шаг на микро-физические действия.", "Страх отступит: сделайте глубокий вдох на 4 секунды и выдохните тревогу."],
+        ["Слабость врага: Не выносит ритмичной музыки. Запустите Spotify-трек и действуйте на скорость!", "Усыпите его бдительность: согласитесь поработать ровно 10 минут, а затем устройте привал."],
+        ["Слабость врага: Ненавидит конкретику. Дайте четкое письменное намерение квеста.", "Противник ослепнет: перепишите шаг, указав точное физическое действие в скобках."],
+        ["Монстр беспомощен перед правилом 2 минут: сделайте микроскопическое действие прямо сейчас.", "Слабое место: враг слепнет, если вы уберете телефон во внутренний карман доспехов."],
+        ["Сила монстра иссякнет, если вы просто откроете рабочий файл и посмотрите на него 60 секунд.", "Уязвимость: монстр теряет бдительность, если начать делать задачу криво и неидеально."],
+        ["Враг боится смены обстановки: встаньте и потянитесь перед началом битвы.", "Слабость: монстр питается вашим перфекционизмом. Разрешите себе сделать работу на троечку."]
+      ];
+      const selectedWeakPoints = allWeakPoints[hash % allWeakPoints.length];
+
+      // Procedural battle events
+      const events = [
+        "Допаминовая Вспышка: Двойной опыт за этот бой!",
+        "Густой Туман Бездны скрывает точные значения здоровья противника.",
+        "Аура Стойкости: Любой удар по врагу восстанавливает 2 MP маны.",
+        "Дыхание Скверны: Время идет чуть быстрее, но враг бьет слабее.",
+        "Алтарь Рун: Проведение шага наносит противнику сокрушительный критический урон!"
+      ];
+      const selectedEvent = events[hash % events.length];
 
       return {
         id: `task-${Date.now()}-${idx}`,
@@ -1068,39 +1194,54 @@ const handleWinActiveSession = (task) => {
           : generateLocalSteps(t.title, t.type || 'hunt').map((s, sIdx) => ({ id: `step-${sIdx}-${Date.now()}`, title: s, completed: false })),
         intent: t.intent || '',
         deadline: t.deadline || '',
+        nature: t.nature || 'external',
+        executionMode: t.executionMode || 'ask_later',
         combatLore: {
           enemyName: t.enemyName || `${variation.prefix} ${variation.suffix}`,
           visualType: t.visualType || variation.type,
-          weakPoints: t.weakPoints || ["Монстр боится разбития на мелкие части.", "Сделайте шаг за 5 минут!"],
-          randomEvent: t.randomEvent || "Бой протекает при поддержке Бездны."
+          weakPoints: t.weakPoints || selectedWeakPoints,
+          randomEvent: t.randomEvent || selectedEvent
         }
       };
     });
 
     setTasks(prev => [...prev, ...newTasks]);
-    const target = newTasks[0] || null;
-    setActiveTask(target);
-    if (target) {
-      setTimeLeft(target.pomodoroTime * 60);
-      setSessionSteps(target.steps);
-      generateCombatEncounter(target);
-      localStorage.setItem('active_task_id', target.id);
-      localStorage.setItem('combat_time_left', target.pomodoroTime * 60);
-    }
 
-    if (character.shacklesBroken) {
-      setSetupStage('active');
-      const initialTime = target.pomodoroTime * 60;
-      localStorage.setItem('combat_timer_start_time', Date.now());
-      localStorage.setItem('combat_timer_start_value', initialTime);
-      localStorage.setItem('combat_is_running', 'true');
-      setDeadlineDmgApplied(false);
-      setIsRunning(true);
-      setAtmosphereMood(target?.type === 'siege' ? 'siege' : 'hunt');
-      if (playActiveSessionTrack) playActiveSessionTrack(target?.type === 'siege' ? 'siege' : 'hunt');
+    if (newTasks.length > 1 || skipCombat) {
+      // Go directly to contracts grid lobby to choose!
+      setActiveTask(null);
+      setSetupStage('hub');
+      localStorage.removeItem('active_task_id');
+      localStorage.setItem('combat_is_running', 'false');
+      setIsRunning(false);
     } else {
-      setSetupStage('crash');
-      setAtmosphereMood('escape');
+      // Single task and not skipped: auto-start combat session
+      const target = newTasks[0] || null;
+      setActiveTask(target);
+      if (target) {
+        setTimeLeft(target.pomodoroTime * 60);
+        setSessionSteps(target.steps);
+        generateCombatEncounter(target);
+        localStorage.setItem('active_task_id', target.id);
+        localStorage.setItem('combat_time_left', target.pomodoroTime * 60);
+      }
+
+      if (character.shacklesBroken) {
+        setSetupStage('active');
+        const initialTime = target.pomodoroTime * 60;
+        localStorage.setItem('combat_timer_start_time', Date.now());
+        localStorage.setItem('combat_timer_start_value', initialTime);
+        
+        const isTimer = target.executionMode !== 'day'; // False for 'day' (Free Transition/No timer)
+        localStorage.setItem('combat_is_running', isTimer ? 'true' : 'false');
+        setDeadlineDmgApplied(false);
+        setIsRunning(isTimer);
+        setAtmosphereMood(target?.type === 'siege' ? 'siege' : 'hunt');
+        if (playActiveSessionTrack) playActiveSessionTrack(target?.type === 'siege' ? 'siege' : 'hunt');
+      } else {
+        setSetupStage('crash');
+        setAtmosphereMood('escape');
+      }
     }
   };
 
@@ -1141,11 +1282,12 @@ const handleWinActiveSession = (task) => {
     setSetupStage('active');
 
     const initialTime = timeLeft;
+    const isTimer = activeTask?.executionMode !== 'day';
     localStorage.setItem('combat_timer_start_time', Date.now());
     localStorage.setItem('combat_timer_start_value', initialTime);
-    localStorage.setItem('combat_is_running', 'true');
+    localStorage.setItem('combat_is_running', isTimer ? 'true' : 'false');
     setDeadlineDmgApplied(false);
-    setIsRunning(true);
+    setIsRunning(isTimer);
 
     setAtmosphereMood(activeTask?.type === 'siege' ? 'siege' : 'hunt');
     if (playActiveSessionTrack) playActiveSessionTrack(activeTask?.type === 'siege' ? 'siege' : 'hunt');
@@ -1395,7 +1537,8 @@ const handleWinActiveSession = (task) => {
     }
     setBreakEvent(null);
     setBreakAiText('');
-    setIsRunning(true);
+    const isTimer = activeTask?.executionMode !== 'day';
+    setIsRunning(isTimer);
     setAtmosphereMood(activeTask?.type === 'siege' ? 'siege' : 'hunt');
   };
 
@@ -1651,6 +1794,238 @@ const handleWinActiveSession = (task) => {
               🎪 Войти в Лагерь
             </button>
           </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderEditTaskModal = () => {
+    if (!editingTask) return null;
+    return (
+      <div className="gothic-modal-overlay" style={{ zIndex: 99999 }}>
+        <div className="gothic-modal-content" style={{ maxWidth: '680px', width: '90%', maxHeight: '90vh', overflowY: 'auto' }}>
+          
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-iron-light)', paddingBottom: '0.8rem', marginBottom: '1.2rem' }}>
+            <h3 className="gothic-title" style={{ fontSize: '1.2rem', color: 'var(--color-relic-glow)' }}>
+              ⚔ Свиток Контракта: {editingTask.title.slice(0, 30)}...
+            </h3>
+            <button 
+              className="rpg-btn" 
+              style={{ padding: '3px 8px' }} 
+              onClick={() => setEditingTask(null)}
+            >
+              Отмена
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
+            
+            {/* 1. Title, Type, and Time */}
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '0.8rem' }}>
+              <div style={{ gridColumn: 'span 1' }}>
+                <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginBottom: '4px' }}>НАЗВАНИЕ КВЕСТА</label>
+                <textarea 
+                  className="rpg-input rpg-input-auto" 
+                  style={{ 
+                    width: '100%', 
+                    minHeight: '40px',
+                    height: '40px',
+                    resize: 'none',
+                    overflowY: 'auto',
+                    paddingTop: '8px',
+                    paddingBottom: '8px',
+                    lineHeight: '1.3',
+                    display: 'block'
+                  }} 
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginBottom: '4px' }}>ТИП СУЩНОСТИ</label>
+                <select 
+                  className="rpg-input" 
+                  style={{ width: '100%', fontSize: '0.9rem' }}
+                  value={editType}
+                  onChange={(e) => setEditType(e.target.value)}
+                >
+                  <option value="hunt">🏹 Охота</option>
+                  <option value="siege">💥 Осада</option>
+                  <option value="relic">💎 Реликвия</option>
+                  <option value="corpse">💀 Труп прошлого</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginBottom: '4px' }}>ВРЕМЯ (МИН)</label>
+                <input 
+                  type="number" 
+                  className="rpg-input" 
+                  style={{ width: '100%', fontSize: '0.9rem' }} 
+                  value={editTime}
+                  onChange={(e) => setEditTime(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Nature, Execution Mode and Deadline selectors */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.8rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginBottom: '4px' }}>ПРИРОДА ЗАДАЧИ</label>
+                <select 
+                  className="rpg-input" 
+                  style={{ width: '100%', fontSize: '0.9rem' }}
+                  value={editNature}
+                  onChange={(e) => setEditNature(e.target.value)}
+                >
+                  <option value="internal">🧿 Внутренний Обет (для себя)</option>
+                  <option value="external">⚔️ Внешняя Схватка (для мира)</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginBottom: '4px' }}>РЕЖИМ ВЫПОЛНЕНИЯ</label>
+                <select 
+                  className="rpg-input" 
+                  style={{ width: '100%', fontSize: '0.9rem' }}
+                  value={editExecutionMode}
+                  onChange={(e) => setEditExecutionMode(e.target.value)}
+                >
+                  <option value="timer">⏳ Таймер (Печать Времени)</option>
+                  <option value="day">🌅 В течение дня (Свободный Переход)</option>
+                  <option value="ask_later">❓ Спросить позже (Шепот Сомнений)</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginBottom: '4px' }}>СРОК (ДЕДЛАЙН)</label>
+                <input 
+                  type="text" 
+                  className="rpg-input" 
+                  style={{ width: '100%', fontSize: '0.9rem' }} 
+                  placeholder="Например: до 18:00, через 2 дня"
+                  value={editDeadline}
+                  onChange={(e) => setEditDeadline(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* 2. Intent Field ("Зачем мне это сегодня") */}
+            <div>
+              <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginBottom: '4px' }}>
+                СМЫСЛОВОЙ ЯКОРЬ (НАМЕРЕНИЕ ДЛЯ ADHD - ЗАЧЕМ МНЕ ЭТО СЕГОДНЯ?)
+              </label>
+              <textarea 
+                className="rpg-input" 
+                style={{ width: '100%', minHeight: '55px', fontSize: '0.85rem', resize: 'vertical' }}
+                placeholder="Например: Чтобы сдать проект и получить деньги..."
+                value={editIntent}
+                onChange={(e) => setEditIntent(e.target.value)}
+              />
+            </div>
+
+            {/* 3. AI Deconstructor Panel */}
+            <div style={{ background: 'rgba(0,0,0,0.3)', padding: '1rem', border: '1px solid var(--color-iron-light)' }}>
+              <h4 style={{ fontSize: '0.85rem', color: 'var(--color-mana-glow)', marginBottom: '5px', fontFamily: 'var(--font-rpg)' }}>
+                🔮 Авто-настройка шагов ИИ (Контекст Бездны)
+              </h4>
+              <p style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginBottom: '10px' }}>
+                ИИ автоматически перестроит структуру шагов, используя отредактированное название и намерение выше.
+              </p>
+              
+              <button 
+                className="rpg-btn rpg-btn-mana" 
+                style={{ width: '100%', fontSize: '0.85rem', padding: '6px 0' }} 
+                onClick={handleDetailedDeconstructInEdit}
+                disabled={editDeconstructLoading}
+              >
+                {editDeconstructLoading ? "🔮 ПЕРЕПИСЫВАНИЕ ШАГОВ БЕЗДНОЙ..." : "🚀 РАСЩЕПИТЬ КВЕСТ ИИ НА МИКРО-ДЕЙСТВИЯ"}
+              </button>
+            </div>
+
+            {/* 4. Manual steps manipulation */}
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-bone)', marginBottom: '6px', fontFamily: 'var(--font-rpg)' }}>
+                СПИСОК ШАГОВ (ЖМИТЕ НА ТЕКСТ ДЛЯ РЕДАКТИРОВАНИЯ ИЛИ ДОБАВЬТЕ/УДАЛИТЕ):
+              </label>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '180px', overflowY: 'auto', marginBottom: '0.8rem' }} className="rpg-scrollbar">
+                {editSteps.map(s => (
+                  <div 
+                    key={s.id} 
+                    style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '0.5rem', 
+                      background: 'rgba(0,0,0,0.2)', 
+                      padding: '4px 10px', 
+                      border: '1px solid var(--color-iron-light)' 
+                    }}
+                  >
+                    <input 
+                      type="checkbox" 
+                      checked={s.completed} 
+                      onChange={() => handleToggleEditStep(s.id)}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    <input 
+                      type="text" 
+                      className="rpg-input" 
+                      style={{ 
+                        flex: 1, 
+                        fontSize: '0.85rem', 
+                        background: 'transparent', 
+                        border: 'none', 
+                        borderBottom: '1px dashed rgba(255,255,255,0.1)', 
+                        padding: '2px 0',
+                        color: s.completed ? 'var(--color-bone-dim)' : '#fff',
+                        textDecoration: s.completed ? 'line-through' : 'none'
+                      }}
+                      value={s.title}
+                      onChange={(e) => handleUpdateEditStepText(s.id, e.target.value)}
+                    />
+                    <button 
+                      className="rpg-btn" 
+                      style={{ padding: '2px 6px', color: 'var(--color-blood-glow)', fontSize: '0.75rem' }} 
+                      onClick={() => handleRemoveEditStep(s.id)}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+                {editSteps.length === 0 && (
+                  <div style={{ fontSize: '0.8rem', fontStyle: 'italic', color: 'var(--color-iron-light)', padding: '5px' }}>
+                    Нет шагов в контракте. Сделайте ручной шаг или призовите ИИ.
+                  </div>
+                )}
+              </div>
+
+              {/* Manual Step Adding Field */}
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <input 
+                  type="text" 
+                  className="rpg-input" 
+                  style={{ flex: 1, fontSize: '0.85rem' }} 
+                  placeholder="Добавить свой ручной шаг..."
+                  value={newStepText}
+                  onChange={(e) => setNewStepText(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleAddEditStep()}
+                />
+                <button className="rpg-btn" onClick={handleAddEditStep} disabled={!newStepText.trim()}>
+                  Добавить
+                </button>
+              </div>
+            </div>
+
+          </div>
+
+          {/* Footer Controls */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', borderTop: '1px solid var(--color-iron-light)', paddingTop: '1rem', marginTop: '0.5rem' }}>
+            <button className="rpg-btn" onClick={() => setEditingTask(null)}>
+              ОТМЕНИТЬ
+            </button>
+            <button className="rpg-btn rpg-btn-blood" onClick={handleSaveEdit}>
+              СОХРАНИТЬ КОНТРАКТ В БАЗУ
+            </button>
+          </div>
+
         </div>
       </div>
     );
@@ -2219,17 +2594,19 @@ const handleWinActiveSession = (task) => {
                     justifyContent: 'space-between',
                     minHeight: '430px',
                     position: 'relative',
-                    transition: 'all 0.25s ease'
+                    transition: 'all 0.25s ease',
+                    cursor: 'pointer'
                   }}
                   className="gothic-fate-card"
+                  onClick={() => handleOpenEdit(task)}
                 >
                   <div>
                     {/* Centered Small Icon */}
-                    <div style={{ display: 'flex', justifyContent: 'center', fontSize: '2rem', margin: '0.2rem 0 0.5rem 0', filter: 'drop-shadow(0 0 10px rgba(255,255,255,0.05))' }}>
+                    <div style={{ display: 'flex', justifyContent: 'center', fontSize: '2rem', margin: '0.2rem 0 0.5rem 0', filter: 'drop-shadow(0 0 10px rgba(255,255,255,0.05))' }} onClick={(e) => e.stopPropagation()}>
                       {variation.icon}
                     </div>
 
-                    <h4 className="gothic-title" style={{ fontSize: '0.95rem', color: '#fff', fontWeight: 'bold', margin: '0 0 0.5rem 0', textAlign: 'center', lineHeight: '1.3' }}>
+                    <h4 className="gothic-title" style={{ fontSize: '0.95rem', color: '#fff', fontWeight: 'bold', margin: '0 0 0.5rem 0', textAlign: 'center', lineHeight: '1.3', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                       {task.title}
                     </h4>
                     
@@ -2306,7 +2683,7 @@ const handleWinActiveSession = (task) => {
                               <span style={{ color: step.completed ? 'var(--color-relic-glow)' : 'var(--color-blood-glow)' }}>
                                 {step.completed ? '☑' : '☐'}
                               </span>
-                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={step.title}>
+                              <span style={{ whiteSpace: 'normal', wordBreak: 'break-word', overflowWrap: 'anywhere' }} title={step.title}>
                                 {step.title}
                               </span>
                             </div>
@@ -2319,7 +2696,8 @@ const handleWinActiveSession = (task) => {
                   <button 
                     className="rpg-btn rpg-btn-blood"
                     style={{ width: '100%', padding: '0.4rem 0', fontSize: '0.85rem', marginTop: '1rem' }}
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       playClick();
                       handleStartCombatSession(task);
                     }}
@@ -2342,6 +2720,7 @@ const handleWinActiveSession = (task) => {
           )}
         </div>
         {renderMeditationSelect()}
+        {editingTask && renderEditTaskModal()}
       </div>
     );
   }
@@ -2518,18 +2897,37 @@ const handleWinActiveSession = (task) => {
 
             {/* Interactive Options inside single card */}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem', alignItems: 'center', justifyContent: 'space-between' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.85rem', color: 'var(--color-bone-dim)' }}>
-                <input 
-                  type="checkbox" 
-                  checked={currentCard.isLongJourney || false} 
-                  onChange={(e) => {
-                    const isChecked = e.target.checked;
-                    setParsedList(prev => prev.map((item, idx) => idx === reviewIndex ? { ...item, isLongJourney: isChecked } : item));
-                  }} 
-                  style={{ width: '16px', height: '16px', accentColor: 'var(--color-blood)', cursor: 'pointer' }} 
-                />
-                <span>Длительное путешествие</span>
-              </label>
+              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.85rem', color: 'var(--color-bone-dim)' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={currentCard.isLongJourney || false} 
+                    onChange={(e) => {
+                      const isChecked = e.target.checked;
+                      setParsedList(prev => prev.map((item, idx) => idx === reviewIndex ? { ...item, isLongJourney: isChecked } : item));
+                    }} 
+                    style={{ width: '16px', height: '16px', accentColor: 'var(--color-blood)', cursor: 'pointer' }} 
+                  />
+                  <span>Длительное путешествие</span>
+                </label>
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', color: 'var(--color-bone-dim)' }}>
+                  Режим:
+                  <select
+                    value={currentCard.executionMode || 'ask_later'}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setParsedList(prev => prev.map((item, idx) => idx === reviewIndex ? { ...item, executionMode: val } : item));
+                    }}
+                    className="rpg-input"
+                    style={{ fontSize: '0.8rem', padding: '2px 5px', height: '28px', cursor: 'pointer' }}
+                  >
+                    <option value="ask_later">❓ Спросить позже</option>
+                    <option value="timer">⏳ Таймер</option>
+                    <option value="day">🌅 В течение дня</option>
+                  </select>
+                </label>
+              </div>
 
               <button 
                 className="rpg-btn" 
@@ -2544,9 +2942,22 @@ const handleWinActiveSession = (task) => {
         )}
 
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', marginTop: '1.5rem' }}>
-          <button className="rpg-btn" onClick={() => setSetupStage('input')}>
-            ВЕРНУТЬСЯ
-          </button>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button className="rpg-btn" onClick={() => setSetupStage('input')}>
+              ВЕРНУТЬСЯ
+            </button>
+            <button 
+              className="rpg-btn rpg-btn-mana"
+              style={{ fontSize: '0.8rem', padding: '4px 12px' }}
+              onClick={() => {
+                playClick();
+                handleStartCrashSequence(parsedList, true);
+              }}
+              title="Создать все задачи из дампа хаоса и перейти к выбору"
+            >
+              ⏭️ Создать все и выбрать квест
+            </button>
+          </div>
           
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             <button 

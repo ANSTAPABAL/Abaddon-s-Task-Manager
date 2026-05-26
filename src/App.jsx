@@ -1006,6 +1006,7 @@ export default function App() {
               tasks={tasks}
               setTasks={setTasks}
               parseMessyTasks={parseMessyTasks}
+              requestDeconstruction={requestDeconstruction}
               playActiveSessionTrack={playActiveSessionTrack}
               generateRedemptionEulogy={generateRedemptionEulogy}
               pedestals={pedestals}
