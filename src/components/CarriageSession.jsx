@@ -1036,11 +1036,12 @@ const handleWinActiveSession = (task) => {
     }
   };
 
-  const handleStartCrashSequence = () => {
+  const handleStartCrashSequence = (listToUse = null) => {
     playClick();
     const todayStr = new Date().toISOString().split('T')[0];
+    const sourceList = listToUse || parsedList;
     
-    const newTasks = parsedList.map((t, idx) => {
+    const newTasks = sourceList.map((t, idx) => {
       // Hashing and pre-generating lore profiles for parsed tasks
       const hashStr = t.title + idx;
       let hash = 0;
@@ -2555,8 +2556,11 @@ const handleWinActiveSession = (task) => {
                 playClick();
                 const updated = parsedList.filter((_, idx) => idx !== reviewIndex);
                 setParsedList(updated);
-                if (reviewIndex >= updated.length && reviewIndex > 0) {
-                  setReviewIndex(reviewIndex - 1);
+                if (updated.length === 0) {
+                  setSetupStage('input');
+                } else if (reviewIndex >= updated.length) {
+                  // If we rejected the last card but have remaining approved tasks, start the journey!
+                  handleStartCrashSequence(updated);
                 }
               }}
             >
