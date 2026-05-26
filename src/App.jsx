@@ -11,6 +11,29 @@ import { Settings as SettingsIcon, Volume2, VolumeX, Sliders } from 'lucide-reac
 import { getVirtualTodayStr, getVirtualTomorrowStr } from './utils/dateUtils';
 import { rollStartingCharacter } from './utils/characterUtils';
 
+function parseDeadline(deadlineStr, taskDateStr) {
+  if (!deadlineStr) return null;
+  const timeMatch = deadlineStr.match(/(\d{1,2}):(\d{2})/);
+  if (timeMatch) {
+    const hours = parseInt(timeMatch[1], 10);
+    const minutes = parseInt(timeMatch[2], 10);
+    const date = taskDateStr ? new Date(taskDateStr) : new Date();
+    if (taskDateStr) {
+      const parts = taskDateStr.split('-');
+      if (parts.length === 3) {
+        date.setFullYear(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+      }
+    }
+    date.setHours(hours, minutes, 0, 0);
+    return date;
+  }
+  const parsed = Date.parse(deadlineStr);
+  if (!isNaN(parsed)) {
+    return new Date(parsed);
+  }
+  return null;
+}
+
 export default function App() {
   const { initAudio, setAtmosphereMood, playClick, playSuccess, setMuted, setVolume, setUseLocalDoublePlaylist, setAmbientLayerActive, restartActiveLayers, synthInstance } = useAudio();
   
@@ -18,7 +41,75 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('escape'); // escape, character, planner, recovery
   const [tasks, setTasks] = useState([]);
   const [character, setCharacter] = useState(rollStartingCharacter);
-  const [characterLoaded, setCharacterLoaded] = useState(false);
+  
+  // Reminders states
+  const [activeReminders, setActiveReminders] = useState([]);
+  const triggeredRemindersRef = React.useRef({});
+
+  // Background check for task deadlines every 10 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = new Date();
+      tasks.forEach(task => {
+        if (task.status !== 'active' || !task.deadline) return;
+        const deadlineDate = parseDeadline(task.deadline, task.date);
+        if (!deadlineDate) return;
+
+        const diffMinutes = (deadlineDate - now) / 60000;
+        if (diffMinutes <= 0) return; // passed
+
+        // Calculate original span
+        const createdAt = task.createdAt || (new Date(task.date || new Date()).setHours(0,0,0,0));
+        const originalSpanMin = (deadlineDate - createdAt) / 60000;
+
+        let rule = null;
+        let diffMinutesThreshold = 0;
+        let label = '';
+
+        if (originalSpanMin >= 180) {
+          rule = '1hour';
+          diffMinutesThreshold = 60;
+          label = 'Остался 1 час до дедлайна!';
+        } else if (originalSpanMin >= 60) {
+          rule = '30min';
+          diffMinutesThreshold = 30;
+          label = 'Осталось 30 минут до дедлайна!';
+        } else {
+          rule = '15min';
+          diffMinutesThreshold = 15;
+          label = 'Осталось 15 минут до дедлайна!';
+        }
+
+        // Check if we should trigger now
+        if (diffMinutes <= diffMinutesThreshold && diffMinutes > (diffMinutesThreshold - 5)) {
+          if (!triggeredRemindersRef.current[task.id]) {
+            triggeredRemindersRef.current[task.id] = {};
+          }
+          if (!triggeredRemindersRef.current[task.id][rule]) {
+            triggeredRemindersRef.current[task.id][rule] = true;
+            
+            const reminderId = `reminder-${task.id}-${rule}-${Date.now()}`;
+            setActiveReminders(prev => [
+              ...prev,
+              {
+                id: reminderId,
+                taskId: task.id,
+                title: task.title,
+                text: `${label} (Срок: ${task.deadline})`,
+                rule
+              }
+            ]);
+            playClick();
+          }
+        }
+      });
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [tasks, playClick]);
+
+  // Settings & Env Configuration State
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [assetBookOpen, setAssetBookOpen] = useState(false);  const [characterLoaded, setCharacterLoaded] = useState(false);
 
   const [pedestals, setPedestals] = useState([]);
 
@@ -213,9 +304,6 @@ export default function App() {
       return `«Его воля сокрушила прокрастинацию и навеки разогнала Скверну Абаддона...»\n\n(Не удалось соединиться с сервером AI для составления индивидуальной летописи, но духи помнят твой подвиг!)`;
     }
   };
-
-  // Settings & Env Configuration State
-  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const [ambientLayers, setAmbientLayers] = useState({
     chains: localStorage.getItem('ambient_layer_chains') === 'true',
@@ -747,7 +835,7 @@ export default function App() {
       {/* Settings gothic dropdown/modal panel */}
       {settingsOpen && (
         <div className="gothic-modal-overlay" style={{ zIndex: 1050 }} onClick={() => setSettingsOpen(false)}>
-          <div className="gothic-modal-content" style={{ maxWidth: '500px', width: '90%', border: '2px solid var(--color-iron-light)' }} onClick={(e) => e.stopPropagation()}>
+          <div className="gothic-modal-content" style={{ maxWidth: '900px', width: '95%', maxHeight: '90vh', overflowY: 'auto', border: '2px solid var(--color-iron-light)' }} onClick={(e) => e.stopPropagation()}>
             
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-iron-light)', paddingBottom: '0.6rem', marginBottom: '1.2rem' }}>
               <h3 className="gothic-title" style={{ fontSize: '1.2rem', color: '#ffb813', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -942,6 +1030,35 @@ export default function App() {
               </div>
             </div>
 
+            {/* 4. SPOTIFY INTEGRATION DECK */}
+            <div style={{ background: 'rgba(0,0,0,0.3)', padding: '1rem', border: '1px solid rgba(255,255,255,0.03)', marginTop: '1.2rem' }}>
+              <h4 style={{ fontSize: '0.85rem', color: 'var(--color-bone-dim)', textTransform: 'uppercase', marginBottom: '10px', fontFamily: 'var(--font-rpg)' }}>
+                🎵 Интеграция Spotify
+              </h4>
+              <SpotifyPlayer 
+                character={character}
+                spotifyToken={spotifyToken}
+                setSpotifyToken={setSpotifyToken}
+                currentTrack={currentTrack}
+                setCurrentTrack={setCurrentTrack}
+                activeSessionType={activeSessionType}
+              />
+            </div>
+
+            {/* 5. ASSET BOOK CUSTOMIZATION HANDBOOK */}
+            <div style={{ background: 'rgba(0,0,0,0.3)', padding: '1rem', border: '1px solid rgba(255,255,255,0.03)', marginTop: '1.2rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)' }}>Справочник ассетов:</span>
+                <button 
+                  className="rpg-btn" 
+                  style={{ padding: '3px 10px', fontSize: '0.75rem', borderColor: 'var(--color-relic-glow)' }}
+                  onClick={() => { playClick(); setAssetBookOpen(true); }}
+                >
+                  📖 Свидетельство ассетов
+                </button>
+              </div>
+            </div>
+
           </div>
         </div>
       )}
@@ -1009,17 +1126,6 @@ export default function App() {
           )}
         </main>
 
-        {/* Spotify Integration Deck at Footer */}
-        <footer style={{ marginTop: 'auto' }}>
-          <SpotifyPlayer 
-            character={character}
-            spotifyToken={spotifyToken}
-            setSpotifyToken={setSpotifyToken}
-            currentTrack={currentTrack}
-            setCurrentTrack={setCurrentTrack}
-            activeSessionType={activeSessionType}
-          />
-        </footer>
       </div>
 
       {/* КАРТА СУДЬБЫ: ВЫБОР РЕЖИМА ВЫПОЛНЕНИЯ (Tarot/Card Game Style Overlay) */}
@@ -1345,7 +1451,7 @@ export default function App() {
                       const exp = isSiege ? 60 : 25;
                       const gold = isSiege ? 15 : 5;
 
-                      // Complete task
+                       // Complete task
                       setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: 'completed' } : t));
                       
                       // Rewards
@@ -1363,6 +1469,7 @@ export default function App() {
                           level: nextLvl,
                           xp: rx,
                           gold: (c.gold || 0) + gold,
+                          moralCompass: Math.min(100, (c.moralCompass || 50) + 5),
                           completedTasksCount: (c.completedTasksCount || 0) + 1,
                           completedSiegesCount: (c.completedSiegesCount || 0) + (isSiege ? 1 : 0),
                           totalGoldEarned: (c.totalGoldEarned || 0) + gold
@@ -1380,15 +1487,16 @@ export default function App() {
                     👍 ДА, ВЫПОЛНЕНО
                   </button>
                   
-                  <button 
+                   <button 
                     className="rpg-btn"
                     style={{ background: '#e74c3c', color: '#fff', borderColor: '#c0392b', padding: '8px 25px' }}
                     onClick={() => {
                       playClick();
-                      // HP damage
+                      // HP damage and Moral Compass loss
                       setCharacter(c => ({
                         ...c,
                         hp: Math.max(10, c.hp - 10),
+                        moralCompass: Math.max(0, (c.moralCompass || 50) - 10),
                         totalHpSacrificed: (c.totalHpSacrificed || 0) + 10
                       }));
                       setJudgmentShowReschedule(true);
@@ -1614,6 +1722,120 @@ export default function App() {
           }}
         />
       )}
+
+      {/* ASSET CUSTOMIZATION HANDBOOK MODAL */}
+      {assetBookOpen && (
+        <div className="gothic-modal-overlay" style={{ zIndex: 1060 }} onClick={() => setAssetBookOpen(false)}>
+          <div className="gothic-modal-content" style={{ maxWidth: '680px', width: '90%', maxHeight: '85vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-iron-light)', paddingBottom: '0.8rem', marginBottom: '1rem' }}>
+              <h3 className="gothic-title" style={{ fontSize: '1.25rem', color: 'var(--color-relic-glow)' }}>
+                📖 Книга Кастомизации & Поиска Ассетов
+              </h3>
+              <button className="rpg-btn" style={{ padding: '4px 10px' }} onClick={() => setAssetBookOpen(false)}>
+                Закрыть книгу
+              </button>
+            </div>
+
+            <p style={{ fontSize: '0.85rem', color: 'var(--color-bone-dim)', marginBottom: '1.5rem', lineHeight: '1.5' }}>
+              Процедурные звуки Web Audio работают отлично, но вы можете сделать погружение полноценным! 
+              Просто найдите и положите аудио файлы формата **.mp3** в вашу локальную папку:
+              <br />
+              <code style={{ background: '#000', padding: '3px 8px', color: '#1db954', fontSize: '0.85rem', fontFamily: 'monospace', display: 'inline-block', marginTop: '5px' }}>
+                public/sounds/
+              </code>
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
+              <div style={{ background: 'rgba(0,0,0,0.3)', padding: '10px', borderLeft: '3px solid var(--color-relic-glow)' }}>
+                <b style={{ color: '#fff', fontSize: '0.9rem' }}>🖱️ Звук Клика:</b>
+                <div style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)' }}>Имя файла: <code style={{ color: 'var(--color-mana-glow)' }}>public/sounds/click.mp3</code></div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginTop: '2px' }}>Рекомендуется: Короткий деревянный щелчок или звон меча из Diablo.</div>
+              </div>
+
+              <div style={{ background: 'rgba(0,0,0,0.3)', padding: '10px', borderLeft: '3px solid var(--color-blood)' }}>
+                <b style={{ color: '#fff', fontSize: '0.9rem' }}>☠️ Звук Разрушения / Смерти (Bury):</b>
+                <div style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)' }}>Имя файла: <code style={{ color: 'var(--color-blood-glow)' }}>public/sounds/bonecrack.mp3</code></div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginTop: '2px' }}>Рекомендуется: Хруст костей, скрежет тяжелой цепи, или звук смерти скелета.</div>
+              </div>
+
+              <div style={{ background: 'rgba(0,0,0,0.3)', padding: '10px', borderLeft: '3px solid var(--color-mana)' }}>
+                <b style={{ color: '#fff', fontSize: '0.9rem' }}>✨ Звук Запечатывания (Complete):</b>
+                <div style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)' }}>Имя файла: <code style={{ color: 'var(--color-mana-glow)' }}>public/sounds/success.mp3</code></div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginTop: '2px' }}>Рекомендуется: Звон церковного колокола, триумфальные фанфары или шелест святой магии.</div>
+              </div>
+
+              <div style={{ background: 'rgba(0,0,0,0.3)', padding: '10px', borderLeft: '3px solid var(--color-blood-glow)' }}>
+                <b style={{ color: '#fff', fontSize: '0.9rem' }}>💓 Звук Сердцебиения (Timer):</b>
+                <div style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)' }}>Имя файла: <code style={{ color: 'var(--color-blood-glow)' }}>public/sounds/heartbeat.mp3</code></div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginTop: '2px' }}>Рекомендуется: Глухой, двойной удар человеческого сердца. Автоматически ускоряется на таймере.</div>
+              </div>
+            </div>
+
+            <h4 className="rpg-title" style={{ color: '#fff', fontSize: '0.95rem', marginBottom: '0.5rem' }}>🎨 Кастомизация графики (CSS):</h4>
+            <p style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)', lineHeight: '1.4' }}>
+              Вы можете заменить фоновые изображения на текстуры старинного пергамента! Положите картинку <code style={{ color: 'var(--color-relic-glow)' }}>parchment.png</code> в папку <code style={{ color: 'var(--color-mana-glow)' }}>public/</code> и укажите её в файле <code style={{ color: 'var(--color-mana-glow)' }}>src/index.css</code> для классов <code style={{ color: '#fff' }}>.rpg-panel</code> или <code style={{ color: '#fff' }}>.parchment-contract</code>.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Gothic Toast Notifications for Deadlines */}
+      <div style={{
+        position: 'fixed',
+        top: '25px',
+        right: '25px',
+        zIndex: 1100,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.8rem',
+        maxWidth: '350px',
+        width: '100%',
+        pointerEvents: 'none'
+      }}>
+        {activeReminders.map(rem => (
+          <div 
+            key={rem.id}
+            className="rpg-panel animate-fade-in"
+            style={{
+              background: 'radial-gradient(circle, #1c0e0e 0%, #0d0505 100%)',
+              border: '2px solid var(--color-blood-glow)',
+              boxShadow: '0 0 20px rgba(139, 26, 26, 0.4), inset 0 0 10px rgba(139, 26, 26, 0.1)',
+              padding: '12px 16px',
+              position: 'relative',
+              pointerEvents: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '4px'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <span style={{ fontSize: '0.7rem', color: 'var(--color-blood-glow)', fontWeight: 'bold', textTransform: 'uppercase', fontFamily: 'var(--font-rpg)' }}>
+                🚨 Шепот Судьбы (Дедлайн)
+              </span>
+              <button 
+                onClick={() => setActiveReminders(prev => prev.filter(r => r.id !== rem.id))}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--color-bone-dim)',
+                  cursor: 'pointer',
+                  fontSize: '0.8rem',
+                  padding: 0,
+                  lineHeight: 1
+                }}
+              >
+                ✕
+              </button>
+            </div>
+            <h4 style={{ fontSize: '0.85rem', color: '#fff', margin: 0, fontWeight: 'bold' }}>
+              {rem.title}
+            </h4>
+            <p style={{ fontSize: '0.75rem', color: 'var(--color-bone)', margin: 0, fontStyle: 'italic' }}>
+              {rem.text}
+            </p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { useAudio } from '../hooks/useAudio';
 
 const generateLocalSteps = (title, type) => {
   const t = title.toLowerCase();
-  
+
   if (t.includes('код') || t.includes('программ') || t.includes('питон') || t.includes('тест') || t.includes('написать') || t.includes('разработ') || t.includes('фикс') || t.includes('баг') || t.includes('dev') || t.includes('react') || t.includes('js') || t.includes('css')) {
     return [
       "Найти безопасное место в укрытии (Включить компьютер, открыть IDE)",
@@ -15,7 +15,7 @@ const generateLocalSteps = (title, type) => {
       "Осадить врага до конца (Сосредоточенно работать в течение 10-15 минут)"
     ];
   }
-  
+
   if (t.includes('изучить') || t.includes('прочитать') || t.includes('почитать') || t.includes('курс') || t.includes('книг') || t.includes('лекци') || t.includes('учить') || t.includes('разобрать') || t.includes('исследов') || t.includes('анализ')) {
     return [
       "Протереть линзы очков мудрости (Открыть нужный учебный материал, статью или книгу)",
@@ -26,7 +26,7 @@ const generateLocalSteps = (title, type) => {
       "Осознать полученное знание (Сделать краткую паузу и осмыслить прочитанное)"
     ];
   }
-  
+
   if (t.includes('помыть') || t.includes('убрать') || t.includes('стир') || t.includes('уборка') || t.includes('комнат') || t.includes('вещи') || t.includes('посуд') || t.includes('пыль') || t.includes('чистк')) {
     return [
       "Надеть латные рукавицы выживания (Встать со стула и дойти до места уборки)",
@@ -37,7 +37,7 @@ const generateLocalSteps = (title, type) => {
       "Оглядеть очищенные земли (Оценить результат и похвалить себя за сделанный шаг)"
     ];
   }
-  
+
   // Generic fallback steps
   return [
     "Снять кандалы ступора (Сделать глубокий вдох и выдох по схеме 4-4-4-4)",
@@ -53,7 +53,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
   const { playClick, playBoneCrack, playSuccess } = useAudio();
   const [activeKanbanDay, setActiveKanbanDay] = useState(null); // YYYY-MM-DD
   const [newTaskTitle, setNewTaskTitle] = useState('');
-  
+
   // Drag-and-drop state
   const [draggedTaskId, setDraggedTaskId] = useState(null);
 
@@ -191,6 +191,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
             barrierType: null,
             curseLevel: 0,
             isLongJourney: t.isLongJourney || false,
+            createdAt: Date.now(),
             // Fallback to local steps if AI didn't provide steps
             steps: t.steps ? t.steps.map((s, sIdx) => ({ id: `step-${sIdx}-${Date.now()}`, title: s, completed: false })) : generateLocalSteps(t.title, initialType).map((s, sIdx) => ({ id: `step-${sIdx}-${Date.now()}`, title: s, completed: false })),
             intent: t.intent || '',
@@ -286,9 +287,9 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
       <span style={{ fontSize, fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', flexWrap: 'wrap', gap: '4px' }}>
         {task.title}
         {task.runeOfReturn && (
-          <span style={{ 
-            fontSize: '0.65rem', 
-            color: 'var(--color-relic-glow)', 
+          <span style={{
+            fontSize: '0.65rem',
+            color: 'var(--color-relic-glow)',
             background: 'rgba(255, 184, 19, 0.1)',
             padding: '1px 4px',
             borderRadius: '3px',
@@ -331,7 +332,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
 
     const performPostpone = (runeData) => {
       playBoneCrack();
-      
+
       const updatedTasks = tasks.map(t => {
         if (t.date === todayDateStr && t.status === 'active') {
           return {
@@ -630,7 +631,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
     const today = new Date();
     const dayOfWeek = today.getDay(); // 0 is Sun, 1 is Mon
     const distanceToMon = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-    
+
     const monday = new Date(today);
     monday.setDate(today.getDate() + distanceToMon);
 
@@ -640,7 +641,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
       const current = new Date(monday);
       current.setDate(monday.getDate() + i);
       const dateStr = current.toISOString().split('T')[0];
-      
+
       dates.push({
         name: weekdaysRU[i],
         dateStr: dateStr,
@@ -660,17 +661,17 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
     if (!newTaskTitle.trim()) return;
     const title = newTaskTitle;
     playClick();
-    
+
     // Instant local classification for zero lag
     const initialType = classifyLocally(title);
-    
+
     const taskId = `task-${Date.now()}`;
     const localSteps = generateLocalSteps(title, initialType).map((s, sIdx) => ({
       id: `step-${sIdx}-${Date.now()}`,
       title: s,
       completed: false
     }));
-    
+
     const newTask = {
       id: taskId,
       title: title,
@@ -682,6 +683,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
       toxicity: 'standard',
       barrierType: null,
       curseLevel: 0,
+      createdAt: Date.now(),
       steps: localSteps,
       intent: '',
       isLongJourney: isLongJourney
@@ -752,7 +754,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
   const handleSealTask = (taskId) => {
     playSuccess();
     setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: 'completed' } : t));
-    
+
     // Reward XP & Gold & update ADHD stats
     setCharacter(prev => {
       const target = tasks.find(t => t.id === taskId);
@@ -760,27 +762,27 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
       const reward = isSiege ? 50 : target?.type === 'relic' ? 35 : 15;
       const nextXp = prev.xp + reward;
       const xpNeeded = prev.level * 100;
-      
+
       let nextLevel = prev.level;
       let remXp = nextXp;
       let goldReward = 2; // base gold from planner
       let levelUpGold = 0;
-      
+
       if (remXp >= xpNeeded) {
         nextLevel += 1;
         remXp -= xpNeeded;
         levelUpGold = 10;
       }
-      
+
       const totalEarned = goldReward + levelUpGold;
-      
+
       return {
         ...prev,
         level: nextLevel,
         xp: remXp,
         gold: (prev.gold || 0) + totalEarned,
         hp: nextLevel > prev.level ? prev.maxHp : prev.hp,
-        
+
         // ADHD stats updates
         completedTasksCount: (prev.completedTasksCount || 0) + 1,
         completedSiegesCount: (prev.completedSiegesCount || 0) + (isSiege ? 1 : 0),
@@ -794,8 +796,8 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
     const synonym = task.combatLore?.visualType || task.visualType;
     return (
       <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
-        <span style={{ 
-          fontSize: '0.62rem', 
+        <span style={{
+          fontSize: '0.62rem',
           color: isInternal ? '#4fc3f7' : '#ff8a80',
           background: 'rgba(0,0,0,0.5)',
           padding: '1px 4px',
@@ -829,8 +831,8 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
       const updatedTasks = tasks.map(t => {
         if (t.id === taskId) {
           const nextCurse = Math.min(5, t.curseLevel + 1);
-          return { 
-            ...t, 
+          return {
+            ...t,
             date: targetDateStr,
             curseLevel: nextCurse,
             runeOfReturn: runeData
@@ -902,9 +904,9 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
             curse = Math.min(5, curse + 1);
             dateChanged = true;
           }
-          return { 
-            ...t, 
-            date: targetDateStr, 
+          return {
+            ...t,
+            date: targetDateStr,
             curseLevel: curse,
             runeOfReturn: runeData || t.runeOfReturn
           };
@@ -993,7 +995,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', minHeight: '80vh' }}>
-      
+
       {/* Exile's Journey Map Roadmap */}
       {renderJourneyMap()}
 
@@ -1001,11 +1003,11 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
       <div className="rpg-panel" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', background: '#09080a', borderColor: '#3a2d21' }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center' }}>
           <div style={{ flex: '2', minWidth: '250px' }}>
-            <textarea 
+            <textarea
               ref={newTaskTitleRef}
-              className="rpg-input rpg-input-auto rpg-scrollbar" 
-              style={{ 
-                width: '100%', 
+              className="rpg-input rpg-input-auto rpg-scrollbar"
+              style={{
+                width: '100%',
                 fontSize: '1.1rem',
                 minHeight: '40px',
                 resize: 'none',
@@ -1014,8 +1016,8 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
                 paddingBottom: '8px',
                 lineHeight: '1.3',
                 display: 'block'
-              }} 
-              placeholder="Вбейте задачу..." 
+              }}
+              placeholder="Вбейте задачу..."
               value={newTaskTitle}
               onChange={(e) => setNewTaskTitle(e.target.value)}
               onKeyDown={(e) => {
@@ -1029,7 +1031,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
           </div>
 
           <div style={{ flex: '1', minWidth: '180px', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <select 
+            <select
               className="rpg-input"
               style={{ width: '100%', fontSize: '0.9rem', cursor: 'pointer', height: '40px', padding: '0 8px' }}
               value={taskDateOption}
@@ -1039,13 +1041,13 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
             </select>
-            
+
             {taskDateOption === 'custom' && (
-              <input 
-                type="text" 
-                className="rpg-input animate-fade-in" 
-                style={{ width: '115px', fontSize: '0.85rem', height: '40px' }} 
-                placeholder="ГГГГ-ММ-ДД" 
+              <input
+                type="text"
+                className="rpg-input animate-fade-in"
+                style={{ width: '115px', fontSize: '0.85rem', height: '40px' }}
+                placeholder="ГГГГ-ММ-ДД"
                 value={customDateValue}
                 onChange={(e) => setCustomDateValue(e.target.value)}
               />
@@ -1054,18 +1056,18 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
 
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.9rem', color: 'var(--color-bone-dim)' }}>
-              <input 
-                type="checkbox" 
-                checked={isLongJourney} 
-                onChange={(e) => setIsLongJourney(e.target.checked)} 
-                style={{ width: '18px', height: '18px', accentColor: 'var(--color-blood)', cursor: 'pointer' }} 
+              <input
+                type="checkbox"
+                checked={isLongJourney}
+                onChange={(e) => setIsLongJourney(e.target.checked)}
+                style={{ width: '18px', height: '18px', accentColor: 'var(--color-blood)', cursor: 'pointer' }}
               />
               <span>Длительное путешествие</span>
             </label>
           </div>
 
           <div style={{ display: 'flex', gap: '0.5rem', marginLeft: 'auto' }}>
-            <button 
+            <button
               className="rpg-btn rpg-btn-mana"
               onClick={() => {
                 const targetDate = taskDateOption === 'backlog' ? null : (taskDateOption === 'custom' ? customDateValue.trim() || null : taskDateOption);
@@ -1137,7 +1139,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
           animation: 'screen-shiver 0.3s 1'
         }}>
           <span>{ritualMessage}</span>
-          <button 
+          <button
             onClick={() => setRitualMessage('')}
             style={{ background: 'none', border: 'none', color: 'var(--color-bone-dim)', cursor: 'pointer', fontSize: '1rem', fontWeight: 'bold' }}
           >
@@ -1147,7 +1149,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
       )}
 
       {/* 2. Tweek Horizontal Scrollboard - NOW AT THE TOP WITH DRAG-TO-SCROLL */}
-      <div 
+      <div
         className="tweek-scrollboard"
         ref={scrollRef}
         onMouseDown={handleMouseDown}
@@ -1159,13 +1161,13 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
           const dayTasks = tasks.filter(t => t.date === day.dateStr && t.status !== 'buried');
 
           return (
-            <div 
-              key={day.dateStr} 
+            <div
+              key={day.dateStr}
               className={`tweek-day-col ${day.isToday ? 'today' : ''}`}
               onDragOver={handleDragOver}
               onDrop={(e) => handleDrop(e, day.dateStr)}
             >
-              <div 
+              <div
                 className="tweek-day-header"
                 onClick={() => { playClick(); setActiveKanbanDay(day.dateStr); }}
                 style={{ cursor: 'pointer' }}
@@ -1186,7 +1188,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
               {/* Day Tasks List */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1, overflowY: 'auto' }}>
                 {dayTasks.map(task => (
-                  <div 
+                  <div
                     key={task.id}
                     className={`task-card ${task.type} ${task.status === 'completed' ? 'completed' : ''} ${task.curseLevel > 2 ? 'cursed' : ''}`}
                     draggable
@@ -1203,20 +1205,20 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
                       )}
                     </div>
                     {renderTaskNatureBadge(task)}
-                    
+
                     {/* Small action bars */}
                     <div style={{ display: 'flex', gap: '0.3rem', marginTop: '0.5rem', justifyContent: 'flex-end' }}>
                       {task.status !== 'completed' && (
                         <>
-                          <button 
-                            className="rpg-btn" 
+                          <button
+                            className="rpg-btn"
                             style={{ fontSize: '0.65rem', padding: '2px 5px' }}
                             onClick={() => handleSealTask(task.id)}
                           >
                             Запечатать
                           </button>
-                          <button 
-                            className="rpg-btn rpg-btn-blood" 
+                          <button
+                            className="rpg-btn rpg-btn-blood"
                             style={{ fontSize: '0.65rem', padding: '2px 5px' }}
                             onClick={() => handleBuryTask(task.id)}
                           >
@@ -1238,9 +1240,9 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
 
       {/* 3. Bottom Row: Backlog Skull Contract & Cemetery list */}
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.5rem', marginTop: '1rem' }}>
-        
+
         {/* Parchment Backlog Pact */}
-        <div 
+        <div
           className="parchment-contract"
           onDragOver={handleDragOver}
           onDrop={(e) => handleDrop(e, null)}
@@ -1268,8 +1270,8 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
                   <span style={{ fontSize: '0.65rem', color: 'var(--color-bone-dim)' }}>
                     {task.type === 'siege' ? 'Осада' : 'Охота'}
                   </span>
-                  <button 
-                    className="rpg-btn" 
+                  <button
+                    className="rpg-btn"
                     style={{ fontSize: '0.6rem', padding: '1px 4px' }}
                     onClick={() => handleSealTask(task.id)}
                   >
@@ -1301,8 +1303,8 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
                 <span style={{ textDecoration: 'line-through', opacity: 0.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '120px' }}>
                   {task.title}
                 </span>
-                <button 
-                  className="rpg-btn" 
+                <button
+                  className="rpg-btn"
                   style={{ fontSize: '0.6rem', padding: '1px 5px' }}
                   onClick={() => handleResurrectTask(task.id)}
                 >
@@ -1341,8 +1343,8 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
           {/* Postpone all */}
           <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', background: 'rgba(0,0,0,0.3)', padding: '0.8rem', border: '1px solid rgba(255,255,255,0.03)' }}>
             <span style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', textTransform: 'uppercase', marginBottom: '8px' }}>Временная Отсрочка (Все задачи)</span>
-            <button 
-              className="rpg-btn rpg-btn-blood" 
+            <button
+              className="rpg-btn rpg-btn-blood"
               style={{ padding: '8px 12px', fontSize: '0.8rem', fontWeight: 'bold' }}
               onClick={handlePostponeAllToday}
               disabled={tasks.filter(t => t.date === new Date().toISOString().split('T')[0] && t.status === 'active').length === 0}
@@ -1355,8 +1357,8 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
           <div style={{ display: 'flex', flexDirection: 'column', background: 'rgba(0,0,0,0.3)', padding: '0.8rem', border: '1px solid rgba(255,255,255,0.03)' }}>
             <span style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', textTransform: 'uppercase', marginBottom: '8px' }}>Призвать контракт на сегодня</span>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <select 
-                className="rpg-input" 
+              <select
+                className="rpg-input"
                 style={{ flex: 1, fontSize: '0.8rem' }}
                 value={taskToPullId}
                 onChange={(e) => setTaskToPullId(e.target.value)}
@@ -1368,8 +1370,8 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
                   </option>
                 ))}
               </select>
-              <button 
-                className="rpg-btn rpg-btn-mana" 
+              <button
+                className="rpg-btn rpg-btn-mana"
                 style={{ fontSize: '0.8rem', padding: '4px 10px' }}
                 onClick={() => handlePullTaskToToday(taskToPullId)}
                 disabled={!taskToPullId}
@@ -1383,8 +1385,8 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
           <div style={{ display: 'flex', flexDirection: 'column', background: 'rgba(0,0,0,0.3)', padding: '0.8rem', border: '1px solid rgba(255,255,255,0.03)' }}>
             <span style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', textTransform: 'uppercase', marginBottom: '8px' }}>Изгнать контракт из сегодняшнего дня</span>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-              <select 
-                className="rpg-input" 
+              <select
+                className="rpg-input"
                 style={{ fontSize: '0.8rem' }}
                 value={taskToPushId}
                 onChange={(e) => setTaskToPushId(e.target.value)}
@@ -1395,8 +1397,8 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
                 ))}
               </select>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <select 
-                  className="rpg-input" 
+                <select
+                  className="rpg-input"
                   style={{ flex: 1, fontSize: '0.8rem' }}
                   value={pushDestination}
                   onChange={(e) => setPushDestination(e.target.value)}
@@ -1404,8 +1406,8 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
                   <option value="backlog">В Бэклог (Без даты)</option>
                   <option value="tomorrow">На завтра</option>
                 </select>
-                <button 
-                  className="rpg-btn" 
+                <button
+                  className="rpg-btn"
                   style={{ fontSize: '0.8rem', borderColor: 'var(--color-blood)', padding: '4px 10px' }}
                   onClick={() => handlePushTask(taskToPushId, pushDestination)}
                   disabled={!taskToPushId}
@@ -1417,14 +1419,14 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
           </div>
         </div>
       </div>
-        
+
 
 
       {/* NESTED KANBAN DAY BOARD MODAL */}
       {activeKanbanDay && (
         <div className="gothic-modal-overlay">
           <div className="gothic-modal-content" style={{ maxWidth: '900px', width: '95%' }}>
-            
+
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-iron-light)', paddingBottom: '0.8rem', marginBottom: '1rem' }}>
               <div>
                 <h3 className="gothic-title" style={{ fontSize: '1.3rem', color: '#fff' }}>
@@ -1434,7 +1436,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
                   Управляйте активной фазой сражений за этот конкретный день.
                 </span>
               </div>
-              <button 
+              <button
                 className="rpg-btn"
                 style={{ padding: '4px 10px' }}
                 onClick={() => { playClick(); setActiveKanbanDay(null); }}
@@ -1446,7 +1448,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
             {/* Kanban Grid */}
             <div className="kanban-grid">
               {/* 1. TO DO / CONTRACT BACKLOG */}
-              <div 
+              <div
                 className="kanban-col"
                 onDragOver={handleDragOver}
                 onDrop={(e) => handleDrop(e, activeKanbanDay)}
@@ -1454,8 +1456,8 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
                 <h4 className="kanban-col-title">📜 Контракты (To Do)</h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   {tasks.filter(t => t.date === activeKanbanDay && t.status === 'active' && (!t.steps || !t.steps.some(s => s.completed))).map(task => (
-                    <div 
-                      key={task.id} 
+                    <div
+                      key={task.id}
                       className={`task-card ${task.type}`}
                       draggable
                       onDragStart={(e) => handleDragStart(e, task.id)}
@@ -1477,9 +1479,9 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
                 <h4 className="kanban-col-title">⚔ В разгаре боя (In Progress)</h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   {tasks.filter(t => t.date === activeKanbanDay && t.status === 'active' && t.steps && t.steps.some(s => s.completed)).map(task => (
-                    <div 
-                      key={task.id} 
-                      className={`task-card ${task.type}`} 
+                    <div
+                      key={task.id}
+                      className={`task-card ${task.type}`}
                       style={{ borderLeftColor: 'var(--color-mana)', cursor: 'pointer' }}
                       onDoubleClick={() => { playClick(); handleOpenEdit(task); }}
                     >
@@ -1501,8 +1503,8 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
                 <h4 className="kanban-col-title">💎 Победа / Запечатано (Done)</h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   {tasks.filter(t => t.date === activeKanbanDay && t.status === 'completed').map(task => (
-                    <div 
-                      key={task.id} 
+                    <div
+                      key={task.id}
                       className="task-card completed"
                       onDoubleClick={() => { playClick(); handleOpenEdit(task); }}
                       style={{ cursor: 'pointer' }}
@@ -1518,11 +1520,11 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
 
             {/* Quick add within Kanban day */}
             <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1.5rem', borderTop: '1px solid var(--color-iron-light)', paddingTop: '1rem' }}>
-              <textarea 
+              <textarea
                 ref={kanbanNewTaskTitleRef}
-                className="rpg-input rpg-input-auto kanban-input rpg-scrollbar" 
-                style={{ 
-                  flex: 1, 
+                className="rpg-input rpg-input-auto kanban-input rpg-scrollbar"
+                style={{
+                  flex: 1,
                   fontSize: '0.85rem',
                   minHeight: '35px',
                   resize: 'none',
@@ -1531,7 +1533,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
                   paddingBottom: '6px',
                   lineHeight: '1.3',
                   display: 'block'
-                }} 
+                }}
                 placeholder="Быстрый контракт на этот день..."
                 value={newTaskTitle}
                 onChange={(e) => setNewTaskTitle(e.target.value)}
@@ -1542,8 +1544,8 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
                   }
                 }}
               />
-              <button 
-                className="rpg-btn rpg-btn-mana" 
+              <button
+                className="rpg-btn rpg-btn-mana"
                 onClick={() => handleCreateTask(activeKanbanDay)}
                 disabled={!newTaskTitle.trim()}
               >
@@ -1559,7 +1561,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
       {editingTask && (
         <div className="gothic-modal-overlay" onClick={() => setEditingTask(null)}>
           <div className="gothic-modal-content" style={{ maxWidth: '680px', width: '90%', maxHeight: '90vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
-            
+
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-iron-light)', paddingBottom: '0.8rem', marginBottom: '1.2rem' }}>
               <h3 className="gothic-title" style={{ fontSize: '1.2rem', color: 'var(--color-relic-glow)' }}>
                 ⚔ Свиток Контракта: {editingTask.title.slice(0, 30)}...
@@ -1611,9 +1613,9 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
                       <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--color-bone-dim)', marginBottom: '4px' }}>
                         Вопрос {idx + 1}: {q}
                       </label>
-                      <input 
-                        type="text" 
-                        className="rpg-input" 
+                      <input
+                        type="text"
+                        className="rpg-input"
                         style={{ width: '100%', fontSize: '0.9rem' }}
                         placeholder="Ответьте честно..."
                         value={guidedAnswers[idx] || ''}
@@ -1624,8 +1626,8 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
                   <button className="rpg-btn" onClick={() => setGuidedStep(0)}>Назад</button>
-                  <button 
-                    className="rpg-btn rpg-btn-mana" 
+                  <button
+                    className="rpg-btn rpg-btn-mana"
                     onClick={handleEditAnswerSubmit}
                     disabled={Object.keys(guidedAnswers).length < guidedQuestions.length}
                   >
@@ -1641,11 +1643,11 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
                 <div style={{ display: 'grid', gridTemplateColumns: '2.5fr 1fr 1fr', gap: '0.8rem' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginBottom: '4px' }}>НАЗВАНИЕ КОНТРАКТА</label>
-                    <textarea 
+                    <textarea
                       ref={editTitleRef}
-                      className="rpg-input rpg-input-auto rpg-scrollbar" 
-                      style={{ 
-                        width: '100%', 
+                      className="rpg-input rpg-input-auto rpg-scrollbar"
+                      style={{
+                        width: '100%',
                         fontSize: '0.95rem',
                         minHeight: '40px',
                         resize: 'none',
@@ -1654,15 +1656,15 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
                         paddingBottom: '8px',
                         lineHeight: '1.3',
                         display: 'block'
-                      }} 
+                      }}
                       value={editTitle}
                       onChange={(e) => setEditTitle(e.target.value)}
                     />
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginBottom: '4px' }}>ТИП СУЩНОСТИ</label>
-                    <select 
-                      className="rpg-input" 
+                    <select
+                      className="rpg-input"
                       style={{ width: '100%', fontSize: '0.9rem' }}
                       value={editType}
                       onChange={(e) => setEditType(e.target.value)}
@@ -1675,10 +1677,10 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginBottom: '4px' }}>ВРЕМЯ (МИН)</label>
-                    <input 
-                      type="number" 
-                      className="rpg-input" 
-                      style={{ width: '100%', fontSize: '0.9rem' }} 
+                    <input
+                      type="number"
+                      className="rpg-input"
+                      style={{ width: '100%', fontSize: '0.9rem' }}
                       value={editTime}
                       onChange={(e) => setEditTime(e.target.value)}
                     />
@@ -1689,8 +1691,8 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginBottom: '4px' }}>ПРИРОДА ЗАДАЧИ</label>
-                    <select 
-                      className="rpg-input" 
+                    <select
+                      className="rpg-input"
                       style={{ width: '100%', fontSize: '0.9rem' }}
                       value={editNature}
                       onChange={(e) => setEditNature(e.target.value)}
@@ -1701,8 +1703,8 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginBottom: '4px' }}>РЕЖИМ ВЫПОЛНЕНИЯ</label>
-                    <select 
-                      className="rpg-input" 
+                    <select
+                      className="rpg-input"
                       style={{ width: '100%', fontSize: '0.9rem' }}
                       value={editExecutionMode}
                       onChange={(e) => setEditExecutionMode(e.target.value)}
@@ -1719,8 +1721,8 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
                   <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginBottom: '4px' }}>
                     СМЫСЛОВОЙ ЯКОРЬ (НАМЕРЕНИЕ ДЛЯ ADHD - ЗАЧЕМ МНЕ ЭТО СЕГОДНЯ?)
                   </label>
-                  <textarea 
-                    className="rpg-input" 
+                  <textarea
+                    className="rpg-input"
                     style={{ width: '100%', minHeight: '55px', fontSize: '0.85rem', resize: 'vertical' }}
                     placeholder="Например: Чтобы сдать проект и получить деньги на долгожданный стул, сняв тревогу..."
                     value={editIntent}
@@ -1736,18 +1738,18 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
                   <p style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginBottom: '10px' }}>
                     ИИ автоматически перестроит структуру шагов, используя отредактированное название и намерение выше как истинный контекст.
                   </p>
-                  
+
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button 
-                      className="rpg-btn" 
-                      style={{ flex: 1, fontSize: '0.75rem' }} 
+                    <button
+                      className="rpg-btn"
+                      style={{ flex: 1, fontSize: '0.75rem' }}
                       onClick={handleEditInstantDeconstruct}
                     >
                       🚀 БЫСТРО И ГРУБО
                     </button>
-                    <button 
-                      className="rpg-btn rpg-btn-mana" 
-                      style={{ flex: 1, fontSize: '0.75rem' }} 
+                    <button
+                      className="rpg-btn rpg-btn-mana"
+                      style={{ flex: 1, fontSize: '0.75rem' }}
                       onClick={handleEditStartGuided}
                     >
                       🔮 С СОПРОВОЖДЕНИЕМ (ВОПРОСЫ)
@@ -1760,36 +1762,36 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
                   <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--color-bone)', marginBottom: '6px', fontFamily: 'var(--font-rpg)' }}>
                     СПИСОК ШАГОВ (РУЧНЫЕ КОРРЕКТИРОВКИ):
                   </label>
-                  
+
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '180px', overflowY: 'auto', marginBottom: '0.8rem' }}>
                     {editSteps.map(s => (
-                      <div 
-                        key={s.id} 
-                        style={{ 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          gap: '0.5rem', 
-                          background: 'rgba(0,0,0,0.2)', 
-                          padding: '6px 10px', 
-                          border: '1px solid var(--color-iron-light)' 
+                      <div
+                        key={s.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          background: 'rgba(0,0,0,0.2)',
+                          padding: '6px 10px',
+                          border: '1px solid var(--color-iron-light)'
                         }}
                       >
-                        <input 
-                          type="checkbox" 
-                          checked={s.completed} 
+                        <input
+                          type="checkbox"
+                          checked={s.completed}
                           onChange={() => handleToggleStepManual(s.id)}
                         />
-                        <span style={{ 
-                          fontSize: '0.85rem', 
+                        <span style={{
+                          fontSize: '0.85rem',
                           color: s.completed ? 'var(--color-bone-dim)' : '#fff',
                           textDecoration: s.completed ? 'line-through' : 'none',
                           flex: 1
                         }}>
                           {s.title}
                         </span>
-                        <button 
-                          className="rpg-btn" 
-                          style={{ padding: '2px 6px', color: 'var(--color-blood-glow)' }} 
+                        <button
+                          className="rpg-btn"
+                          style={{ padding: '2px 6px', color: 'var(--color-blood-glow)' }}
                           onClick={() => handleDeleteStepManual(s.id)}
                         >
                           ✕
@@ -1805,10 +1807,10 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
 
                   {/* Manual Step Adding Field */}
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <input 
-                      type="text" 
-                      className="rpg-input" 
-                      style={{ flex: 1, fontSize: '0.85rem' }} 
+                    <input
+                      type="text"
+                      className="rpg-input"
+                      style={{ flex: 1, fontSize: '0.85rem' }}
                       placeholder="Добавить свой ручной шаг..."
                       value={newStepText}
                       onChange={(e) => setNewStepText(e.target.value)}

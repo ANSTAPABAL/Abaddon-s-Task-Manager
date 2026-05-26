@@ -11,6 +11,15 @@ const getRacePortraitUrl = (race) => {
   return null;
 };
 
+const getMoralCompassInfo = (moral) => {
+  const m = moral !== undefined ? moral : 50;
+  if (m >= 80) return { label: "☀️ Искупленный (Redeemer)", color: "#ffb813", desc: "Душа чиста. Путники Бездны видят в вас спасителя и с радостью делятся силой." };
+  if (m >= 60) return { label: "🕯️ Стойкий Путник (Wayfarer)", color: "#2ecc71", desc: "Ваш дух крепок, вы держите слово и помогаете тем, кого встречаете." };
+  if (m >= 40) return { label: "🌫️ Черствый Скиталец (Callous)", color: "#95a5a6", desc: "Вы безразличны к другим. Мирные встречи становятся холодными." };
+  if (m >= 20) return { label: "💀 Падший Изгой (Fallen)", color: "#e74c3c", desc: "Ваше имя осквернено прокрастинацией. На вас нападают бандиты, а NPC гибнут." };
+  return { label: "👹 Мясник Бездны (Butcher)", color: "#ff0000", desc: "Полное падение духа. Вокруг вас лишь смерть и пепел." };
+};
+
 export default function CharacterSheet({ character, setCharacter, tasks, setTasks, requestDeconstruction, pedestals = [], savePedestals }) {
   const { playClick, playBoneCrack, playSuccess } = useAudio();
   const [selectedTask, setSelectedTask] = useState(null);
@@ -22,9 +31,6 @@ export default function CharacterSheet({ character, setCharacter, tasks, setTask
   const [guidedQuestions, setGuidedQuestions] = useState([]);
   const [guidedAnswers, setGuidedAnswers] = useState({});
   const [guidedStep, setGuidedStep] = useState(0); // 0 = start, 1 = answering questions, 2 = steps generated
-
-  // Customization handbook state
-  const [assetScrollOpen, setAssetScrollOpen] = useState(false);
 
   // Shop Items Configuration
   const merchantItems = [
@@ -225,6 +231,8 @@ export default function CharacterSheet({ character, setCharacter, tasks, setTask
     setCharacter(prev => ({ ...prev, mana: Math.min(prev.maxMana, prev.mana + 2) }));
   };
 
+  const getMoralCompassInfoLocal = (moral) => getMoralCompassInfo(moral);
+
   const getClassIcon = () => {
     if (character.class.includes("Некромант")) return "💀";
     if (character.class.includes("Рыцарь")) return "⚔";
@@ -279,21 +287,28 @@ export default function CharacterSheet({ character, setCharacter, tasks, setTask
               <span>{getClassIcon()}</span>
               <span>Лист Персонажа</span>
             </h2>
-            
-            <button 
-              className="rpg-btn" 
-              style={{ fontSize: '0.7rem', padding: '3px 8px', borderColor: 'var(--color-relic-glow)' }}
-              onClick={() => { playClick(); setAssetScrollOpen(true); }}
-            >
-              <FileText size={10} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />
-              СВИДЕТЕЛЬСТВО АССЕТОВ
-            </button>
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', background: 'rgba(0,0,0,0.2)', padding: '5px 10px', border: '1px solid var(--color-iron-light)' }}>
             <span style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)' }}>Сундук с золотом:</span>
             <span style={{ fontSize: '1rem', color: 'var(--color-relic-glow)', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '2px' }}>
               🪙 {character.gold || 0} ЗОЛОТА
+            </span>
+          </div>
+
+          {/* Moral Compass Display */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '1rem', background: 'rgba(0,0,0,0.2)', padding: '8px 10px', border: '1px solid var(--color-iron-light)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)' }}>Моральный Компас:</span>
+              <span style={{ fontSize: '0.85rem', color: getMoralCompassInfoLocal(character.moralCompass).color, fontWeight: 'bold', fontFamily: 'var(--font-rpg)' }}>
+                {getMoralCompassInfoLocal(character.moralCompass).label}
+              </span>
+            </div>
+            <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '3px', overflow: 'hidden', marginTop: '4px', border: '1px solid rgba(255,255,255,0.1)' }}>
+              <div style={{ width: `${character.moralCompass !== undefined ? character.moralCompass : 50}%`, height: '100%', background: getMoralCompassInfoLocal(character.moralCompass).color, transition: 'width 0.5s ease-in-out' }} />
+            </div>
+            <span style={{ fontSize: '0.68rem', color: 'var(--color-bone-dim)', fontStyle: 'italic', marginTop: '2px', lineHeight: '1.2' }}>
+              {getMoralCompassInfoLocal(character.moralCompass).desc} (Сила духа: {character.moralCompass !== undefined ? character.moralCompass : 50}/100)
             </span>
           </div>
 
@@ -577,61 +592,6 @@ export default function CharacterSheet({ character, setCharacter, tasks, setTask
         </div>
       </div>
 
-      {/* ASSET CUSTOMIZATION HANDBOOK MODAL */}
-      {assetScrollOpen && (
-        <div className="gothic-modal-overlay">
-          <div className="gothic-modal-content" style={{ maxWidth: '680px', width: '90%', maxHeight: '85vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-iron-light)', paddingBottom: '0.8rem', marginBottom: '1rem' }}>
-              <h3 className="gothic-title" style={{ fontSize: '1.25rem', color: 'var(--color-relic-glow)' }}>
-                📖 Книга Кастомизации & Поиска Ассетов
-              </h3>
-              <button className="rpg-btn" style={{ padding: '4px 10px' }} onClick={() => setAssetScrollOpen(false)}>
-                Закрыть книгу
-              </button>
-            </div>
-
-            <p style={{ fontSize: '0.85rem', color: 'var(--color-bone-dim)', marginBottom: '1.5rem', lineHeight: '1.5' }}>
-              Процедурные звуки Web Audio работают отлично, но вы можете сделать погружение полноценным! 
-              Просто найдите и положите аудио файлы формата **.mp3** в вашу локальную папку:
-              <br />
-              <code style={{ background: '#000', padding: '3px 8px', color: '#1db954', fontSize: '0.85rem', fontFamily: 'monospace', display: 'inline-block', marginTop: '5px' }}>
-                public/sounds/
-              </code>
-            </p>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
-              <div style={{ background: 'rgba(0,0,0,0.3)', padding: '10px', borderLeft: '3px solid var(--color-relic-glow)' }}>
-                <b style={{ color: '#fff', fontSize: '0.9rem' }}>🖱️ Звук Клика:</b>
-                <div style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)' }}>Имя файла: <code style={{ color: 'var(--color-mana-glow)' }}>public/sounds/click.mp3</code></div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginTop: '2px' }}>Рекомендуется: Короткий деревянный щелчок или звон меча из Diablo.</div>
-              </div>
-
-              <div style={{ background: 'rgba(0,0,0,0.3)', padding: '10px', borderLeft: '3px solid var(--color-blood)' }}>
-                <b style={{ color: '#fff', fontSize: '0.9rem' }}>☠️ Звук Разрушения / Смерти (Bury):</b>
-                <div style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)' }}>Имя файла: <code style={{ color: 'var(--color-blood-glow)' }}>public/sounds/bonecrack.mp3</code></div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginTop: '2px' }}>Рекомендуется: Хруст костей, скрежет тяжелой цепи, или звук смерти скелета.</div>
-              </div>
-
-              <div style={{ background: 'rgba(0,0,0,0.3)', padding: '10px', borderLeft: '3px solid var(--color-mana)' }}>
-                <b style={{ color: '#fff', fontSize: '0.9rem' }}>✨ Звук Запечатывания (Complete):</b>
-                <div style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)' }}>Имя файла: <code style={{ color: 'var(--color-mana-glow)' }}>public/sounds/success.mp3</code></div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginTop: '2px' }}>Рекомендуется: Звон церковного колокола, триумфальные фанфары или шелест святой магии.</div>
-              </div>
-
-              <div style={{ background: 'rgba(0,0,0,0.3)', padding: '10px', borderLeft: '3px solid var(--color-blood-glow)' }}>
-                <b style={{ color: '#fff', fontSize: '0.9rem' }}>💓 Звук Сердцебиения (Timer):</b>
-                <div style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)' }}>Имя файла: <code style={{ color: 'var(--color-blood-glow)' }}>public/sounds/heartbeat.mp3</code></div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginTop: '2px' }}>Рекомендуется: Глухой, двойной удар человеческого сердца. Автоматически ускоряется на таймере.</div>
-              </div>
-            </div>
-
-            <h4 className="rpg-title" style={{ color: '#fff', fontSize: '0.95rem', marginBottom: '0.5rem' }}>🎨 Кастомизация графики (CSS):</h4>
-            <p style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)', lineHeight: '1.4' }}>
-              Вы можете заменить фоновые изображения на текстуры старинного пергамента! Положите картинку <code style={{ color: 'var(--color-relic-glow)' }}>parchment.png</code> в папку <code style={{ color: 'var(--color-mana-glow)' }}>public/</code> и укажите её в файле <code style={{ color: 'var(--color-mana-glow)' }}>src/index.css</code> для классов <code style={{ color: '#fff' }}>.rpg-panel</code> или <code style={{ color: '#fff' }}>.parchment-contract</code>.
-            </p>
-          </div>
-        </div>
-      )}
 
         </div>
       ) : (

@@ -5,7 +5,8 @@ import {
   Timer, Award, Compass, Eye, BookOpen, Volume2 
 } from 'lucide-react';
 import { useAudio } from '../hooks/useAudio';
-import { rollStartingCharacter, merchantItems } from '../utils/characterUtils';
+import { rollStartingCharacter } from '../utils/characterUtils';
+import { getVirtualTodayStr, getVirtualTomorrowStr } from '../utils/dateUtils';
 
 // Список 50 уникальных вариаций когнитивной борьбы Бездны (ADHD-аспекты)
 const COMBAT_VARIATIONS = [
@@ -316,7 +317,6 @@ export default function CarriageSession({
   const [sessionSteps, setSessionSteps] = useState([]);
 
   const [resolutionNpc, setResolutionNpc] = useState(null);
-  const [selectedDeed, setSelectedDeed] = useState(null);
   const [npcNewTaskTitle, setNpcNewTaskTitle] = useState('');
 
   // Editing Task modal states in CarriageSession
@@ -418,8 +418,9 @@ export default function CarriageSession({
   const [resolutionType, setResolutionType] = useState('victory'); // victory, flee, death
   const [resolutionText, setResolutionText] = useState('');
   const [resolutionLoading, setResolutionLoading] = useState(false);
+  const [resolutionIsAmbush, setResolutionIsAmbush] = useState(false);
 
-  const handleGenerateResolutionChronicle = async (type, task, enemy) => {
+  const handleGenerateResolutionChronicle = async (type, task, enemy, isAmbush = false, npcName = '') => {
     if (resolutionLoading) return;
     setResolutionLoading(true);
     setResolutionText('');
@@ -439,7 +440,10 @@ export default function CarriageSession({
     }
 
     let prompt = '';
-    if (type === 'victory') {
+    if (isAmbush) {
+      prompt = `Ты — Летописец Бездны во вселенной Абаддона. Опиши короткую, суровую и грязную летопись-эпитафию в стиле Джо Аберкромби.
+Герой завершил контракт «${task?.title || ''}», одолев врага «${enemy}», но его промедление и нерешительность привлекли разбойников. Он пришел на место встречи, но обнаружил лишь растерзанное тело «${npcName}». Герой в ярости перебил бандитов Бездны, осквернивших привал. Опиши эту суровую схватку и запах крови. До 90 слов, 2 абзаца.`;
+    } else if (type === 'victory') {
       prompt = `Ты — Летописец Бездны во вселенной Абаддона. Опиши короткую, суровую и грязную летопись-эпитафию в стиле Джо Аберкромби (темное фэнтези, реализм, цинизм, кровь, пот и грязь).
 Герой одержал победу в фокус-сессии над когнитивной тварью: «${enemy}» (задача: "${task?.title || ''}").
 ${legacyPromptContext}
@@ -524,14 +528,1367 @@ ${legacyPromptContext}
         }
       }
 
-      const fallbacks = {
-        mirror: `«${npc.name}» обнажает ваши скрытые когнитивные страхи...\n\nТы медлишь не из-за лени, а из-за страха. Но кандалы куются из сомнений. Сделай первый шаг: проведи ритуал "${activity.label.toLowerCase()}", чтобы вернуть себе контроль.`,
-        provoking: `«${npc.name}» испытывает вашу стойкость...\n\nДумаешь, у тебя полно времени? Бездна сожрет твои часы, если ты не очнешься. Встань и выполни "${activity.label.toLowerCase()}". Докажи, что ты хозяин своей воли!`,
-        helping: `«${npc.name}» дает практическое напутствие...\n\nРитуал "${activity.label.toLowerCase()}" — это не трата времени, это замена изношенных колес у твоей повозки. Сделай его не спеша, восстанови когнитивные силы.`,
-        motivating: `«${npc.name}» укрепляет твою решимость...\n\nКаждая победа рождается из умения вовремя перевести дух. Выполни "${activity.label.toLowerCase()}" — очисти разум от накопленной когнитивной гнили.`,
-        nonNpc: `Вы погружаетесь в глубокие размышления на границе Бездны. Проведя ритуал "${activity.label.toLowerCase()}", вы ощущаете, как когнитивное напряжение плавно отступает, уступая место чистой концентрации.`
+      if (isAmbush) {
+        setResolutionText(`Ты завершил контракт «${task?.title || ''}», одолев врага «${enemy}», но твое промедление привело к трагедии. Придя на встречу, ты наткнулся лишь на растерзанный труп «${npcName}», окруженный шакалами Бездны. 
+
+В ярости ты врубился в строй разбойников. Земля пропиталась грязной кровью, когда последний бандит испустил дух. Запах гари и сырого мяса еще долго будет преследовать тебя, а в карманах нападавших нашлось лишь 10 XP и 5 золотых монет.`);
+      } else {
+        const fallbacks = {
+          victory: `Удар пришелся точно в цель. Зазубренное лезвие вошло по самую рукоять, и эта сука «${enemy}» наконец-то испустила дух, захлебнувшись собственной когнитивной желчью. Твой клинок дымится, а вокруг оседает вонючая тень.${heritageVictoryLine}
+
+Ты стоишь по колено в грязи, тяжело дыша, но оковы спали. Голова чиста от дерьма и страхов. ${isLargeQuest || isPastDebt ? 'Этот чертов триумф заставляет тебя вновь поверить в себя, ублюдок, после всей этой бесконечной череды провалов!' : 'Ты победил эту тварь, а значит, и весь остальной мир подождет, пока ты вытираешь кровь с лица.'}`,
+          flee: `Пришлось улепетывать. Тварь «${enemy}» оказалась слишком проворной, а ноги вязли в липкой жиже Бездны. Привкус поражения горчит во рту, как протухший эль.
+
+Но хрен там плавал — ты все еще жив. Спрячься в лагере, залижи раны, погрей задницу у костра и возвращайся. Следующий раунд будет за нами, ублюдок.`,
+          death: `Лицо встретилось с холодной грязью. Хруст костей, гогот «${enemy}» над ухом и темнота. Твой разум расколот на куски, а костлявая уже тянет свои лапы.${heritageDeathLine}
+
+Но сдохнуть сегодня не получилось. Ты очнулся у костра в лагере. Голова трещит, все тело ноет, но ты дышишь. Поднимайся из дерьма, Изгнанник. Нам еще нужно отплатить этой твари.`
+        };
+        setResolutionText(fallbacks[type] || fallbacks.victory);
+      }
+    } finally {
+      setResolutionLoading(false);
+    }
+  };
+
+  // Track running state in localStorage
+  useEffect(() => {
+    localStorage.setItem('combat_is_running', isRunning ? 'true' : 'false');
+  }, [isRunning]);
+
+  // Unmount cleanup: Save time and release indicators
+  useEffect(() => {
+    return () => {
+      if (setupStageRef.current === 'active' && activeTaskRef.current) {
+        const storedTime = localStorage.getItem('combat_time_left');
+        const finalTime = storedTime !== null ? Number(storedTime) : timeLeftRef.current;
+        setTasks(prev => prev.map(t => t.id === activeTaskRef.current.id ? { ...t, timeLeft: finalTime } : t));
+        localStorage.removeItem('active_task_id');
+        localStorage.removeItem('combat_time_left');
+        localStorage.setItem('combat_is_running', 'false');
+      }
+    };
+  }, [setTasks]);
+
+
+
+  const handleRetreatToHub = () => {
+    playClick();
+    if (activeTask && activeTask.executionMode === 'timer') {
+      if (!window.confirm("Вы собираетесь временно отступить в штаб. Оставшееся время таймера будет сохранено. Продолжить?")) {
+        return;
+      }
+    }
+    setIsRunning(false);
+    localStorage.setItem('combat_is_running', 'false');
+
+    if (activeTask) {
+      setTasks(prev => prev.map(t => t.id === activeTask.id ? { ...t, timeLeft: timeLeft } : t));
+    }
+
+    localStorage.removeItem('active_task_id');
+    localStorage.removeItem('combat_time_left');
+    setActiveTask(null);
+    setSetupStage('hub');
+  };
+
+  // --- LEGACY LEGEND & WIN CONDITION FUNCTIONS ---
+
+  
+  const enrichTaskAndLore = async (task) => {
+    // If the task already has steps AND custom combatLore, we can skip it
+    if (task.steps && task.steps.length > 0 && task.combatLore && !task.combatLore.isGeneric) {
+      return;
+    }
+
+    try {
+      const needsSteps = !task.steps || task.steps.length === 0;
+      
+      const lastLegend = pedestals && pedestals.length > 0 ? pedestals[pedestals.length - 1] : null;
+      let legacyPromptContext = "";
+      if (lastLegend && Math.random() < 0.45) { // 45% chance to refer to the legacy, maintaining high variance!
+        if (lastLegend.legacyStatus === 'stained') {
+          legacyPromptContext = "\n⚠️ ЛЕГЕНДА ПРОШЛОГО (Используй ТОЛЬКО для тонкого намека или редкой издевки, не зацикливайся!): Предыдущий герой (" + lastLegend.name + ", класс " + lastLegend.class + ") погиб в канавах Абаддона, и его имя ЗАПЯТНАНО. Если уместно, пусть враг в своем появлении (\"loreDescription\") мимоходом поглумится над этим позором рода текущего героя (например: \"Я чую запах гнилой крови " + lastLegend.name + " на тебе...\"). Но сохраняй уникальную самобытность текущего врага!";
+        } else if (lastLegend.legacyStatus === 'sanctified') {
+          legacyPromptContext = "\n⚠️ ЛЕГЕНДА ПРОШЛОГО (Используй ТОЛЬКО для тонкого намека, не зацикливайся!): Предыдущий герой (" + lastLegend.name + ", класс " + lastLegend.class + ") совершил великий триумф, и его имя ОСВЯЩЕНО. Если уместно, пусть враг в своем появлении (\"loreDescription\") выразит ярость или опаску относительно этого благородного рода (например: \"Слава твоего предка " + lastLegend.name + " не спасет тебя от моих когтей...\"). Но сохраняй уникальную самобытность текущего врага!";
+        }
+      }
+
+      const systemPrompt = `Ты — Древний Летописец Бездны во вселенной Абаддона (grim-dark RPG).
+Твоя задача — проанализировать задачу пользователя и вернуть JSON с геймификацией и деконструкцией.
+${legacyPromptContext}
+
+1. Классифицируй задачу по типу ("type"):
+   - "siege" (осада): крупные проекты, сложные отчеты, курсовые, дипломные, написание большого объема кода/текста.
+   - "relic" (реликвия): изучение нового, чтение документации, рисование, исследование, анализ.
+   - "corpse" (тлен/труп): разбор старых хвостов, долгов, уборка, очистка файлов, рутина.
+   - "hunt" (охота): стандартные дела, звонки, отправка писем, быстрые задачи.
+
+2. Сгенерируй атмосферного уникального врага:
+   - Враг должен быть преимущественно ГУМАНОИДНЫМ или МИФОЛОГИЧЕСКИМ существом из жанра grim-dark (например: ослепший паладин, плачущая сирена, костяной ткач, безумный жрец Бездны, пожиратель кожи, повелитель цепей, безголовый командор).
+   - Дай ему жуткое, уникальное имя ("enemyName") и подробное описание его появления из грота ("loreDescription", 3-4 предложения) с его повадками, оружием и внешним видом. Описание должно сочно и детализированно рисовать гуманоидный или мифологический grim-dark силуэт (его пронзительный взгляд, очертания лат или масок, трещины на оружии, мрачные повадки). СТРОГО ЗАПРЕЩЕНЫ любые бесформенные летающие сгустки плоти, аморфные черные черви, склизкие паразиты и клубки конечностей (избегай этого клише полностью).
+   - Сгенерируй 2 слабости ("weakPoints") на основе его повадок (например: "он медлителен из-за тяжелых лат...", "боится резких шагов...").
+   - Сгенерируй 1 случайное событие поля боя ("randomEvent").
+
+3. Если needsSteps равен true, разложи задачу на 4-6 элементарных физических микро-шагов ("steps"). Шаги должны быть геймифицированы (RPG действие + в скобках простое реальное действие, например: "Прочесть первую страницу древнего фолианта (Открыть документацию)"). Также дай краткое намерение квеста ("intent").
+
+Выведи ТОЛЬКО валидный JSON-объект в формате:
+{
+  "type": "siege"|"relic"|"hunt"|"corpse",
+  "enemyName": "Имя врага",
+  "loreDescription": "Жуткое подробное описание появления врага из грота.",
+  "weakPoints": ["Слабость 1", "Слабость 2"],
+  "randomEvent": "Событие на поле боя",
+  "intent": "Намерение",
+  "steps": ["Микро-шаг 1", "Микро-шаг 2"] // вернуть только если needsSteps равен true
+}`;
+
+      const userPrompt = `Задача: "${task.title}". Текущий тип: ${task.type || 'hunt'}. Требуется шагов (needsSteps): ${needsSteps}.`;
+
+      const response = await fetch('http://localhost:3001/api/ai/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ]
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        let text = data.choices[0].message.content.trim();
+        if (text.startsWith("```json")) text = text.slice(7);
+        if (text.endsWith("```")) text = text.slice(0, -3);
+        const parsed = JSON.parse(text.trim());
+
+        const updatedLore = {
+          enemyName: parsed.enemyName || "Безымянный Ужас Бездны",
+          visualType: parsed.type || task.type || 'hunt',
+          weakPoints: parsed.weakPoints || ["Враг неповоротлив: начните с простого действия."],
+          randomEvent: parsed.randomEvent || "Тьма сгущается над полем боя.",
+          loreDescription: parsed.loreDescription || "Жуткая тварь преграждает вам путь.",
+          isGeneric: false
+        };
+
+        const generatedSteps = parsed.steps ? parsed.steps.map((st, index) => ({
+          id: `step-${Date.now()}-${index}`,
+          title: st,
+          completed: false
+        })) : [];
+
+        // Update tasks list in parent state
+        setTasks(prev => prev.map(t => t.id === task.id ? {
+          ...t,
+          type: updatedLore.visualType,
+          pomodoroTime: updatedLore.visualType === 'siege' ? 50 : 25,
+          combatLore: updatedLore,
+          steps: needsSteps ? generatedSteps : t.steps,
+          intent: parsed.intent || t.intent
+        } : t));
+
+        // Update current activeTask state
+        setActiveTask(prev => {
+          if (prev && prev.id === task.id) {
+            return {
+              ...prev,
+              type: updatedLore.visualType,
+              pomodoroTime: updatedLore.visualType === 'siege' ? 50 : 25,
+              combatLore: updatedLore,
+              steps: needsSteps ? generatedSteps : prev.steps,
+              intent: parsed.intent || prev.intent
+            };
+          }
+          return prev;
+        });
+
+        if (needsSteps) {
+          setSessionSteps(generatedSteps);
+          setEnemyHp(100);
+        }
+
+        setEnemyName(updatedLore.enemyName);
+        setCombatVignette(`💥 Режим схватки: [${updatedLore.visualType.toUpperCase()}]. ${updatedLore.loreDescription}`);
+        setCombatLog(prev => [
+          ...prev,
+          `⚔️ Духовная связь установлена! Противник опознан как: ${updatedLore.enemyName}.`,
+          `👁️ Мысль о слабости врага: "${updatedLore.weakPoints[0]}"`,
+          `🌀 Событие поля боя: ${updatedLore.randomEvent}`
+        ]);
+      }
+    } catch (e) {
+      console.warn("Could not enrich task and lore with AI, generating procedural local values:", e);
+      generateCombatEncounter(task);
+    }
+  };
+
+  // --- CARRIAGE TASK EDITING LOGIC ---
+  const handleOpenEdit = (task) => {
+    playClick();
+    setEditingTask(task);
+    setEditTitle(task.title);
+    setEditType(task.type || 'hunt');
+    setEditTime(task.pomodoroTime || 25);
+    setEditIntent(task.intent || '');
+    setEditSteps(task.steps ? [...task.steps] : []);
+    setNewStepText('');
+    setEditDeadline(task.deadline || '');
+    setEditNature(task.nature || 'external');
+    setEditExecutionMode(task.executionMode || 'ask_later');
+    setGuidedStep(0);
+    setGuidedAnswers({});
+  };
+
+  const handleSaveEdit = () => {
+    playClick();
+    if (!editTitle.trim()) return;
+    setTasks(prev => prev.map(t => {
+      if (t.id === editingTask.id) {
+        return {
+          ...t,
+          title: editTitle,
+          type: editType,
+          pomodoroTime: parseInt(editTime) || 25,
+          intent: editIntent,
+          steps: editSteps,
+          deadline: editDeadline,
+          nature: editNature,
+          executionMode: editExecutionMode
+        };
+      }
+      return t;
+    }));
+    playSuccess();
+    setEditingTask(null);
+    setGuidedStep(0);
+    setGuidedAnswers({});
+  };
+
+  const handleAddToBacklog = () => {
+    playClick();
+    setTasks(prev => prev.map(t => {
+      if (t.id === editingTask.id) {
+        return {
+          ...t,
+          date: null,
+          status: 'active'
+        };
+      }
+      return t;
+    }));
+    playSuccess();
+    spawnFloater("В бэклоге", "heal-hp");
+    setEditingTask(null);
+  };
+
+  const handleExileTask = () => {
+    playBoneCrack();
+    setTasks(prev => prev.map(t => {
+      if (t.id === editingTask.id) {
+        return {
+          ...t,
+          status: 'buried'
+        };
+      }
+      return t;
+    }));
+    setCharacter(prev => ({
+      ...prev,
+      hp: Math.max(10, prev.hp - 15),
+      totalHpSacrificed: (prev.totalHpSacrificed || 0) + 15
+    }));
+    triggerFlash('blood');
+    spawnFloater("-15 HP!", "enemy-strike");
+    setEditingTask(null);
+  };
+
+  const handleDetailedDeconstructInEdit = async () => {
+    if (!editTitle.trim()) return;
+    playClick();
+    setEditDeconstructLoading(true);
+    try {
+      const tempTask = { title: editTitle, type: editType };
+      const response = await requestDeconstruction(tempTask, 'instant');
+      if (response && response.steps) {
+        const generated = response.steps.map((s, idx) => ({
+          id: `step-${idx}-${Date.now()}`,
+          title: s,
+          completed: false
+        }));
+        setEditSteps(generated);
+        setEditIntent(response.intent || '');
+        playSuccess();
+      }
+    } catch (e) {
+      console.warn("AI deconstruction failed, falling back to local steps", e);
+      const localSteps = generateLocalSteps(editTitle, editType).map((s, idx) => ({
+        id: `step-${idx}-${Date.now()}`,
+        title: s,
+        completed: false
+      }));
+      setEditSteps(localSteps);
+      setEditIntent("Локальный контракт воли (ИИ Бездны оффлайн)");
+      playSuccess();
+    } finally {
+      setEditDeconstructLoading(false);
+    }
+  };
+
+  const handleEditStartGuided = async () => {
+    if (!editTitle.trim()) return;
+    playClick();
+    setEditDeconstructLoading(true);
+    try {
+      const tempTask = { title: editTitle };
+      const response = await requestDeconstruction(tempTask, 'guided_questions');
+      setGuidedQuestions(response.questions || [
+        "Какой технологический стек или инструменты вы планируете использовать?",
+        "Какие конкретные функциональные требования должны быть выполнены?",
+        "Что будет являться промежуточным результатом, а что итоговым?"
+      ]);
+      setGuidedStep(1);
+    } catch (e) {
+      alert("Ошибка запуска ритуала: " + e.message);
+    } finally {
+      setEditDeconstructLoading(false);
+    }
+  };
+
+  const handleEditAnswerSubmit = async () => {
+    playClick();
+    setEditDeconstructLoading(true);
+    try {
+      const tempTask = { title: editTitle };
+      const response = await requestDeconstruction(tempTask, 'guided_steps', {
+        questions: guidedQuestions,
+        answers: guidedAnswers
+      });
+      const steps = response.steps.map((s, idx) => ({
+        id: `step-${idx}-${Date.now()}`,
+        title: s,
+        completed: false
+      }));
+      setEditSteps(steps);
+      setEditIntent(response.intent || '');
+      setGuidedStep(2);
+      playSuccess();
+    } catch (e) {
+      alert("Ошибка ритуала: " + e.message);
+    } finally {
+      setEditDeconstructLoading(false);
+    }
+  };
+
+  const handleAddEditStep = () => {
+    if (!newStepText.trim()) return;
+    playClick();
+    setEditSteps(prev => [
+      ...prev,
+      { id: `step-${Date.now()}`, title: newStepText.trim(), completed: false }
+    ]);
+    setNewStepText('');
+  };
+
+  const handleRemoveEditStep = (stepId) => {
+    playClick();
+    setEditSteps(prev => prev.filter(s => s.id !== stepId));
+  };
+
+  const handleToggleEditStep = (stepId) => {
+    playClick();
+    setEditSteps(prev => prev.map(s => s.id === stepId ? { ...s, completed: !s.completed } : s));
+  };
+
+  const handleUpdateEditStepText = (stepId, text) => {
+    setEditSteps(prev => prev.map(s => s.id === stepId ? { ...s, title: text } : s));
+  };
+
+  const handleStartCombatSession = (task) => {
+    resolutionTriggeredRef.current = false;
+    const runStart = (mode) => {
+      setActiveTask(task);
+      const initialTime = task.timeLeft !== undefined ? task.timeLeft : task.pomodoroTime * 60;
+      setTimeLeft(initialTime);
+      setSessionSteps(task.steps || []);
+      setSetupStage('active');
+      generateCombatEncounter(task);
+      localStorage.setItem('active_task_id', task.id);
+      localStorage.setItem('combat_time_left', initialTime);
+      setDeadlineDmgApplied(false);
+      if (mode === 'timer') {
+        localStorage.setItem('combat_timer_start_time', Date.now());
+        localStorage.setItem('combat_timer_start_value', initialTime);
+        localStorage.setItem('combat_is_running', 'true');
+        setIsRunning(true);
+      } else {
+        localStorage.setItem('combat_is_running', 'false');
+        setIsRunning(false);
+      }
+      setAtmosphereMood(task.type === 'siege' ? 'siege' : 'hunt');
+      if (playActiveSessionTrack) playActiveSessionTrack(task.type === 'siege' ? 'siege' : 'hunt');
+      
+      // Async enrich lore and steps using AI!
+      enrichTaskAndLore(task);
+    };
+
+    if (!task.executionMode || task.executionMode === 'ask_later') {
+      requestTaskExecutionModeSelect(task, (chosenMode) => {
+        runStart(chosenMode);
+      });
+    } else {
+      runStart(task.executionMode);
+    }
+  };
+
+  const createSingleTaskLocally = (title) => {
+    let initialType = 'hunt';
+    const lower = title.toLowerCase();
+    if (lower.includes('прочитать') || lower.includes('изучить') || lower.includes('почитать') || lower.includes('нарисовать')) {
+      initialType = 'relic';
+    } else if (lower.includes('уборка') || lower.includes('помыть') || lower.includes('очистить')) {
+      initialType = 'siege';
+    } else if (lower.includes('хвост') || lower.includes('долг') || lower.includes('старый') || lower.includes('разобрать')) {
+      initialType = 'corpse';
+    }
+    const todayDateStr = new Date().toISOString().split('T')[0];
+    const newTask = {
+      id: 'task-' + Date.now(),
+      title,
+      type: initialType,
+      status: 'active',
+      date: todayDateStr,
+      pomodoroTime: initialType === 'siege' ? 50 : 25,
+      pomodoroSpent: 0,
+      toxicity: 'standard',
+      barrierType: null,
+      curseLevel: 0,
+      createdAt: Date.now(),
+      steps: generateLocalSteps(title, initialType).map((s, sIdx) => ({ id: 'step-' + sIdx + '-' + Date.now(), title: s, completed: false })),
+      intent: '',
+      deadline: '',
+      combatLore: {
+        enemyName: "Безымянный Ужас Бездны",
+        visualType: initialType,
+        weakPoints: ["Монстр боится конкретики.", "Разбейте на микро-действия!"],
+        randomEvent: "Бой протекает при поддержке Бездны."
+      }
+    };
+    setTasks(prev => [...prev, newTask]);
+    handleStartCombatSession(newTask);
+    playSuccess();
+  };
+
+  const handleCreateAndStartTaskFromNpc = async () => {
+    if (!npcNewTaskTitle.trim()) return;
+    const rawText = npcNewTaskTitle.trim();
+    setNpcNewTaskTitle('');
+    playClick();
+
+    // Check if it looks like a chaos dump: long text or contains newlines, or multiple clauses
+    const isChaosDump = rawText.length > 50 || rawText.includes('\n') || rawText.includes(';') || rawText.includes(',');
+
+    if (isChaosDump && parseMessyTasks) {
+      setResolutionLoading(true);
+      try {
+        const result = await parseMessyTasks(rawText);
+        if (result && Array.isArray(result) && result.length > 0) {
+          const todayDateStr = new Date().toISOString().split('T')[0];
+          const newTasks = result.map((t, idx) => {
+            const initialType = t.type || 'hunt';
+            return {
+              id: 'task-' + Date.now() + '-' + idx,
+              title: t.title,
+              type: initialType,
+              status: 'active',
+              date: todayDateStr, 
+              pomodoroTime: t.estimatedTime || (initialType === 'siege' ? 50 : 25),
+              pomodoroSpent: 0,
+              toxicity: t.toxicity || 'standard',
+              barrierType: null,
+              curseLevel: 0,
+              isLongJourney: t.isLongJourney || false,
+              createdAt: Date.now(),
+              steps: t.steps ? t.steps.map((s, sIdx) => ({ id: 'step-' + sIdx + '-' + Date.now(), title: s, completed: false })) : generateLocalSteps(t.title, initialType).map((s, sIdx) => ({ id: 'step-' + sIdx + '-' + Date.now(), title: s, completed: false })),
+              intent: t.intent || '',
+              deadline: t.deadline || '',
+              combatLore: {
+                enemyName: t.enemyName || "Безымянный Ужас Бездны",
+                visualType: t.visualType || initialType,
+                weakPoints: t.weakPoints || ["Монстр боится конкретики.", "Разбейте на микро-действия!"],
+                randomEvent: t.randomEvent || "Бой протекает при поддержке Бездны."
+              }
+            };
+          });
+          setTasks(prev => [...prev, ...newTasks]);
+          // Immediately start combat session for the first parsed task
+          handleStartCombatSession(newTasks[0]);
+          playSuccess();
+        } else {
+          createSingleTaskLocally(rawText);
+        }
+      } catch (err) {
+        console.warn("Failed to parse messy task from NPC, falling back to single task creation:", err);
+        createSingleTaskLocally(rawText);
+      } finally {
+        setResolutionLoading(false);
+      }
+    } else {
+      createSingleTaskLocally(rawText);
+    }
+  };
+
+const handleWinActiveSession = (task) => {
+    if (resolutionTriggeredRef.current) return;
+    resolutionTriggeredRef.current = true;
+    setIsRunning(false);
+    playSuccess();
+    
+    const moral = character.moralCompass !== undefined ? character.moralCompass : 50;
+    const ambushChance = (40 - moral) / 40;
+    const isAmbush = moral < 40 && (Math.random() < ambushChance);
+    setResolutionIsAmbush(isAmbush);
+
+    // Choose random NPC for encounter
+    const randNpc = NPC_ENCOUNTERS[Math.floor(Math.random() * NPC_ENCOUNTERS.length)];
+    setResolutionNpc(randNpc);
+    
+    const isSiege = task?.type === 'siege';
+    const expReward = isAmbush ? 10 : (isSiege ? 60 : 25);
+    const goldReward = isAmbush ? 5 : (isSiege ? 15 : 5);
+    
+    setCharacter(prev => {
+      const nextXp = prev.xp + expReward;
+      const xpNeeded = prev.level * 100;
+      let nextLevel = prev.level;
+      let remXp = nextXp;
+      let extraGold = 0;
+      
+      let nextHp = prev.hp;
+      if (nextLevel > prev.level && !isAmbush) {
+        nextHp = prev.maxHp;
+      }
+
+      if (remXp >= xpNeeded) {
+        nextLevel += 1;
+        remXp -= xpNeeded;
+        extraGold = isAmbush ? 0 : 15;
+        playSuccess();
+      }
+      
+      const earnedGold = goldReward + extraGold;
+      
+      const updatedBio = [...(prev.biography || [])];
+      if (isAmbush) {
+        updatedBio.push(`На месте встречи Изгнанник обнаружил лишь растерзанное тело ${randNpc.name}. Ему пришлось вступить в бой с устроившими засаду бандитами Бездны. Разбойники перебиты, с их тел снято +10 XP и +5 Золота.`);
+      } else {
+        updatedBio.push(`Выполнен контракт: "${task?.title || ''}". Встречен ${randNpc.name}. Получено +${expReward} XP и +${earnedGold} Золота.`);
+      }
+
+      return {
+        ...prev,
+        level: nextLevel,
+        xp: remXp,
+        gold: (prev.gold || 0) + earnedGold,
+        hp: nextHp,
+        moralCompass: Math.min(100, (prev.moralCompass || 50) + 5),
+        completedTasksCount: (prev.completedTasksCount || 0) + 1,
+        completedSiegesCount: (prev.completedSiegesCount || 0) + (isSiege ? 1 : 0),
+        totalGoldEarned: (prev.totalGoldEarned || 0) + earnedGold,
+        biography: updatedBio
       };
-      setBreakAiText(npc.isNonNpc ? fallbacks.nonNpc : (fallbacks[npc.type] || fallbacks.motivating));
+    });
+
+    if (task) {
+      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: 'completed' } : t));
+    }
+    
+    localStorage.removeItem('active_task_id');
+    localStorage.removeItem('combat_time_left');
+    
+    setSetupStage('resolution');
+    setResolutionType('victory');
+    handleGenerateResolutionChronicle('victory', task, enemyName, isAmbush, randNpc.name);
+  };
+
+  const handleInstantCompleteTask = (task) => {
+    resolutionTriggeredRef.current = false;
+    setIsRunning(false);
+    playSuccess();
+
+    // Determine enemy name
+    const hashStr = task.title + (task.id || '');
+    let hash = 0;
+    for (let i = 0; i < hashStr.length; i++) {
+      hash = hashStr.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    hash = Math.abs(hash);
+    const variation = COMBAT_VARIATIONS[hash % COMBAT_VARIATIONS.length];
+    const eName = task.combatLore?.enemyName || `${variation.prefix} ${variation.suffix}`;
+    setEnemyName(eName);
+
+    const moral = character.moralCompass !== undefined ? character.moralCompass : 50;
+    const ambushChance = (40 - moral) / 40;
+    const isAmbush = moral < 40 && (Math.random() < ambushChance);
+    setResolutionIsAmbush(isAmbush);
+
+    // Choose random NPC for encounter
+    const randNpc = NPC_ENCOUNTERS[Math.floor(Math.random() * NPC_ENCOUNTERS.length)];
+    setResolutionNpc(randNpc);
+
+    const isSiege = task.type === 'siege';
+    const expReward = isAmbush ? 10 : (isSiege ? 60 : 25);
+    const goldReward = isAmbush ? 5 : (isSiege ? 15 : 5);
+
+    setCharacter(prev => {
+      const nextXp = prev.xp + expReward;
+      const xpNeeded = prev.level * 100;
+      let nextLevel = prev.level;
+      let remXp = nextXp;
+      let extraGold = 0;
+
+      let nextHp = prev.hp;
+      if (nextLevel > prev.level && !isAmbush) {
+        nextHp = prev.maxHp;
+      }
+
+      if (remXp >= xpNeeded) {
+        nextLevel += 1;
+        remXp -= xpNeeded;
+        extraGold = isAmbush ? 0 : 15;
+        playSuccess();
+      }
+
+      const earnedGold = goldReward + extraGold;
+
+      const updatedBio = [...(prev.biography || [])];
+      if (isAmbush) {
+        updatedBio.push(`На месте встречи Изгнанник обнаружил лишь растерзанное тело ${randNpc.name}. Ему пришлось вступить в бой с устроившими засаду бандитами Бездны. Разбойники перебиты, с их тел снято +10 XP и +5 Золота.`);
+      } else {
+        updatedBio.push(`Выполнен контракт: "${task.title}". Встречен ${randNpc.name}. Получено +${expReward} XP и +${earnedGold} Золота.`);
+      }
+
+      return {
+        ...prev,
+        level: nextLevel,
+        xp: remXp,
+        gold: (prev.gold || 0) + earnedGold,
+        hp: nextHp,
+        moralCompass: Math.min(100, (prev.moralCompass || 50) + 5),
+        completedTasksCount: (prev.completedTasksCount || 0) + 1,
+        completedSiegesCount: (prev.completedSiegesCount || 0) + (isSiege ? 1 : 0),
+        totalGoldEarned: (prev.totalGoldEarned || 0) + earnedGold,
+        biography: updatedBio
+      };
+    });
+
+    setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: 'completed' } : t));
+
+    localStorage.removeItem('active_task_id');
+    localStorage.removeItem('combat_time_left');
+
+    setSetupStage('resolution');
+    setResolutionType('victory');
+    handleGenerateResolutionChronicle('victory', task, eName, isAmbush, randNpc.name);
+  };
+
+  const handleRescheduleTomorrow = (task) => {
+    playClick();
+    const tomorrowStr = getVirtualTomorrowStr();
+    setTasks(prev => prev.map(t => t.id === task.id ? { ...t, date: tomorrowStr } : t));
+    spawnFloater("На завтра", "heal-hp");
+  };
+
+  const handleMoveToBacklog = (task) => {
+    playClick();
+    setTasks(prev => prev.map(t => t.id === task.id ? { ...t, date: null } : t));
+    spawnFloater("В бэклог", "heal-hp");
+  };
+
+  const handleEscapeFate = (task) => {
+    playBoneCrack();
+    setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: 'buried' } : t));
+    setCharacter(prev => ({
+      ...prev,
+      hp: Math.max(1, prev.hp - 15),
+      moralCompass: Math.max(0, (prev.moralCompass || 50) - 10),
+      totalHpSacrificed: (prev.totalHpSacrificed || 0) + 15
+    }));
+    triggerFlash('blood');
+    spawnFloater("-15 HP!", "enemy-strike");
+    spawnFloater("-10 Мораль", "enemy-strike");
+  };
+
+  const handleTriggerRedemptionCeremony = async () => {
+    if (!generateRedemptionEulogy) return;
+    setRedemptionLoading(true);
+    setAtmosphereMood('recovery');
+    try {
+      const text = await generateRedemptionEulogy(character);
+      setRedemptionEulogyText(text);
+    } catch (err) {
+      setRedemptionEulogyText("«Его воля сокрушила прокрастинацию и навеки разогнала Скверну Абаддона...»\n\n(Не удалось соединиться с сервером AI для составления индивидуальной летописи, но духи помнят твой подвиг!)");
+    } finally {
+      setRedemptionLoading(false);
+    }
+  };
+
+  const handleEnshrineLegend = () => {
+    playSuccess();
+    
+    const newLegend = {
+      name: character.name || "Безымянный Герой",
+      nickname: character.nickname || "Первый Изгнанник",
+      race: character.race || "Человек",
+      class: character.class || "Воин",
+      level: character.level || 1,
+      completedTasksCount: character.completedTasksCount || 15,
+      completedSiegesCount: character.completedSiegesCount || 3,
+      totalGoldEarned: character.totalGoldEarned || 0,
+      totalManaSpent: character.totalManaSpent || 0,
+      totalHpSacrificed: character.totalHpSacrificed || 0,
+      potionsDrunk: character.potionsDrunk || 0,
+      meditationsCount: character.meditationsCount || 0,
+      legacyStatus: 'sanctified',
+      pedestalEulogy: redemptionEulogyText || "Его воля спасла Бездну..."
+    };
+
+    // Convert active tasks to "corpse" (Труп прошлого / Debt) for the new character
+    setTasks(prev => prev.map(t => {
+      if (t.status === 'active') {
+        return {
+          ...t,
+          type: 'corpse',
+          curseLevel: Math.min(5, (t.curseLevel || 0) + 1)
+        };
+      }
+      return t;
+    }));
+
+    const updatedPedestals = [...pedestals, newLegend];
+    savePedestals(updatedPedestals);
+
+    // Reset character using the centralized percentage-based drop utility passing updatedPedestals
+    const newChar = rollStartingCharacter(updatedPedestals);
+    newChar.intensity = character.intensity || "grim";
+    setCharacter(newChar);
+
+    setSetupStage('lore');
+    setAtmosphereMood('escape');
+  };
+
+  const handleAcceptDeathAndStainName = () => {
+    playBoneCrack();
+    
+    const newLegend = {
+      name: character.name || "Безымянный Падший",
+      nickname: character.nickname || "Первый Изгнанник",
+      race: character.race || "Человек",
+      class: character.class || "Воин",
+      level: character.level || 1,
+      completedTasksCount: character.completedTasksCount || 0,
+      completedSiegesCount: character.completedSiegesCount || 0,
+      totalGoldEarned: character.totalGoldEarned || 0,
+      totalManaSpent: character.totalManaSpent || 0,
+      totalHpSacrificed: character.totalHpSacrificed || 0,
+      potionsDrunk: character.potionsDrunk || 0,
+      meditationsCount: character.meditationsCount || 0,
+      legacyStatus: 'stained',
+      pedestalEulogy: resolutionText || "Его когнитивные силы иссякли, разум сдался Бездне..."
+    };
+
+    // Convert active tasks to "corpse" (Труп прошлого / Debt) and increase curse
+    setTasks(prev => prev.map(t => {
+      if (t.status === 'active') {
+        return {
+          ...t,
+          type: 'corpse',
+          curseLevel: Math.min(5, (t.curseLevel || 0) + 1)
+        };
+      }
+      return t;
+    }));
+
+    const updatedPedestals = [...pedestals, newLegend];
+    savePedestals(updatedPedestals);
+
+    // Roll new character with legacy array
+    const newChar = rollStartingCharacter(updatedPedestals);
+    newChar.intensity = character.intensity || "grim";
+    setCharacter(newChar);
+
+    setSetupStage('lore');
+    setAtmosphereMood('escape');
+  };
+
+  // 1. Persistent Character Check (Skips lore setup if alive!)
+  useEffect(() => {
+    if (setupStage !== 'lore') return; // Guard to run only during initial page load
+    if (character && character.race && character.class && character.hp > 0) {
+      const activeTaskId = localStorage.getItem('active_task_id');
+      const activeTaskInTasks = activeTaskId ? tasks.find(t => t.id === activeTaskId && t.status === 'active') : null;
+      
+      if (activeTaskInTasks) {
+        setActiveTask(activeTaskInTasks);
+        const storedTime = Number(localStorage.getItem('combat_time_left') || activeTaskInTasks.pomodoroTime * 60);
+        setTimeLeft(storedTime);
+        setSessionSteps(activeTaskInTasks.steps || []);
+        setSetupStage('active');
+        generateCombatEncounter(activeTaskInTasks);
+        
+        // Start running immediately if timer mode!
+        const isTimer = activeTaskInTasks.executionMode !== 'day';
+        localStorage.setItem('combat_timer_start_time', Date.now());
+        localStorage.setItem('combat_timer_start_value', storedTime);
+        localStorage.setItem('combat_is_running', isTimer ? 'true' : 'false');
+        setDeadlineDmgApplied(storedTime <= 0);
+        setIsRunning(isTimer);
+      } else {
+        setSetupStage('hub'); // Directly load Tasks Hub
+      }
+    }
+  }, [character, tasks, setupStage]);
+
+  // 2. Generate RPG Combat Encounter from 50+ Variations
+  const generateCombatEncounter = (task) => {
+    let lore = null;
+    if (task.combatLore) {
+      lore = task.combatLore;
+    } else {
+      // Hashing algorithm to pick one of the 50 variations strictly
+      const hashStr = task.title + (task.id || '');
+      let hash = 0;
+      for (let i = 0; i < hashStr.length; i++) {
+        hash = hashStr.charCodeAt(i) + ((hash << 5) - hash);
+      }
+      hash = Math.abs(hash);
+      const variation = COMBAT_VARIATIONS[hash % COMBAT_VARIATIONS.length];
+
+      let weakPoints = [
+        "Монстр боится правила 5 минут: первый шаг сломает его панцирь.",
+        "Враг неповоротлив: начните с самого глупого действия, чтобы войти в слепое пятно."
+      ];
+      if (task.toxicity === 'scary') {
+        weakPoints = [
+          "Слабость врага: Боится расщепления. Разбейте первый шаг на микро-физические действия.",
+          "Страх отступит: Закройте глаза и сделайте глубокий вдох на 4 секунды."
+        ];
+      } else if (task.toxicity === 'tedious') {
+        weakPoints = [
+          "Слабость врага: Не выносит быстрой музыки. Включите Spotify-трек и действуйте на скорость!",
+          "Усыпите его бдительность: Согласитесь работать ровно 10 минут, а затем отдохните."
+        ];
+      } else if (task.toxicity === 'vague') {
+        weakPoints = [
+          "Слабость врага: Ненавидит конкретику. Дайте четкое письменное Намерение квеста.",
+          "Противник ослепнет: Перепишите шаг, указав точное физическое действие в скобках."
+        ];
+      }
+
+      const events = [
+        "Допаминовая Вспышка: Двойной опыт за этот бой!",
+        "Густой Туман Бездны скрывает точные значения здоровья противника.",
+        "Аура Стойкости: Любой удар по врагу восстанавливает 2 MP маны.",
+        "Дыхание Скверны: Время идет чуть быстрее, но враг бьет слабее.",
+        "Алтарь Рун: Проведение шага наносит противнику сокрушительный критический урон!"
+      ];
+      const randomEvent = events[hash % events.length];
+
+      const enemyName = `${variation.prefix} ${variation.suffix}`;
+      const detailedDesc = generateEnrichedEnemyDescription(
+        enemyName,
+        task.title,
+        task.toxicity || 'standard',
+        variation
+      );
+
+      lore = {
+        enemyName: enemyName,
+        visualType: variation.type,
+        weakPoints: weakPoints,
+        randomEvent: randomEvent,
+        loreDescription: detailedDesc,
+        isGeneric: true
+      };
+    }
+
+    setEnemyName(lore.enemyName);
+    // Calculate initial enemy HP based on already completed steps to support resuming tasks correctly
+    if (task.steps && task.steps.length > 0) {
+      const totalSteps = task.steps.length;
+      const completedSteps = task.steps.filter(s => s.completed).length;
+      const dmgPerStep = Math.ceil(100 / totalSteps);
+      const remainingHp = Math.max(0, 100 - completedSteps * dmgPerStep);
+      setEnemyHp(remainingHp);
+    } else {
+      setEnemyHp(100);
+    }
+    setCombatVignette(`💥 Режим схватки: [${lore.visualType.toUpperCase()}]. ${lore.loreDescription}`);
+    setCombatLog([
+      `⚔️ Начинается бой! Противник: ${lore.enemyName}.`,
+      `📜 Вы зажали в руках оружие своего класса. Ваша цель: уничтожить врага, выполняя шаги квеста!`,
+      `👁️ Мысль о слабости врага: "${lore.weakPoints[0]}"`,
+      `🌀 Событие поля боя: ${lore.randomEvent}`
+    ]);
+    setTicksWithoutStep(0);
+  };
+
+  // WOW Effect: Trigger Screen Flash
+  const triggerFlash = (type) => {
+    setScreenFlash(type);
+    setTimeout(() => setScreenFlash(null), 450);
+  };
+
+  // WOW Effect: Spawn Damage Floater
+  const spawnFloater = (text, type) => {
+    const id = Date.now() + Math.random();
+    setDamageFloats(prev => [...prev, { id, text, type }]);
+    setTimeout(() => {
+      setDamageFloats(prev => prev.filter(f => f.id !== id));
+    }, 1200);
+  };
+
+  // Core random initialization of character using the centralized percentage drop utility
+  const generateRandomCharacter = () => {
+    playClick();
+    const newChar = rollStartingCharacter(pedestals);
+    newChar.intensity = character?.intensity || "grim";
+    setCharacter(newChar);
+    setSetupStage('hub');
+  };
+
+  // Parse Tasks with AI Tunnel
+  const handleParseTasks = async () => {
+    if (!messyText.trim()) return;
+    setLoadingAI(true);
+    playClick();
+    try {
+      const result = await parseMessyTasks(messyText);
+      // Initialize with isLongJourney defaults
+      const mapped = result.map(t => ({ ...t, isLongJourney: false }));
+      setParsedList(mapped);
+      setReviewIndex(0);
+      setSetupStage('review');
+    } catch (e) {
+      alert("Не удалось связаться с Бездной (AI Tunnel): " + e.message);
+    } finally {
+      setLoadingAI(false);
+    }
+  };
+
+  const handleDetailedDeconstruction = async () => {
+    if (!parsedList[reviewIndex]) return;
+    const currentCard = parsedList[reviewIndex];
+    setLoadingAI(true);
+    playClick();
+    try {
+      const prompt = `Ты — Бездна во вселенной Абаддона. Разложи задачу «${currentCard.title}» на 5-8 максимально мелких, понятных физических микро-шагов, чтобы человек с СДВГ мог приступить к ней без паники и ступора. Текущие шаги: ${currentCard.steps ? currentCard.steps.join(', ') : 'нет'}. Выведи ответ строго в формате JSON: { "steps": ["микро-шаг 1", "микро-шаг 2", ...] }`;
+      
+      const response = await fetch('http://localhost:3001/api/ai/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: [{ role: 'user', content: prompt }] })
+      });
+      if (!response.ok) throw new Error('AI Tunnel offline');
+      const data = await response.json();
+      let cleanedText = data.choices[0].message.content.trim();
+      if (cleanedText.startsWith("```json")) cleanedText = cleanedText.slice(7);
+      if (cleanedText.endsWith("```")) cleanedText = cleanedText.slice(0, -3);
+      const parsed = JSON.parse(cleanedText.trim());
+      
+      if (parsed.steps) {
+        setParsedList(prev => prev.map((item, idx) => {
+          if (idx === reviewIndex) {
+            return { ...item, steps: parsed.steps };
+          }
+          return item;
+        }));
+        playSuccess();
+      }
+    } catch (e) {
+      alert("Не удалось детализировать шаги: " + e.message);
+    } finally {
+      setLoadingAI(false);
+    }
+  };
+
+  const handleStartCrashSequence = (listToUse = null, skipCombat = false) => {
+    playClick();
+    const todayStr = new Date().toISOString().split('T')[0];
+    const sourceList = listToUse || parsedList;
+    
+    const newTasks = sourceList.map((t, idx) => {
+      // Hashing and pre-generating lore profiles for parsed tasks
+      const hashStr = t.title + idx;
+      let hash = 0;
+      for (let i = 0; i < hashStr.length; i++) {
+        hash = hashStr.charCodeAt(i) + ((hash << 5) - hash);
+      }
+      hash = Math.abs(hash);
+      const variation = COMBAT_VARIATIONS[hash % COMBAT_VARIATIONS.length];
+
+      // Procedural rich ADHD weakness insights
+      const allWeakPoints = [
+        ["Монстр боится правила 5 минут: первый физический шаг разрушит его броню.", "Враг неповоротлив: начните с самого простого действия, чтобы войти в его слепую зону."],
+        ["Слабость врага: Боится расщепления. Разбейте первый шаг на микро-физические действия.", "Страх отступит: сделайте глубокий вдох на 4 секунды и выдохните тревогу."],
+        ["Слабость врага: Не выносит ритмичной музыки. Запустите Spotify-трек и действуйте на скорость!", "Усыпите его бдительность: согласитесь поработать ровно 10 минут, а затем устройте привал."],
+        ["Слабость врага: Ненавидит конкретику. Дайте четкое письменное намерение квеста.", "Противник ослепнет: перепишите шаг, указав точное физическое действие в скобках."],
+        ["Монстр беспомощен перед правилом 2 минут: сделайте микроскопическое действие прямо сейчас.", "Слабое место: враг слепнет, если вы уберете телефон во внутренний карман доспехов."],
+        ["Сила монстра иссякнет, если вы просто откроете рабочий файл и посмотрите на него 60 секунд.", "Уязвимость: монстр теряет бдительность, если начать делать задачу криво и неидеально."],
+        ["Враг боится смены обстановки: встаньте и потянитесь перед началом битвы.", "Слабость: монстр питается вашим перфекционизмом. Разрешите себе сделать работу на троечку."]
+      ];
+      const selectedWeakPoints = allWeakPoints[hash % allWeakPoints.length];
+
+      // Procedural battle events
+      const events = [
+        "Допаминовая Вспышка: Двойной опыт за этот бой!",
+        "Густой Туман Бездны скрывает точные значения здоровья противника.",
+        "Аура Стойкости: Любой удар по врагу восстанавливает 2 MP маны.",
+        "Дыхание Скверны: Время идет чуть быстрее, но враг бьет слабее.",
+        "Алтарь Рун: Проведение шага наносит противнику сокрушительный критический урон!"
+      ];
+      const selectedEvent = events[hash % events.length];
+
+      return {
+        id: `task-${Date.now()}-${idx}`,
+        title: t.title,
+        type: t.type || 'hunt',
+        status: 'active',
+        date: todayStr, 
+        pomodoroTime: t.estimatedTime || 25,
+        pomodoroSpent: 0,
+        toxicity: t.toxicity || 'standard',
+        barrierType: null,
+        curseLevel: 0,
+        isLongJourney: t.isLongJourney || false,
+        createdAt: Date.now(),
+        steps: (t.steps && t.steps.length > 0) 
+          ? t.steps.map((s, sIdx) => ({ id: `step-${sIdx}-${Date.now()}`, title: s, completed: false })) 
+          : generateLocalSteps(t.title, t.type || 'hunt').map((s, sIdx) => ({ id: `step-${sIdx}-${Date.now()}`, title: s, completed: false })),
+        intent: t.intent || '',
+        deadline: t.deadline || '',
+        nature: t.nature || 'external',
+        executionMode: t.executionMode || 'ask_later',
+        combatLore: {
+          enemyName: t.enemyName || `${variation.prefix} ${variation.suffix}`,
+          visualType: t.visualType || variation.type,
+          weakPoints: t.weakPoints || selectedWeakPoints,
+          randomEvent: t.randomEvent || selectedEvent
+        }
+      };
+    });
+
+    setTasks(prev => [...prev, ...newTasks]);
+
+    if (newTasks.length > 1 || skipCombat) {
+      // Go directly to contracts grid lobby to choose!
+      setActiveTask(null);
+      setSetupStage('hub');
+      localStorage.removeItem('active_task_id');
+      localStorage.setItem('combat_is_running', 'false');
+      setIsRunning(false);
+    } else {
+      // Single task and not skipped: auto-start combat session
+      const target = newTasks[0] || null;
+      setActiveTask(target);
+      if (target) {
+        setTimeLeft(target.pomodoroTime * 60);
+        setSessionSteps(target.steps);
+        generateCombatEncounter(target);
+        localStorage.setItem('active_task_id', target.id);
+        localStorage.setItem('combat_time_left', target.pomodoroTime * 60);
+      }
+
+      if (character.shacklesBroken) {
+        setSetupStage('active');
+        const initialTime = target.pomodoroTime * 60;
+        localStorage.setItem('combat_timer_start_time', Date.now());
+        localStorage.setItem('combat_timer_start_value', initialTime);
+        
+        const isTimer = target.executionMode !== 'day'; // False for 'day' (Free Transition/No timer)
+        localStorage.setItem('combat_is_running', isTimer ? 'true' : 'false');
+        setDeadlineDmgApplied(false);
+        setIsRunning(isTimer);
+        setAtmosphereMood(target?.type === 'siege' ? 'siege' : 'hunt');
+        if (playActiveSessionTrack) playActiveSessionTrack(target?.type === 'siege' ? 'siege' : 'hunt');
+      } else {
+        setSetupStage('crash');
+        setAtmosphereMood('escape');
+      }
+    }
+  };
+
+  // "Write to Survive" countdown logic
+  useEffect(() => {
+    let interval = null;
+    if (setupStage === 'crash' && survivalTimerStarted && survivalTimeLeft > 0 && !survivalCompleted) {
+      interval = setInterval(() => {
+        setSurvivalTimeLeft(prev => prev - 1);
+        const heartRate = survivalTimeLeft < 60 ? 120 : survivalTimeLeft < 120 ? 90 : 70;
+        startHeartbeat(heartRate);
+      }, 1000);
+    } else if (survivalTimeLeft === 0) {
+      setCharacter(prev => ({ ...prev, hp: Math.max(10, prev.hp - 20) }));
+      handleWakeUp();
+    }
+    return () => {
+      clearInterval(interval);
+      stopHeartbeat();
+    };
+  }, [setupStage, survivalTimerStarted, survivalTimeLeft, survivalCompleted]);
+
+  const handleSurvivalTyping = (e) => {
+    const val = e.target.value;
+    setSurvivalInput(val);
+    if (!survivalTimerStarted && val.trim().length > 0) {
+      setSurvivalTimerStarted(true);
+      startHeartbeat(70);
+    }
+  };
+
+  const handleWakeUp = () => {
+    stopHeartbeat();
+    playBoneCrack();
+    playSuccess();
+    setSurvivalCompleted(true);
+    setCharacter(prev => ({ ...prev, shacklesBroken: true }));
+    setSetupStage('active');
+
+    const initialTime = timeLeft;
+    const isTimer = activeTask?.executionMode !== 'day';
+    localStorage.setItem('combat_timer_start_time', Date.now());
+    localStorage.setItem('combat_timer_start_value', initialTime);
+    localStorage.setItem('combat_is_running', isTimer ? 'true' : 'false');
+    setDeadlineDmgApplied(false);
+    setIsRunning(isTimer);
+
+    setAtmosphereMood(activeTask?.type === 'siege' ? 'siege' : 'hunt');
+    if (playActiveSessionTrack) playActiveSessionTrack(activeTask?.type === 'siege' ? 'siege' : 'hunt');
+  };
+
+  // Active Session Focus Timer & Fatigue accumulation & Ticking Combat Damage (Background friendly!)
+  useEffect(() => {
+    let timer = null;
+    if (setupStage === 'active' && isRunning && !meditationActive && activeTask?.executionMode !== 'day') {
+      timer = setInterval(() => {
+        const startTime = Number(localStorage.getItem('combat_timer_start_time') || Date.now());
+        const startVal = Number(localStorage.getItem('combat_timer_start_value') || 1500);
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const nextTime = startVal - elapsed;
+
+        setTimeLeft(nextTime);
+        localStorage.setItem('combat_time_left', nextTime);
+
+        // 1. Fatigue accumulator (caps work daily limits) using accurate delta
+        const now = Date.now();
+        const deltaSec = Math.max(0, (now - lastTickTimeRef.current) / 1000);
+        lastTickTimeRef.current = now;
+
+        setCharacter(c => {
+          const nextMin = (c.dailyWorkMinutes || 0) + (deltaSec / 60);
+          return { ...c, dailyWorkMinutes: nextMin };
+        });
+
+        // 2. Overtime Damage system: Enemy deals damage only if time is expired (timeLeft <= 0)
+        if (nextTime <= 0) {
+          // If all steps are completed, win immediately
+          if (sessionSteps.length > 0 && sessionSteps.every(s => s.completed)) {
+            handleWinActiveSession(activeTask);
+            return;
+          }
+
+          if (!deadlineDmgApplied) {
+            setDeadlineDmgApplied(true);
+            playBoneCrack();
+            let died = false;
+            setCharacter(c => {
+              const nextHp = Math.max(10, c.hp - 15);
+              if (nextHp <= 10 && c.hp > 10) {
+                died = true;
+              }
+              return { ...c, hp: nextHp };
+            });
+            triggerFlash('blood');
+            spawnFloater("-15 HP!", "enemy-strike");
+            setCombatLog(log => [
+              `💥 [Дедлайн] Время истекло! Противник ${enemyName} наносит вам сокрушительный удар на 15 HP за опоздание!`,
+              ...log.slice(0, 5)
+            ]);
+
+            if (died) {
+              if (resolutionTriggeredRef.current) return;
+              resolutionTriggeredRef.current = true;
+              setIsRunning(false);
+              setSetupStage('resolution');
+              setResolutionType('death');
+
+              // Convert active tasks to corpse and increase curse level as penalty
+              setTasks(prev => prev.map(t => {
+                if (t.status === 'active') {
+                  return {
+                    ...t,
+                    type: 'corpse',
+                    curseLevel: Math.min(5, (t.curseLevel || 0) + 1)
+                  };
+                }
+                return t;
+              }));
+
+              handleGenerateResolutionChronicle('death', activeTask, enemyName);
+            }
+          }
+        }
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [setupStage, isRunning, meditationActive, activeTask, sessionSteps, enemyName, deadlineDmgApplied]);
+
+  // Timed Meditation Recovery Timer Loop
+  useEffect(() => {
+    let medInterval = null;
+    if (setupStage === 'active' && meditationActive && meditationTimeLeft > 0) {
+      medInterval = setInterval(() => {
+        setMeditationTimeLeft(prev => {
+          const nextSec = prev - 1;
+          
+          // 1. Ticking Breathing Cycle: Inhale (4s) -> Hold (4s) -> Exhale (4s) -> Hold (4s)
+          setMeditationPulseCounter(c => {
+            const nextPulse = (c + 1) % 16;
+            if (nextPulse < 4) {
+              setMeditationPhase('inhale');
+            } else if (nextPulse < 8) {
+              setMeditationPhase('hold-in');
+            } else if (nextPulse < 12) {
+              setMeditationPhase('exhale');
+            } else {
+              setMeditationPhase('hold-out');
+            }
+            return nextPulse;
+          });
+
+          // 2. Recovery Ticks
+          setCharacter(hero => {
+            const nextHp = Math.min(hero.maxHp, hero.hp + 0.5);
+            const nextMp = Math.min(hero.maxMana, hero.mana + 0.35);
+            const nextFatigue = Math.max(0, hero.dailyWorkMinutes - 1.5/60);
+            return {
+              ...hero,
+              hp: nextHp,
+              mana: nextMp,
+              dailyWorkMinutes: nextFatigue
+            };
+          });
+
+          // Floating indicators every 4 seconds
+          if (nextSec % 4 === 0) {
+            spawnFloater("+HP восстанавливается", "heal-hp");
+            spawnFloater("-1.5мин Усталости", "fatigue-recovery");
+          }
+
+          return nextSec;
+        });
+      }, 1000);
+    } else if (meditationTimeLeft === 0 && meditationActive) {
+      // Completed meditation chimes
+      setMeditationActive(false);
+      playSuccess();
+      setCharacter(prev => ({
+        ...prev,
+        meditationsCount: (prev.meditationsCount || 0) + 1
+      }));
+      alert("Медитация в Лагере завершена! Силы разума полностью очищены от скверны.");
+      setAtmosphereMood(activeTask?.type === 'siege' ? 'siege' : 'hunt');
+    }
+    return () => clearInterval(medInterval);
+  }, [meditationActive, meditationTimeLeft]);
+
+  // Break Event Timer: мини-перерыв каждые 30 мин, большой привал каждые 1.5 часа активной работы
+  useEffect(() => {
+    let breakTimer = null;
+    if (setupStage === 'active' && isRunning && !meditationActive && !breakEvent) {
+      breakTimer = setInterval(() => {
+        sessionElapsedRef.current += 1;
+        const elapsed = sessionElapsedRef.current;
+        const sinceLastMini = elapsed - lastMiniBreakRef.current;
+        const sinceLastBig = elapsed - lastBigBreakRef.current;
+
+        if (sinceLastBig >= 5400) {
+          triggerBreakEvent('big');
+          lastBigBreakRef.current = elapsed;
+          lastMiniBreakRef.current = elapsed;
+        } else if (sinceLastMini >= 1800) {
+          triggerBreakEvent('mini');
+          lastMiniBreakRef.current = elapsed;
+        }
+      }, 1000);
+    }
+    return () => clearInterval(breakTimer);
+  }, [setupStage, isRunning, meditationActive, breakEvent]);
+
+  const triggerBreakEvent = (type) => {
+    playClick();
+    setIsRunning(false);
+    const npc = NPC_ENCOUNTERS[Math.floor(Math.random() * NPC_ENCOUNTERS.length)];
+    const moral = character.moralCompass !== undefined ? character.moralCompass : 50;
+    const ambushChance = (40 - moral) / 40;
+    const isAmbush = moral < 40 && (Math.random() < ambushChance);
+
+    setBreakEvent({ type, npc, isAmbush });
+    setBreakAiText('');
+    setBreakAiLoading(false);
+    setBreakActivityChoice(type === 'big' ? 'eat' : 'breathing');
+    setAtmosphereMood('recovery');
+  };
+
+  const handleBreakAiGenerate = async () => {
+    if (!breakEvent) return;
+    setBreakAiLoading(true);
+    setBreakAiText('');
+    const activities = breakEvent.type === 'big' ? BIG_BREAK_ACTIVITIES : MINI_BREAK_ACTIVITIES;
+    const activity = activities.find(a => a.id === breakActivityChoice) || activities[0];
+    const npc = breakEvent.npc;
+
+    let prompt = '';
+    if (breakEvent.isAmbush) {
+      prompt = `Ты — Летописец Бездны во вселенной Абаддона. Опиши короткую, суровую летопись в стиле Джо Аберкромби.
+Герой (класс: ${character.class}, раса: ${character.race}) собирался сделать перерыв, но обнаружил лишь растерзанный труп «${npc.name}» и засаду разбойников Бездны. Герою пришлось драться за свою жизнь. Опиши эту внезапную схватку в темноте и то, как он перебил бандитов Бездны. 4-5 предложений.`;
+    } else {
+      if (npc.type === 'mirror') {
+        prompt = `Ты — ${npc.name}, ${npc.prompt}. Герой (класс: ${character.class}, раса: ${character.race}, ур.${character.level}) выбрал перерыв: «${activity.label}» (в лоре: ${activity.lore}). Порицай его прокрастинацию как грех изгнанника, напомни что он мог бы избежать Бездны будь он внимательнее к себе, но дай шанс искупиться через эту активность. Жёстко но справедливо, тёмное фэнтези. 4-5 предложений.`;
+      } else if (npc.type === 'provoking') {
+        prompt = `Ты — ${npc.name}, ${npc.prompt}. Герой (класс: ${character.class}, ур.${character.level}) делает перерыв: «${activity.label}» (${activity.lore}). Подначь его, спровоцируй вернуться в бой после перерыва ещё сильнее. Дерзко но с уважением. Тёмное фэнтези. 3-4 предложения.`;
+      } else if (npc.type === 'helping') {
+        prompt = `Ты — ${npc.name}, ${npc.prompt}. Герой (класс: ${character.class}, раса: ${character.race}) делает перерыв: «${activity.label}» (${activity.lore}). Помоги практическим советом в стиле своего персонажа. Объясни пользу через метафору мира Абаддона. 3-4 предложения.`;
+      } else {
+        prompt = `Ты — ${npc.name}, ${npc.prompt}. Герой (класс: ${character.class}, раса: ${character.race}, ур.${character.level}) делает перерыв: «${activity.label}» (${activity.lore}). Мотивируй его, скажи мудрое и ободряющее в стиле тёмного фэнтези мира Абаддона. 3-4 предложения.`;
+      }
+      if (breakEvent.type === 'big') {
+        prompt += ' Это БОЛЬШОЙ привал (1.5 часа работы). Опиши восстановление ран, маны, еду у костра. Подчеркни важность полноценного отдыха для когнитивного здоровья.';
+      }
+    }
+
+    try {
+      const response = await fetch('http://localhost:3001/api/ai/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: [{ role: 'user', content: prompt }] })
+      });
+      if (!response.ok) throw new Error('AI недоступен');
+      const data = await response.json();
+      setBreakAiText(data.choices[0].message.content);
+      playSuccess();
+    } catch (e) {
+      if (breakEvent.isAmbush) {
+        setBreakAiText(`«Привал осквернен кровью»\n\nВместо костра и мирной беседы тебя ждал лишь изуродованный труп «${npc.name}» и оскал разбойников Бездны. Пришлось вынимать оружие. Грязь, крики, хруст стали о кости. Когда все стихло, ты остался стоять среди трупов, тяжело дыша.`);
+      } else {
+        const fallbacks = {
+          mirror: `«${npc.name} смотрит сквозь тебя ледяным взглядом»\n\nТвоя слабость — не в теле, а в разуме. Ты откладывал, прятался, убегал от себя. Именно поэтому ты здесь, в Бездне. Но сейчас у тебя есть выбор: сделать ${activity.label.toLowerCase()}, и доказать что ты сильнее своих демонов.`,
+          provoking: `«${npc.name} усмехается»\n\nХа! Ты думаешь, что заслужил отдых? Может быть. Но не затягивай — враги не ждут. Сделай ${activity.label.toLowerCase()} и возвращайся. Докажи, что ты не трус.`,
+          helping: `«${npc.name} кивает»\n\n${activity.label} — мудрый выбор, путник. В мире Бездны даже короткий привал может спасти жизнь. Позаботься о себе, чтобы потом сражаться с удвоенной силой.`,
+          motivating: `«${npc.name} улыбается»\n\nТы уже прошёл так далеко, воин. ${activity.label} — это не слабость, это мудрость. Даже величайшие герои отдыхали у костра перед решающей битвой.`
+        };
+        setBreakAiText(fallbacks[npc.type] || fallbacks.motivating);
+      }
     } finally {
       setBreakAiLoading(false);
     }
@@ -541,32 +1898,61 @@ ${legacyPromptContext}
     playClick();
     if (applyRewards && breakEvent) {
       playSuccess();
-      triggerFlash('heal');
-      const activitiesList = breakEvent.type === 'big' ? BIG_BREAK_ACTIVITIES : MINI_BREAK_ACTIVITIES;
-      const act = activitiesList.find(a => a.id === breakActivityChoice) || activitiesList[0];
-      addBiographyEntry(`На привале совершил ритуал: "${act.label}". Восстановил душевное равновесие разума.`);
-      if (breakEvent.type === 'big') {
-        setCharacter(prev => ({
-          ...prev,
-          hp: Math.min(prev.maxHp, prev.hp + 20),
-          mana: Math.min(prev.maxMana, prev.mana + 15),
-          dailyWorkMinutes: Math.max(0, prev.dailyWorkMinutes - 30),
-          meditationsCount: (prev.meditationsCount || 0) + 1
-        }));
-        spawnFloater('+20 HP', 'heal-hp');
-        spawnFloater('+15 MP', 'restore-mp');
-        spawnFloater('-30мин Усталости', 'fatigue-recovery');
-        setCombatLog(log => [`🏕️ Большой привал завершён! Раны залечены, мана восстановлена, усталость отступила.`, ...log.slice(0, 5)]);
+      if (breakEvent.isAmbush) {
+        triggerFlash('blood');
+        setCharacter(prev => {
+          const nextXp = prev.xp + 10;
+          const xpNeeded = prev.level * 100;
+          let nextLevel = prev.level;
+          let remXp = nextXp;
+          let extraGold = 0;
+          if (remXp >= xpNeeded) {
+            nextLevel += 1;
+            remXp -= xpNeeded;
+            extraGold = 15;
+          }
+          const earnedGold = 5 + extraGold;
+
+          const updatedBio = [...(prev.biography || [])];
+          updatedBio.push(`При попытке устроить привал Изгнанник столкнулся с засадой бандитов Бездны, убивших ${breakEvent.npc.name}. Разбойники перебиты, получено +10 XP и +5 Золота.`);
+
+          return {
+            ...prev,
+            level: nextLevel,
+            xp: remXp,
+            gold: (prev.gold || 0) + earnedGold,
+            totalGoldEarned: (prev.totalGoldEarned || 0) + earnedGold,
+            biography: updatedBio
+          };
+        });
+        spawnFloater('+10 XP', 'heal-hp');
+        spawnFloater('+5 Золота', 'restore-mp');
+        setCombatLog(log => [`⚔️ Засада бандитов! NPC «${breakEvent.npc.name}» убит. Получено +10 XP и +5 Золота с тел разбойников.`, ...log.slice(0, 5)]);
       } else {
-        setCharacter(prev => ({
-          ...prev,
-          hp: Math.min(prev.maxHp, prev.hp + 8),
-          mana: Math.min(prev.maxMana, prev.mana + 5),
-          dailyWorkMinutes: Math.max(0, prev.dailyWorkMinutes - 10)
-        }));
-        spawnFloater('+8 HP', 'heal-hp');
-        spawnFloater('+5 MP', 'restore-mp');
-        setCombatLog(log => [`🕯️ Мини-привал завершён. Встреча с «${breakEvent.npc.name}» укрепила дух.`, ...log.slice(0, 5)]);
+        triggerFlash('heal');
+        if (breakEvent.type === 'big') {
+          setCharacter(prev => ({
+            ...prev,
+            hp: Math.min(prev.maxHp, prev.hp + 20),
+            mana: Math.min(prev.maxMana, prev.mana + 15),
+            dailyWorkMinutes: Math.max(0, prev.dailyWorkMinutes - 30),
+            meditationsCount: (prev.meditationsCount || 0) + 1
+          }));
+          spawnFloater('+20 HP', 'heal-hp');
+          spawnFloater('+15 MP', 'restore-mp');
+          spawnFloater('-30мин Усталости', 'fatigue-recovery');
+          setCombatLog(log => [`🏕️ Большой привал завершён! Раны залечены, мана восстановлена, усталость отступила.`, ...log.slice(0, 5)]);
+        } else {
+          setCharacter(prev => ({
+            ...prev,
+            hp: Math.min(prev.maxHp, prev.hp + 8),
+            mana: Math.min(prev.maxMana, prev.mana + 5),
+            dailyWorkMinutes: Math.max(0, prev.dailyWorkMinutes - 10)
+          }));
+          spawnFloater('+8 HP', 'heal-hp');
+          spawnFloater('+5 MP', 'restore-mp');
+          setCombatLog(log => [`🕯️ Мини-привал завершён. Встреча с «${breakEvent.npc.name}» укрепила дух.`, ...log.slice(0, 5)]);
+        }
       }
     }
     setBreakEvent(null);
@@ -1163,101 +2549,61 @@ ${legacyPromptContext}
   // --- RENDERING: BREAK EVENT NPC ENCOUNTER OVERLAY ---
   if (breakEvent) {
     const isBig = breakEvent.type === 'big';
+    const isAmbush = breakEvent.isAmbush === true;
     const activities = isBig ? BIG_BREAK_ACTIVITIES : MINI_BREAK_ACTIVITIES;
     const selectedActivity = activities.find(a => a.id === breakActivityChoice) || activities[0];
     const npc = breakEvent.npc;
-    const isMerchant = npc.isMerchant === true;
-    const isNonNpc = npc.isNonNpc === true;
-    
-    const npcTypeBorder = { motivating: '#d4af37', helping: '#2ecc71', provoking: '#e74c3c', mirror: '#9b59b6', merchant: '#ffb813', event: '#3498db' };
-    const npcTypeLabel = { motivating: '📜 Мотиватор', helping: '🌿 Помощник', provoking: '🗡️ Провокатор', mirror: '🪞 Зеркало Истины', merchant: '🏪 Темный Торговец', event: '🧠 Событие Разума' };
-    
-    const typeKey = isMerchant ? 'merchant' : (isNonNpc ? 'event' : npc.type);
-    const borderColor = npcTypeBorder[typeKey] || '#d4af37';
-    const label = npcTypeLabel[typeKey] || 'Привал';
+    const npcTypeBorder = { motivating: '#d4af37', helping: '#2ecc71', provoking: '#e74c3c', mirror: '#9b59b6' };
+    const npcTypeLabelMap = { motivating: '💛 Мотиватор', helping: '💚 Помощник', provoking: '🔴 Провокатор', mirror: '🪞 Зеркало Истины' };
+    const borderColor = isAmbush ? 'var(--color-blood-glow)' : (npcTypeBorder[npc.type] || '#d4af37');
+    const npcTypeLabel = isAmbush ? '👹 Засада бандитов' : (npcTypeLabelMap[npc.type] || 'Путник');
 
     return (
-      <div className="break-event-overlay animate-fade-in" style={{ zIndex: 99999 }}>
-        <div className="break-event-card rpg-scrollbar" style={{ borderColor, maxWidth: '650px', width: '95%', padding: '2rem', maxHeight: '95vh', overflowY: 'auto' }}>
-          {/* Header */}
+      <div className="break-event-overlay animate-fade-in">
+        <div className="break-event-card" style={{ borderColor }}>
+          {/* NPC Header */}
           <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-            <div style={{ fontSize: '3.5rem', marginBottom: '0.5rem', filter: `drop-shadow(0 0 15px ${borderColor})` }}>{npc.icon}</div>
+            <div style={{ fontSize: '3.5rem', marginBottom: '0.5rem', filter: `drop-shadow(0 0 15px ${borderColor})` }}>{isAmbush ? '👹' : npc.icon}</div>
             <h1 className="gothic-title" style={{ fontSize: isBig ? '1.8rem' : '1.5rem', color: borderColor, marginBottom: '0.3rem' }}>
-              {isBig ? '⛺ Большой Привал у Костра' : '⛺ Когнитивный Привал'}
+              {isAmbush ? '⚔️ Внезапная Засада' : (isBig ? '🏕️ Большой Привал' : '🕯️ Встреча на Пути')}
             </h1>
-            <h2 className="rpg-title" style={{ fontSize: '1.2rem', color: '#fff', marginBottom: '0.4rem' }}>{npc.name}</h2>
+            <h2 className="rpg-title" style={{ fontSize: '1.2rem', color: '#fff', marginBottom: '0.4rem', textDecoration: isAmbush ? 'line-through' : 'none' }}>
+              {isAmbush ? `${npc.name} (Убит)` : npc.name}
+            </h2>
             <span style={{ fontSize: '0.75rem', padding: '2px 10px', background: `${borderColor}22`, border: `1px solid ${borderColor}`, color: borderColor, fontFamily: 'var(--font-rpg)' }}>
-              {label}
+              {npcTypeLabel}
             </span>
+            {isBig && !isAmbush && (
+              <p style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)', marginTop: '0.8rem', fontStyle: 'italic', maxWidth: '500px', margin: '0.8rem auto 0' }}>
+                «Ты сражался 1.5 часа без остановки. Твоё тело и разум требуют полноценного восстановления. Раны, мана, усталость — всё нуждается в заботе.»
+              </p>
+            )}
           </div>
 
-          {/* Core Content */}
-          {isMerchant ? (
-            <div>
-              <p style={{ fontSize: '0.85rem', color: '#ffb813', fontStyle: 'italic', marginBottom: '1.2rem', lineHeight: '1.4', background: 'rgba(0,0,0,0.3)', padding: '10px', borderLeft: '3px solid #ffb813' }}>
-                «А, Изгнанник... Вижу, Бездна знатно потрепала твою волю. В моем рюкзаке лежат древние реликвии. Они помогут твоему разуму не сорваться с края. Загляни, если звенит золото.»
-              </p>
-
-              {/* Gold Balance */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.2)', padding: '6px 12px', border: '1px solid var(--color-iron-light)', borderRadius: '3px', marginBottom: '1rem' }}>
-                <span style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)' }}>Сундук с золотом:</span>
-                <span style={{ fontSize: '0.95rem', color: '#ffb813', fontWeight: 'bold' }}>🪙 {character.gold || 0} ЗОЛОТА</span>
+          {/* Activity Dropdown or Warning Message */}
+          <div style={{ marginBottom: '1.2rem' }}>
+            {isAmbush ? (
+              <div style={{ 
+                background: 'rgba(139, 26, 26, 0.1)', 
+                border: '1px solid var(--color-blood)', 
+                padding: '1rem', 
+                color: 'var(--color-blood-glow)', 
+                fontSize: '0.85rem', 
+                fontFamily: 'var(--font-rpg)', 
+                marginBottom: '1rem',
+                lineHeight: '1.4',
+                borderRadius: '4px'
+              }}>
+                ⚠️ Бандиты напали на лагерь и убили вашего спутника. У вас нет возможности отдохнуть или восстановить ману. Сражайтесь, чтобы выжить и забрать их скудное золото!
               </div>
-
-              {/* Catalog list */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginBottom: '1.5rem', maxHeight: '200px', overflowY: 'auto', paddingRight: '4px' }} className="rpg-scrollbar">
-                {merchantItems.map(item => {
-                  const alreadyBought = item.slot !== 'potion' && (character.inventory?.some(i => i.id === item.id) || Object.values(character.equipped).some(i => i && i.id === item.id));
-                  return (
-                    <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', background: 'rgba(0,0,0,0.4)', border: '1px solid var(--color-iron-light)', padding: '6px 10px', opacity: alreadyBought ? 0.45 : 1 }}>
-                      <div style={{ fontSize: '1.5rem' }}>{item.icon}</div>
-                      <div style={{ flex: 1, textAlign: 'left' }}>
-                        <div style={{ fontSize: '0.85rem', color: '#fff', fontWeight: 'bold' }}>{item.name}</div>
-                        <div style={{ fontSize: '0.7rem', color: 'var(--color-bone-dim)', fontStyle: 'italic' }}>{item.bonus}</div>
-                      </div>
-                      <button 
-                        className="rpg-btn" 
-                        style={{ fontSize: '0.72rem', padding: '3px 8px', borderColor: '#ffb813', color: '#ffb813' }}
-                        onClick={() => handleBuyMerchantItem(item)}
-                        disabled={alreadyBought}
-                      >
-                        {alreadyBought ? 'Куплено' : `🪙 ${item.price}`}
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Quick Rest Activity Option */}
-              <div style={{ borderTop: '1px dashed #33281e', paddingTop: '1rem', marginBottom: '1.2rem', textAlign: 'left' }}>
-                <label style={{ fontSize: '0.78rem', color: 'var(--color-bone-dim)', textTransform: 'uppercase', fontFamily: 'var(--font-rpg)', display: 'block', marginBottom: '0.5rem' }}>
-                  Перед выходом вы также можете выполнить обряд привала:
-                </label>
-                <select className="rpg-input" style={{ width: '100%', fontSize: '0.85rem', padding: '6px' }} value={breakActivityChoice} onChange={(e) => setBreakActivityChoice(e.target.value)}>
-                  {activities.map(a => (<option key={a.id} value={a.id}>{a.label}</option>))}
-                </select>
-              </div>
-
-              <button className="rpg-btn rpg-btn-mana" style={{ width: '100%', padding: '0.8rem', fontWeight: 'bold' }} onClick={() => handleDismissBreak(true)}>
-                🚪 Покинуть лавку и завершить привал
-              </button>
-            </div>
-          ) : (
-            /* Non-NPC Event or Standard NPC Break Form */
-            <div>
-              {isNonNpc && (
-                <p style={{ fontSize: '0.85rem', color: '#3498db', fontStyle: 'italic', marginBottom: '1.2rem', lineHeight: '1.4', background: 'rgba(0,0,0,0.3)', padding: '10px', borderLeft: '3px solid #3498db', textAlign: 'justify' }}>
-                  {npc.description}
-                </p>
-              )}
-
-              {/* Standard activity dropdown / premium buttons */}
-              <div style={{ marginBottom: '1.2rem', textAlign: 'left' }}>
+            ) : (
+              <>
                 <label style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)', fontFamily: 'var(--font-rpg)', display: 'block', marginBottom: '0.6rem' }}>
-                  Выполните физическую или ментальную разгрузку:
+                  {isBig ? '🍽️ Выбери способ восстановления:' : '🎯 Выбери активность перерыва:'}
                 </label>
                 
                 {activeTask && activeTask.pomodoroTime < 20 ? (
+                  /* Premium Grid of Buttons for Tasks under 20 mins */
                   <div style={{ 
                     display: 'grid', 
                     gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))', 
@@ -1301,75 +2647,69 @@ ${legacyPromptContext}
                     })}
                   </div>
                 ) : (
+                  /* Standard dropdown for longer tasks */
                   <select className="rpg-input" style={{ width: '100%', fontSize: '0.95rem', padding: '0.6rem' }} value={breakActivityChoice} onChange={(e) => setBreakActivityChoice(e.target.value)}>
                     {activities.map(a => (<option key={a.id} value={a.id}>{a.label}</option>))}
                   </select>
                 )}
 
                 <div style={{ fontSize: '0.72rem', color: '#ffb813', fontStyle: 'italic', marginTop: '4px', textAlign: 'center', background: 'rgba(0,0,0,0.25)', padding: '6px', borderLeft: '3px solid #ffb813' }}>
-                  Суть обряда: «{selectedActivity.lore}»
+                  В мире Бездны: «{selectedActivity.lore}»
                 </div>
-              </div>
+              </>
+            )}
+          </div>
 
-              {/* Generate NPC dialog / Thoughts description */}
-              {!breakAiText && !breakAiLoading && (
-                <button 
-                  className="rpg-btn rpg-btn-mana heartbeat-pulse" 
-                  style={{ 
-                    width: '100%', 
-                    padding: '0.8rem', 
-                    fontSize: '1rem', 
-                    marginBottom: '1rem',
-                    borderColor: borderColor,
-                    color: borderColor,
-                    boxShadow: `0 0 15px ${borderColor}33`,
-                    fontWeight: 'bold'
-                  }} 
-                  onClick={handleBreakAiGenerate}
-                >
-                  🔮 {isNonNpc ? 'ПРОЖИТЬ ЭМОЦИЮ И ЗАФИКСИРОВАТЬ' : `ВНЯТЬ СОВЕТУ: ${npc.name.toUpperCase()}`}
-                </button>
-              )}
+          {/* AI Generate Button */}
+          {!breakAiText && !breakAiLoading && (
+            <button 
+              className={`rpg-btn ${isAmbush ? 'rpg-btn-blood' : 'rpg-btn-mana'} heartbeat-pulse`} 
+              style={{ 
+                width: '100%', 
+                padding: '0.8rem', 
+                fontSize: '1rem', 
+                marginBottom: '1rem',
+                borderColor: isAmbush ? 'var(--color-blood-glow)' : '#ffb813',
+                color: isAmbush ? '#fff' : '#ffb813',
+                boxShadow: isAmbush ? '0 0 15px rgba(139,26,26,0.3)' : '0 0 15px rgba(212,175,55,0.2)',
+                fontWeight: 'bold'
+              }} 
+              onClick={handleBreakAiGenerate}
+            >
+              {isAmbush ? '⚔️ ВСТУПИТЬ В БОЙ' : (activeTask && activeTask.pomodoroTime < 20 ? 'АКТИВИРОВАТЬ ВСТРЕЧУ' : `ПРИЗВАТЬ ${npc.name.toUpperCase()}`)}
+            </button>
+          )}
 
-              {/* Loading */}
-              {breakAiLoading && (
-                <div style={{ textAlign: 'center', padding: '1.5rem' }}>
-                  <RefreshCw className="heartbeat-pulse fast" style={{ color: borderColor, marginBottom: '0.5rem' }} size={28} />
-                  <p style={{ fontStyle: 'italic', fontSize: '0.85rem', color: 'var(--color-bone-dim)' }}>
-                    {isNonNpc ? 'Когнитивное эхо сгущается в мыслях...' : `Свиток наполняется напутствием: ${npc.name}...`}
-                  </p>
-                </div>
-              )}
-
-              {/* Response Display */}
-              {breakAiText && (
-                <div style={{ marginBottom: '1.5rem', textAlign: 'left' }}>
-                  <div style={{ 
-                    background: 'rgba(0,0,0,0.4)', 
-                    border: `1px solid ${borderColor}55`, 
-                    borderLeft: `3px solid ${borderColor}`,
-                    padding: '1rem', 
-                    color: '#dfc5c5', 
-                    fontSize: '0.85rem', 
-                    lineHeight: '1.5',
-                    fontFamily: 'Georgia, serif',
-                    textAlign: 'justify',
-                    whiteSpace: 'pre-line'
-                  }}>
-                    {breakAiText}
-                  </div>
-                  
-                  <button className="rpg-btn rpg-btn-mana animate-fade-in" style={{ width: '100%', padding: '0.75rem', marginTop: '1rem', fontWeight: 'bold' }} onClick={() => handleDismissBreak(true)}>
-                    🚪 Завершить обряд и продолжить путь
-                  </button>
-                </div>
-              )}
+          {/* Loading */}
+          {breakAiLoading && (
+            <div style={{ textAlign: 'center', padding: '1.5rem' }}>
+              <RefreshCw className="heartbeat-pulse fast" style={{ color: borderColor, marginBottom: '0.5rem' }} size={28} />
+              <p style={{ fontStyle: 'italic', fontSize: '0.85rem', color: 'var(--color-bone-dim)' }}>{isAmbush ? 'Идет бой...' : `${npc.name} приближается из тумана Бездны...`}</p>
             </div>
           )}
 
-          {/* Quick status display */}
-          <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingContent: '0.6rem 0', fontSize: '0.72rem', color: 'var(--color-bone-dim)', textAlign: 'center', paddingTop: '0.6rem' }}>
-            Целебный эффект привала: {isBig ? '❤️ +20 HP, 🔮 +15 MP, ⚡ -30мин усталости' : '❤️ +8 HP, 🔮 +5 MP, ⚡ -10мин усталости'}
+          {/* AI NPC Response */}
+          {breakAiText && (
+            <div style={{ background: 'rgba(0,0,0,0.5)', border: `1px solid ${borderColor}44`, borderLeft: `3px solid ${borderColor}`, padding: '1.2rem', marginBottom: '1.2rem' }}>
+              <p style={{ fontSize: '0.95rem', color: '#e6dfd3', lineHeight: '1.7', fontFamily: 'Georgia, serif', whiteSpace: 'pre-line' }}>{breakAiText}</p>
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+            <button className="rpg-btn rpg-btn-mana" style={{ flex: 1, padding: '0.7rem', fontSize: '0.9rem' }} onClick={() => handleDismissBreak(true)}>
+              {isAmbush ? '⚔️ УБИТЬ БАНДИТОВ И ЗАБРАТЬ ДОБЫЧУ' : (isBig ? '✅ ЗАВЕРШИТЬ ПРИВАЛ' : 'ВЫПОЛНЕНО — В БОЙ')}
+            </button>
+            {!isAmbush && (
+              <button className="rpg-btn rpg-btn-blood" style={{ padding: '0.7rem', fontSize: '0.8rem' }} onClick={() => handleDismissBreak(false)}>
+                ⏭️ Пропустить
+              </button>
+            )}
+          </div>
+
+          {/* Rewards Preview */}
+          <div style={{ marginTop: '0.8rem', fontSize: '0.7rem', color: 'var(--color-bone-dim)', textAlign: 'center', borderTop: '1px solid var(--color-iron-light)', paddingTop: '0.6rem' }}>
+            Награда за выполнение: {isAmbush ? '🪙+5 Золота, 🌟+10 XP (0 HP/MP восстановлено)' : (isBig ? '❤️+20 HP, 🔮+15 MP, ⚡-30мин усталости' : '❤️+8 HP, 🔮+5 MP, ⚡-10мин усталости')}
           </div>
         </div>
       </div>
@@ -1383,21 +2723,20 @@ if (setupStage === 'resolution') {
     const isFlee = resolutionType === 'flee';
     const isDeath = resolutionType === 'death';
     const borderColor = isVictory ? '#d4af37' : isFlee ? '#8c7d6b' : '#ff0000';
-    const title = isVictory ? '🏆 Триумф Воли' : isFlee ? '🚪 Побег в Тени' : '💀 Падение Изгнанника';
+    const title = isVictory ? '🏆 Триумф Воли' : isFlee ? '🌫️ Бегство в Тени' : '💀 Падение Изгнанника';
     
     const activeTasksToOffer = tasks.filter(t => t.status === 'active');
     const hasNpc = isVictory && resolutionNpc;
-    const isMerchant = hasNpc && resolutionNpc.isMerchant === true;
     const cardWidth = hasNpc ? '1100px' : '650px';
 
     return (
       <div className="break-event-overlay animate-fade-in" style={{ zIndex: 99999 }}>
         <div className="break-event-card rpg-scrollbar" style={{ borderColor, maxWidth: cardWidth, width: '95%', padding: '2rem', maxHeight: '95vh', overflowY: 'auto' }}>
           <div style={{ textAlign: 'center', marginBottom: '1.2rem' }}>
-            <span style={{ fontSize: '3rem' }}>{isVictory ? '🏆' : isFlee ? '🚪' : '💀'}</span>
+            <span style={{ fontSize: '3rem' }}>{isVictory ? '🏆' : isFlee ? '🌫️' : '💀'}</span>
             <h1 className="gothic-title" style={{ fontSize: '2rem', color: borderColor, marginTop: '0.3rem' }}>{title}</h1>
             <p style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)', fontStyle: 'italic', marginTop: '0.2rem' }}>
-              Летописи Изгнанника в Землях Абаддона
+              Хроники Абаддона • Запись Летописца
             </p>
           </div>
 
@@ -1405,77 +2744,19 @@ if (setupStage === 'resolution') {
             <div style={{ textAlign: 'center', padding: '3rem' }}>
               <RefreshCw className="heartbeat-pulse fast" style={{ color: borderColor, marginBottom: '0.8rem' }} size={32} />
               <p style={{ fontStyle: 'italic', fontSize: '0.9rem', color: 'var(--color-bone-dim)' }}>
-                Летописец Бездны запечатлевает детали битвы в хроники...
+                Летописец Бездны записывает исход битвы в фолиант...
               </p>
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: hasNpc ? '1.1fr 1fr' : '1fr', gap: '1.5rem', alignItems: 'start' }}>
               
-              {/* Left Column: Chronicle & Return Button & Deeds Choice */}
+              {/* Left Column: Chronicle & Return Button */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid ' + borderColor + '44', borderLeft: '3px solid ' + borderColor, padding: '1.25rem', borderRadius: '4px', textAlign: 'justify' }}>
-                  <p style={{ fontSize: '0.95rem', color: '#e6dfd3', lineHeight: '1.6', fontFamily: 'Georgia, serif', whiteSpace: 'pre-line', margin: 0 }}>
+                <div style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid ' + borderColor + '44', borderLeft: '3px solid ' + borderColor, padding: '1.25rem', borderRadius: '4px' }}>
+                  <p style={{ fontSize: '0.95rem', color: '#e6dfd3', lineHeight: '1.6', fontFamily: 'Georgia, serif', whiteSpace: 'pre-line', textAlign: 'justify', margin: 0 }}>
                     {resolutionText}
                   </p>
                 </div>
-
-                {/* === DEEDS CHOICE PANEL FOR VICTORIES === */}
-                {isVictory && (
-                  <div style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid #d4af3733', borderLeft: '3px solid #ffb813', padding: '1rem', borderRadius: '4px', textAlign: 'left' }}>
-                    <h4 className="gothic-title" style={{ color: '#ffb813', fontSize: '0.95rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <span>📜</span>
-                      <span>Свершить Деяние (Выбор Судьбы)</span>
-                    </h4>
-                    <p style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginBottom: '0.8rem', lineHeight: '1.3' }}>
-                      Ваш поступок после завершения контракта навеки останется в хрониках жизни (Биографии) и определит ваш характер:
-                    </p>
-                    
-                    {!selectedDeed ? (
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                        <button 
-                          className="rpg-btn" 
-                          style={{ borderColor: '#2ecc71', fontSize: '0.78rem', padding: '8px 4px', whiteSpace: 'normal', lineHeight: '1.2' }}
-                          onClick={() => handleCommitDeed('spare', activeTask?.title)}
-                        >
-                          🕊️ Спасти душу (Меньшее зло)
-                        </button>
-                        <button 
-                          className="rpg-btn" 
-                          style={{ borderColor: '#e74c3c', fontSize: '0.78rem', padding: '8px 4px', whiteSpace: 'normal', lineHeight: '1.2' }}
-                          onClick={() => handleCommitDeed('kill', activeTask?.title)}
-                        >
-                          🗡️ Казнить чудовище
-                        </button>
-                        <button 
-                          className="rpg-btn" 
-                          style={{ borderColor: 'var(--color-blood-glow)', fontSize: '0.78rem', padding: '8px 4px', whiteSpace: 'normal', lineHeight: '1.2' }}
-                          onClick={() => handleCommitDeed('obliterate', activeTask?.title)}
-                        >
-                          💀 Добить беспощадно (Забвение)
-                        </button>
-                        <button 
-                          className="rpg-btn" 
-                          style={{ borderColor: 'var(--color-mana-glow)', fontSize: '0.78rem', padding: '8px 4px', whiteSpace: 'normal', lineHeight: '1.2' }}
-                          onClick={() => handleCommitDeed('study', activeTask?.title)}
-                        >
-                          🔮 Изучить рунические русла
-                        </button>
-                      </div>
-                    ) : (
-                      <div style={{ 
-                        background: 'rgba(0,0,0,0.2)', 
-                        padding: '8px 12px', 
-                        border: '1px solid var(--color-relic-glow)', 
-                        color: 'var(--color-relic-glow)', 
-                        fontSize: '0.82rem', 
-                        fontStyle: 'italic',
-                        textAlign: 'center'
-                      }}>
-                        Вы совершили деяние: <b>{selectedDeed}</b>. Свиток биографии дополнен новой записью.
-                      </div>
-                    )}
-                  </div>
-                )}
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginTop: '0.5rem', width: '100%' }}>
                   {isDeath && (
@@ -1490,7 +2771,7 @@ if (setupStage === 'resolution') {
                   
                   <button 
                     className="rpg-btn" 
-                    style={{ padding: '0.8rem 2.5rem', fontSize: '1rem', borderColor, width: '100%', fontWeight: 'bold' }}
+                    style={{ padding: '0.8rem 2.5rem', fontSize: '1rem', borderColor, width: '100%' }}
                     onClick={() => {
                       playClick();
                       const willQualify = (character.completedTasksCount || 0) >= 15 && 
@@ -1508,11 +2789,11 @@ if (setupStage === 'resolution') {
                 </div>
               </div>
 
-              {/* Right Column: NPC Card or Merchant Shop */}
+              {/* Right Column: NPC Card */}
               {hasNpc && (
                 <div style={{ 
                   background: 'rgba(25, 20, 30, 0.75)', 
-                  border: `1px solid ${borderColor}55`, 
+                  border: `1px solid ${resolutionIsAmbush ? 'var(--color-blood-glow)' : 'rgba(255, 184, 19, 0.25)'}`, 
                   borderRadius: '6px', 
                   padding: '1.2rem', 
                   boxShadow: '0 4px 15px rgba(0,0,0,0.5)',
@@ -1520,112 +2801,92 @@ if (setupStage === 'resolution') {
                   flexDirection: 'column',
                   gap: '0.8rem'
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.5rem' }}>
-                    <span style={{ fontSize: '1.8rem' }}>{resolutionNpc.icon}</span>
-                    <h3 className="gothic-title" style={{ fontSize: '1.15rem', color: borderColor, margin: 0 }}>
-                      {resolutionNpc.name}
-                    </h3>
-                  </div>
-
-                  {isMerchant ? (
-                    /* Resolution Merchant Shop */
-                    <div>
-                      <p style={{ fontSize: '0.8rem', color: '#ffb813', fontStyle: 'italic', marginBottom: '1rem', lineHeight: '1.4', textAlign: 'justify' }}>
-                        «Приветствую, Изгнанник. Отличный триумф в бою! Пока у тебя в руках звенит свежее золото, взгляни на мои артефакты. Они помогут удержать твой фокус на рубежах империи...»
+                  {resolutionIsAmbush ? (
+                    <>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span style={{ fontSize: '1.5rem', filter: 'grayscale(100%)' }}>💀</span>
+                        <h3 className="gothic-title" style={{ fontSize: '1.1rem', color: 'var(--color-blood-glow)', margin: 0, textDecoration: 'line-through' }}>
+                          {resolutionNpc.name}
+                        </h3>
+                      </div>
+                      <p style={{ fontSize: '0.85rem', color: 'var(--color-blood-glow)', fontStyle: 'italic', margin: 0, lineHeight: '1.3' }}>
+                        «Вы нашли лишь растерзанное тело и засаду бандитов Бездны. Пришлось проливать чужую кровь, чтобы выжить...»
                       </p>
-
-                      {/* Gold balance */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.3)', padding: '5px 10px', border: '1px solid var(--color-iron-light)', borderRadius: '3px', marginBottom: '0.8rem' }}>
-                        <span style={{ fontSize: '0.72rem', color: 'var(--color-bone-dim)' }}>Сундук Изгнанника:</span>
-                        <span style={{ fontSize: '0.9rem', color: '#ffb813', fontWeight: 'bold' }}>🪙 {character.gold || 0} ЗОЛОТА</span>
-                      </div>
-
-                      {/* Catalog list */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '250px', overflowY: 'auto', paddingRight: '4px' }} className="rpg-scrollbar">
-                        {merchantItems.map(item => {
-                          const alreadyBought = item.slot !== 'potion' && (character.inventory?.some(i => i.id === item.id) || Object.values(character.equipped).some(i => i && i.id === item.id));
-                          return (
-                            <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', background: 'rgba(0,0,0,0.4)', border: '1px solid var(--color-iron-light)', padding: '5px 8px', opacity: alreadyBought ? 0.45 : 1 }}>
-                              <div style={{ fontSize: '1.3rem' }}>{item.icon}</div>
-                              <div style={{ flex: 1, textAlign: 'left' }}>
-                                <div style={{ fontSize: '0.78rem', color: '#fff', fontWeight: 'bold' }}>{item.name}</div>
-                                <div style={{ fontSize: '0.65rem', color: 'var(--color-bone-dim)', fontStyle: 'italic' }}>{item.bonus}</div>
-                              </div>
-                              <button 
-                                className="rpg-btn" 
-                                style={{ fontSize: '0.7rem', padding: '2px 6px', borderColor: '#ffb813', color: '#ffb813' }}
-                                onClick={() => handleBuyMerchantItem(item)}
-                                disabled={alreadyBought}
-                              >
-                                {alreadyBought ? 'Куплено' : `🪙 ${item.price}`}
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
+                    </>
                   ) : (
-                    /* Standard NPC Interaction Card */
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-                      <p style={{ fontSize: '0.85rem', color: '#e6dfd3', fontStyle: 'italic', margin: 0, lineHeight: '1.3', textAlign: 'justify' }}>
-                        «Вы победили врага, Изгнанник. Его скверна отступила. Если вы готовы к следующей битве, выберите дальнейшее путешествие прямо сейчас...»
+                    <>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span style={{ fontSize: '1.5rem' }}>{resolutionNpc.icon}</span>
+                        <h3 className="gothic-title" style={{ fontSize: '1.1rem', color: 'var(--color-relic-glow)', margin: 0 }}>
+                          {resolutionNpc.name}
+                        </h3>
+                      </div>
+                      <p style={{ fontSize: '0.85rem', color: '#e6dfd3', fontStyle: 'italic', margin: 0, lineHeight: '1.3' }}>
+                        «Вы одолели угрозу, Изгнанник. Но тени сгущаются. Какой контракт мы запечатаем следующим?»
                       </p>
+                    </>
+                  )}
 
-                      {/* Offer existing contracts */}
-                      {activeTasksToOffer.length > 0 && (
-                        <div>
-                          <div style={{ fontSize: '0.72rem', color: 'var(--color-bone-dim)', textTransform: 'uppercase', marginBottom: '4px', fontFamily: 'var(--font-rpg)', textAlign: 'left' }}>
-                            🎯 Начать существующий контракт:
-                          </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                            {activeTasksToOffer.slice(0, 3).map(t => (
-                              <button 
-                                key={t.id}
-                                className="rpg-btn"
-                                style={{ display: 'block', width: '100%', padding: '5px 10px', fontSize: '0.8rem', textAlign: 'left', borderColor: 'rgba(255,255,255,0.1)' }}
-                                onClick={() => {
-                                  playClick();
-                                  handleStartCombatSession(t);
-                                }}
-                              >
-                                🏹 {t.title} ({t.pomodoroTime} мин)
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Create and start a new contract (Auto-expanding Textarea Chaos Dump) */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', textAlign: 'left' }}>
-                        <div style={{ fontSize: '0.72rem', color: 'var(--color-bone-dim)', textTransform: 'uppercase', fontFamily: 'var(--font-rpg)' }}>
-                          🔮 Быстрый пакт с бездной (в бой):
-                        </div>
-                        <div style={{ display: 'flex', gap: '0.4rem', width: '100%', alignItems: 'stretch' }}>
-                          <textarea 
-                            rows={1}
-                            placeholder="Сгрузите мысль в бой..." 
-                            className="rpg-input" 
-                            style={{ flex: 1, resize: 'none', minHeight: '34px', fontSize: '0.82rem', padding: '6px' }}
-                            value={npcInputText}
-                            onChange={(e) => {
-                              setNpcInputText(e.target.value);
-                              e.target.style.height = 'auto';
-                              e.target.style.height = e.target.scrollHeight + 'px';
-                            }}
-                          />
+                  {/* Offer existing contracts */}
+                  {activeTasksToOffer.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--color-bone-dim)', textTransform: 'uppercase', marginBottom: '4px', fontFamily: 'var(--font-rpg)' }}>
+                        📜 Выбрать существующий контракт:
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                        {activeTasksToOffer.slice(0, 3).map(t => (
                           <button 
-                            className="rpg-btn rpg-btn-mana" 
-                            style={{ padding: '0 12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} 
-                            onClick={handleNpcAcceptQuest}
+                            key={t.id}
+                            className="rpg-btn"
+                            style={{ display: 'block', width: '100%', padding: '5px 10px', fontSize: '0.8rem', textAlign: 'left', borderColor: 'rgba(255,255,255,0.1)' }}
+                            onClick={() => {
+                              playClick();
+                              handleStartCombatSession(t);
+                            }}
                           >
-                            В бой
+                            ⚔️ {t.title} ({t.pomodoroTime}м)
                           </button>
-                        </div>
+                        ))}
                       </div>
                     </div>
                   )}
+
+                  {/* Create and start a new contract (Auto-expanding Textarea Chaos Dump) */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--color-bone-dim)', textTransform: 'uppercase', fontFamily: 'var(--font-rpg)' }}>
+                      ✍️ Записать новый контракт (Омут Хаоса):
+                    </div>
+                    <textarea 
+                      placeholder="Опишите новый контракт или излейте хаос мыслей..." 
+                      className="rpg-input rpg-scrollbar" 
+                      value={npcNewTaskTitle}
+                      onChange={(e) => setNpcNewTaskTitle(e.target.value)}
+                      style={{ 
+                        width: '100%', 
+                        minHeight: '60px', 
+                        maxHeight: '180px', 
+                        fontSize: '0.82rem', 
+                        lineHeight: '1.3',
+                        padding: '6px 10px',
+                        resize: 'vertical',
+                        background: 'rgba(0,0,0,0.35)',
+                        border: '1px solid var(--color-iron-light)',
+                        borderRadius: '4px',
+                        color: '#fff'
+                      }}
+                    />
+                    <button 
+                      className="rpg-btn rpg-btn-blood"
+                      onClick={handleCreateAndStartTaskFromNpc}
+                      disabled={!npcNewTaskTitle.trim()}
+                      style={{ fontSize: '0.8rem', padding: '6px 0', width: '100%' }}
+                    >
+                      🔮 В БОЙ
+                    </button>
+                  </div>
                 </div>
               )}
+
             </div>
           )}
         </div>
@@ -1633,7 +2894,1086 @@ if (setupStage === 'resolution') {
     );
   }
 
-if (setupStage === 'redemption') {
+// --- BURNOUT BLOCK OVERLAY (Mandatory Rest Camp Screen) ---
+  if (character && character.dailyWorkMinutes >= 300) {
+    return (
+      <div className="rpg-panel" style={{ maxWidth: '750px', margin: '3rem auto', padding: '2.5rem', border: '3px solid var(--color-blood)', animation: 'pulse-red 3s infinite', textAlign: 'center' }}>
+         <Skull size={64} style={{ color: 'var(--color-blood-glow)', marginBottom: '1.5rem' }} />
+         <h1 className="gothic-title" style={{ color: 'var(--color-blood-glow)', fontSize: '2.2rem', marginBottom: '1rem' }}>
+           Когнитивное Истощение
+         </h1>
+         <p style={{ lineHeight: '1.7', color: 'var(--color-bone)', fontSize: '1.1rem', marginBottom: '1.5rem', fontFamily: 'Georgia, serif' }}>
+           «Скверна Абаддона сковала твой разум. Ты вел ожесточенные сражения и выполнял контракты более 5 часов (300 минут) сегодня. 
+           Твоя когнитивная выносливость полностью иссякла. Продолжение боя приведет к выгоранию разума.»
+         </p>
+         <p style={{ color: 'var(--color-bone-dim)', fontSize: '0.95rem', marginBottom: '2.5rem' }}>
+           Вы можете мгновенно восстановить силы с помощью Зелья Выносливости или руны Стойкости, либо запустить дыхательную сессию медитации в Лагере!
+         </p>
+         
+         <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+           <button 
+             className="rpg-btn rpg-btn-mana"
+             onClick={() => {
+               if (character.mana < 20) {
+                 alert("Недостаточно Маны для плетения руны Стойкости!");
+                 return;
+               }
+               playSuccess();
+               setCharacter(prev => ({ ...prev, mana: prev.mana - 20, dailyWorkMinutes: 0 }));
+             }}
+             disabled={character.mana < 20}
+             style={{ padding: '0.8rem 2rem', fontSize: '0.95rem' }}
+           >
+             🔮 Руна Стойкости (Сбросить усталость за 20 MP)
+           </button>
+           
+           <button 
+             className="rpg-btn"
+             onClick={() => {
+               playClick();
+               setCharacter(prev => ({ ...prev, dailyWorkMinutes: 0 }));
+             }}
+             style={{ padding: '0.8rem 2rem', fontSize: '0.95rem' }}
+           >
+             🛡️ Прилив сил (Ручной Оверрайд)
+           </button>
+         </div>
+      </div>
+    );
+  }
+
+  // --- RENDERING ACTIVE TIMER TIMED REST MEDITATION CAMP OVERLAY ---
+  if (meditationActive) {
+    const formattedMedTime = formatTime(meditationTimeLeft);
+    const progress = ((meditationDuration - meditationTimeLeft) / meditationDuration) * 100;
+
+    return (
+      <div className="rest-camp-overlay animate-fade-in">
+        {/* Bonfire effect */}
+        <div className="bonfire-wrapper">
+          <div className="bonfire-flame" />
+          <div className="bonfire-logs" />
+        </div>
+
+        <h1 className="gothic-title" style={{ fontSize: '2.2rem', color: 'var(--color-relic-glow)', marginBottom: '0.5rem', letterSpacing: '0.1em' }}>
+          🎪 Когнитивный Лагерь Отдыха
+        </h1>
+        <p style={{ color: 'var(--color-bone-dim)', fontSize: '0.95rem', maxWidth: '550px', textAlign: 'center', lineHeight: '1.4', marginBottom: '1.5rem', fontStyle: 'italic' }}>
+          «Позвольте мыслям улечься, а скверне — рассеяться. Восстановите свою силу через выбранное действие.»
+        </p>
+
+        {meditationType === 'breathing' ? (
+          /* Breathing Circular Guide */
+          <div className="breathing-circle-container">
+            <div className={`breathing-circle ${meditationPhase}`}>
+              <span className="breathing-phase-text">
+                {meditationPhase === 'inhale' && "Вдох"}
+                {meditationPhase === 'hold-in' && "Задержка"}
+                {meditationPhase === 'exhale' && "Выдох"}
+                {meditationPhase === 'hold-out' && "Задержка"}
+              </span>
+              <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '2px', opacity: 0.7 }}>
+                {meditationPhase === 'inhale' && "Расширяйте легкие"}
+                {meditationPhase === 'hold-in' && "Удерживайте фокус"}
+                {meditationPhase === 'exhale' && "Отпускайте тревогу"}
+                {meditationPhase === 'hold-out' && "Полное расслабление"}
+              </span>
+            </div>
+          </div>
+        ) : (
+          /* Alternate physical activities guide */
+          <div style={{ margin: '2rem auto', textAlign: 'center' }}>
+            <div className="heartbeat-pulse" style={{ fontSize: '5rem', marginBottom: '1rem', filter: 'drop-shadow(0 0 15px var(--color-relic-glow))' }}>
+              {meditationType === 'stretch' && "🤸"}
+              {meditationType === 'walk' && "🚶"}
+              {meditationType === 'mental' && "🧘"}
+              {meditationType === 'expander' && "✊"}
+              {meditationType === 'look_around' && "👀"}
+              {meditationType === 'wash_face' && "🧊"}
+              {meditationType === 'drink_water' && "💧"}
+            </div>
+            <h3 style={{ fontSize: '1.25rem', color: '#fff', marginBottom: '0.5rem', fontFamily: 'var(--font-rpg)' }}>
+              {meditationType === 'stretch' && "Разминка суставов: расправьте плечи и потянитесь"}
+              {meditationType === 'walk' && "Вылазка по комнате: разомните ноги, посмотрите в окно"}
+              {meditationType === 'mental' && "Медитация Бездны: созерцание тишины"}
+              {meditationType === 'expander' && "Эспандер: пожамкайте антистресс-мяч или эспандер"}
+              {meditationType === 'look_around' && "Посмотреть в стороны: гимнастика для глаз"}
+              {meditationType === 'wash_face' && "Умыться: обряд ледяного пробуждения чувств"}
+              {meditationType === 'drink_water' && "Попить воды: глоток живительной ясности разума"}
+            </h3>
+            <p style={{ color: 'var(--color-bone-dim)', fontSize: '0.85rem', maxWidth: '400px', margin: '0 auto', lineHeight: '1.4' }}>
+              {meditationType === 'stretch' && "Сделайте глубокие круговые движения плечами, наклоните голову, потяните руки вверх. Снимите зажимы."}
+              {meditationType === 'walk' && "Встаньте со стула, сделайте круг по комнате, посмотрите вдаль в окно. Налейте стакан прохладной воды."}
+              {meditationType === 'mental' && "Отпустите все мысли, как плывущие облака. Не концентрируйтесь на них, просто слушайте тишину Бездны."}
+              {meditationType === 'expander' && "Сжимайте эспандер или антистресс-игрушку. Выпустите физическое напряжение и накопившийся стресс."}
+              {meditationType === 'look_around' && "Отведите взор от свитка. Посмотрите влево, вправо, вверх, вниз, а затем сфокусируйтесь на дальнем объекте."}
+              {meditationType === 'wash_face' && "Сделайте паузу, омойте лицо холодной влагой. Ледяное прикосновение мгновенно развеет сонные чары Бездны."}
+              {meditationType === 'drink_water' && "Выпейте стакан чистой прохладной воды медленными глотками. Вода вернет тонус вашему телу и уму."}
+            </p>
+          </div>
+        )}
+
+        {/* Remaining meditation time */}
+        <div style={{ fontSize: '2rem', fontFamily: 'var(--font-rpg)', color: '#fff', marginBottom: '0.8rem' }}>
+          {formattedMedTime}
+        </div>
+
+        {/* Recovery progress bar */}
+        <div style={{ width: '100%', maxWidth: '400px', height: '8px', background: '#000', border: '1px solid var(--color-iron-light)', borderRadius: '4px', overflow: 'hidden', marginBottom: '2.5rem' }}>
+          <div style={{ width: `${progress}%`, height: '100%', background: 'linear-gradient(to right, var(--color-relic-glow), var(--color-mana-glow))', transition: 'width 0.4s' }} />
+        </div>
+
+        <div style={{ display: 'flex', gap: '1rem' }}>
+          <button 
+            className="rpg-btn rpg-btn-blood"
+            style={{ padding: '0.75rem 2rem', fontSize: '0.95rem' }}
+            onClick={() => {
+              playClick();
+              setMeditationActive(false);
+              setAtmosphereMood(activeTask?.type === 'siege' ? 'siege' : 'hunt');
+            }}
+          >
+            🏃 Прервать отдых и вернуться в бой
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // --- STAGES RENDERING ---
+
+  if (setupStage === 'lore') {
+    return (
+      <div className="rpg-panel" style={{ maxWidth: '750px', margin: '3rem auto', padding: '2.5rem' }}>
+        <h1 className="gothic-title" style={{ color: 'var(--color-blood-glow)', fontSize: '2rem', textAlign: 'center', marginBottom: '1.5rem' }}>
+          Путешествие Смерти
+        </h1>
+        <p style={{ lineHeight: '1.7', color: 'var(--color-bone)', fontSize: '1.05rem', marginBottom: '1.5rem', fontFamily: 'Georgia, serif' }}>
+          «Ты — изгнанник, совершивший непростительное злодеяние во вселенной Абаддона. Твои силы запечатаны, на руках звенят 
+          тяжелые антимагические оковы. Тебя везли на скрипучей повозке к рубежам Империи Света, чтобы выпнуть в бескрайние 
+          пустоши выживать в одиночку...»
+        </p>
+        <p style={{ lineHeight: '1.7', color: 'var(--color-bone-dim)', fontSize: '0.95rem', marginBottom: '2.5rem', fontFamily: 'Georgia, serif' }}>
+          Но у судьбы свои планы. На рубежах Каргахаула повозка попадает в засаду. Скрежет железа, грохот... Тебе нужно выбраться. 
+          Ваше путешествие начинается здесь. Но сперва давай разберемся с хаосом в твоей голове.
+        </p>
+        <div style={{ textAlign: 'center' }}>
+          <button className="rpg-btn rpg-btn-blood" style={{ padding: '0.8rem 2.5rem', fontSize: '1.1rem' }} onClick={generateRandomCharacter}>
+            СГЕНЕРИРОВАТЬ ГЕРОЯ
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // HUB STAGE: "Текущий статус задач" (Tasks daily overview screen instead of forced text dump)
+  if (setupStage === 'hub') {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const todayTasks = tasks.filter(t => t.date === todayStr && t.status === 'active');
+    const potionCount = character.inventory?.filter(i => i.id === 'item_potion').length || 0;
+
+    return (
+      <div className="rpg-panel" style={{ maxWidth: '1280px', margin: '1rem auto', padding: '2rem' }}>
+        {/* Hub Header: Hero card summary */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid var(--color-iron-light)', paddingBottom: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+          <div>
+            <h2 className="gothic-title" style={{ fontSize: '1.5rem', color: 'var(--color-relic-glow)' }}>
+              ⚜️ Походный Штаб Путешествия
+            </h2>
+            <span style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)' }}>
+              Класс: <b style={{ color: '#fff' }}>{character.class}</b> • Уровень: <b style={{ color: '#fff' }}>{character.level}</b>
+            </span>
+          </div>
+          
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <button 
+              className="rpg-btn" 
+              style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+              onClick={() => { playClick(); setMeditationSelectOpen(true); }}
+            >
+              🎪 Войти в Лагерь (Медитация)
+            </button>
+            <button 
+              className="rpg-btn" 
+              style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+              onClick={() => setSetupStage('input')}
+            >
+              🔮 Сплести хаос
+            </button>
+          </div>
+        </div>
+
+        {/* Active daily tasks list (RPG Bounty Contracts) */}
+        <h3 className="gothic-title" style={{ fontSize: '1.15rem', color: 'var(--color-bone)', marginBottom: '1.2rem' }}>
+          ⚔️ Активные Боевые Контракты на Сегодня:
+        </h3>
+        
+        <div className="combat-contracts-grid">
+          {todayTasks.length > 0 ? (
+            todayTasks.map(task => {
+              // Procedural profile generation for preview
+              const hashStr = task.title + task.id;
+              let hash = 0;
+              for (let i = 0; i < hashStr.length; i++) {
+                hash = hashStr.charCodeAt(i) + ((hash << 5) - hash);
+              }
+              const variation = COMBAT_VARIATIONS[Math.abs(hash) % COMBAT_VARIATIONS.length];
+              const eName = task.combatLore?.enemyName || `${variation.prefix} ${variation.suffix}`;
+              const isBoss = task.type === 'siege';
+
+              return (
+                <div 
+                  key={task.id} 
+                  style={{
+                    background: 'radial-gradient(circle, rgba(25, 20, 30, 0.85) 0%, rgba(12, 10, 15, 0.95) 100%)',
+                    border: `2px solid ${isBoss ? 'var(--color-blood-glow)' : 'var(--color-iron-light)'}`,
+                    boxShadow: isBoss 
+                      ? '0 0 15px rgba(139, 26, 26, 0.4), inset 0 0 10px rgba(139, 26, 26, 0.1)'
+                      : '0 5px 15px rgba(0,0,0,0.5), inset 0 0 10px rgba(255,255,255,0.02)',
+                    padding: '1rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    minHeight: '430px',
+                    position: 'relative',
+                    transition: 'all 0.25s ease',
+                    cursor: 'pointer'
+                  }}
+                  className="gothic-fate-card"
+                  onClick={() => handleOpenEdit(task)}
+                >
+                  <div>
+                    {/* Centered Small Icon */}
+                    <div style={{ display: 'flex', justifyContent: 'center', fontSize: '2rem', margin: '0.2rem 0 0.5rem 0', filter: 'drop-shadow(0 0 10px rgba(255,255,255,0.05))' }} onClick={(e) => e.stopPropagation()}>
+                      {variation.icon}
+                    </div>
+
+                    <h4 className="gothic-title" style={{ fontSize: '0.95rem', color: '#fff', fontWeight: 'bold', margin: '0 0 0.5rem 0', textAlign: 'center', lineHeight: '1.3', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+                      {task.title}
+                    </h4>
+                    
+                    {/* Nature / Mode Badges */}
+                    <div style={{ display: 'flex', justifyContent: 'center', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '0.6rem' }}>
+                      <span style={{ 
+                        fontSize: '0.6rem', 
+                        color: task.nature === 'internal' ? '#4fc3f7' : '#ff8a80', 
+                        background: 'rgba(0,0,0,0.4)', 
+                        padding: '1px 5px', 
+                        borderRadius: '3px',
+                        border: `1px solid ${task.nature === 'internal' ? 'rgba(79, 195, 247, 0.25)' : 'rgba(255, 138, 128, 0.25)'}` 
+                      }}>
+                        {task.nature === 'internal' ? '🧿 Внутренний' : '⚔️ Внешний'}
+                      </span>
+                      {task.executionMode && task.executionMode !== 'ask_later' && (
+                        <span style={{
+                          fontSize: '0.6rem',
+                          color: 'var(--color-bone-dim)',
+                          background: 'rgba(0,0,0,0.4)',
+                          padding: '1px 5px',
+                          borderRadius: '3px',
+                          border: '1px solid rgba(255, 255, 255, 0.1)'
+                        }}>
+                          {task.executionMode === 'timer' ? '⏳ Таймер' : '🌅 День'}
+                        </span>
+                      )}
+                    </div>
+                    
+                    {/* Details Info */}
+                    <div style={{ fontSize: '0.72rem', color: 'var(--color-bone-dim)', background: 'rgba(0,0,0,0.25)', padding: '0.4rem 0.5rem', border: '1px solid rgba(255,255,255,0.02)', marginBottom: '0.5rem' }}>
+                      <div style={{ marginBottom: '1px' }}>Враг: <b style={{ color: 'var(--color-blood-glow)' }}>{eName}</b></div>
+                      <div style={{ marginBottom: '1px' }}>Сущность: <b>{isBoss ? 'Осада (Босс)' : 'Охота'}</b></div>
+                      <div style={{ marginBottom: '1px' }}>Время: <b>{task.pomodoroTime} мин</b></div>
+                      <div>Токсичность: <b>{task.toxicity === 'scary' ? 'Страшная' : task.toxicity === 'tedious' ? 'Скучная' : task.toxicity === 'vague' ? 'Мутная' : 'Обычная'}</b></div>
+                    </div>
+
+                    {/* Intent / Description */}
+                    {task.intent && (
+                      <div style={{ 
+                        background: 'rgba(140, 125, 107, 0.08)', 
+                        borderLeft: '2px solid var(--color-relic)', 
+                        padding: '0.4rem 0.6rem', 
+                        fontSize: '0.75rem', 
+                        fontStyle: 'italic', 
+                        color: 'var(--color-bone-dim)', 
+                        margin: '0.6rem 0',
+                        lineHeight: '1.3'
+                      }}>
+                        <b>Намерение:</b> «{task.intent}»
+                      </div>
+                    )}
+
+                    {/* Task Steps */}
+                    {task.steps && task.steps.length > 0 && (
+                      <div style={{ marginTop: '0.6rem', borderTop: '1px dashed rgba(255,255,255,0.08)', paddingTop: '0.6rem' }}>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', textTransform: 'uppercase', fontFamily: 'var(--font-rpg)', display: 'block', marginBottom: '4px' }}>
+                          🎯 Шаги прорыва ({task.steps.filter(s => s.completed).length}/{task.steps.length}):
+                        </span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', maxHeight: '90px', overflowY: 'auto', paddingRight: '4px' }} className="rpg-scrollbar">
+                          {task.steps.map(step => (
+                            <div 
+                              key={step.id} 
+                              style={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '5px', 
+                                fontSize: '0.75rem', 
+                                color: step.completed ? 'var(--color-bone-dim)' : '#fff',
+                                textDecoration: step.completed ? 'line-through' : 'none',
+                                opacity: step.completed ? 0.6 : 1
+                              }}
+                            >
+                              <span style={{ color: step.completed ? 'var(--color-relic-glow)' : 'var(--color-blood-glow)' }}>
+                                {step.completed ? '☑' : '☐'}
+                              </span>
+                              <span style={{ whiteSpace: 'normal', wordBreak: 'break-word', overflowWrap: 'anywhere' }} title={step.title}>
+                                {step.title}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem' }} onClick={(e) => e.stopPropagation()}>
+                    {/* Row 1: В бой and Выполнено */}
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button 
+                        className="rpg-btn rpg-btn-blood"
+                        style={{ flex: 1, padding: '0.4rem 0', fontSize: '0.8rem', fontWeight: 'bold' }}
+                        onClick={() => {
+                          playClick();
+                          handleStartCombatSession(task);
+                        }}
+                      >
+                        {task.timeLeft !== undefined ? `⚔️ В БОЙ (${Math.ceil(task.timeLeft / 60)}м)` : '⚔️ В БОЙ'}
+                      </button>
+                      
+                      <button 
+                        className="rpg-btn"
+                        style={{ 
+                          flex: 1, 
+                          padding: '0.4rem 0', 
+                          fontSize: '0.8rem', 
+                          fontWeight: 'bold',
+                          background: '#1b5e20', 
+                          borderColor: '#2e7d32',
+                          color: '#fff'
+                        }}
+                        onClick={() => {
+                          handleInstantCompleteTask(task);
+                        }}
+                      >
+                        👍 ВЫПОЛНИЛ
+                      </button>
+                    </div>
+
+                    {/* Row 2: На завтра and В бэклог */}
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button 
+                        className="rpg-btn"
+                        style={{ flex: 1, padding: '0.3rem 0', fontSize: '0.72rem', borderColor: 'rgba(255,255,255,0.1)' }}
+                        onClick={() => {
+                          handleRescheduleTomorrow(task);
+                        }}
+                      >
+                        📅 НА ЗАВТРА
+                      </button>
+                      <button 
+                        className="rpg-btn"
+                        style={{ flex: 1, padding: '0.3rem 0', fontSize: '0.72rem', borderColor: 'rgba(255,255,255,0.1)' }}
+                        onClick={() => {
+                          handleMoveToBacklog(task);
+                        }}
+                      >
+                        📦 В БЭКЛОГ
+                      </button>
+                    </div>
+
+                    {/* Row 3: Сбежать от судьбы */}
+                    <button 
+                      className="rpg-btn"
+                      style={{ 
+                        width: '100%', 
+                        padding: '0.3rem 0', 
+                        fontSize: '0.72rem', 
+                        background: '#3a0000', 
+                        borderColor: '#5c0000',
+                        color: '#ff8a80',
+                        marginTop: '0.2rem',
+                        fontWeight: 'bold'
+                      }}
+                      onClick={() => {
+                        handleEscapeFate(task);
+                      }}
+                    >
+                      🏃 СБЕЖАТЬ ОТ СУДЬБЫ
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            <div style={{ border: '1px dashed var(--color-iron-light)', padding: '2rem', textAlign: 'center', background: 'rgba(0,0,0,0.2)', gridColumn: 'span 3' }}>
+              <Compass size={32} style={{ color: 'var(--color-iron-light)', marginBottom: '0.5rem' }} />
+              <p style={{ fontSize: '0.9rem', color: 'var(--color-bone-dim)' }}>
+                Свиток пуст. На сегодня нет активных контрактов (задач) в ежедневнике.
+              </p>
+              <p style={{ fontSize: '0.8rem', color: 'var(--color-iron-light)', marginTop: '4px' }}>
+                Вы можете перетащить ваши задачи на сегодняшний день во вкладке <b>Планировщика</b>, либо нажать кнопку <b>«Сплести хаос»</b> выше, чтобы вывалить СДВГ-мысли и разобрать их Бездной!
+              </p>
+            </div>
+          )}
+        </div>
+        {renderMeditationSelect()}
+        {editingTask && renderEditTaskModal()}
+      </div>
+    );
+  }
+
+  if (setupStage === 'input') {
+    return (
+      <div className="rpg-panel" style={{ maxWidth: '800px', margin: '1rem auto' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <h2 className="gothic-title" style={{ fontSize: '1.5rem', color: 'var(--color-bone)' }}>
+            Сплести заклинание Задач
+          </h2>
+          <button className="rpg-btn" style={{ padding: '2px 10px', fontSize: '0.75rem' }} onClick={() => setSetupStage('hub')}>
+            К ВОЕННОМУ ШТАБУ
+          </button>
+        </div>
+        <p style={{ fontSize: '0.95rem', color: 'var(--color-bone-dim)', marginBottom: '1.5rem', fontFamily: 'Georgia, serif', lineHeight: '1.5', fontStyle: 'italic' }}>
+          «Ввергните в этот омут все помыслы и заботы, что терзают ваш разум черным комом. Бессвязно, хаотично, со всей яростью и отчаянием. Бездна Абаддона внемлет этому шепоту, взвесит скверну каждого деяния и разделит их по законам Пути (Охота, Осады, Реликвии).»
+        </p>
+
+        <textarea
+          className="rpg-input"
+          style={{ width: '100%', minHeight: '220px', resize: 'vertical', fontFamily: 'monospace', fontSize: '1rem', marginBottom: '1.5rem', padding: '1rem' }}
+          placeholder="Например: мне надо помыть посуду, но блин раковина полная и воняет, это пипец страшно начать. Еще сдать проект заказчику до среды, там куча мелких правок, надо написать тесты и проверить сборку, это огромная осада! Еще купить корм коту, это быстро. А, и позвонить бабушке, блин я откладываю это уже месяц, это прям гниющий труп..."
+          value={messyText}
+          onChange={(e) => setMessyText(e.target.value)}
+          disabled={loadingAI}
+        />
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <span style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)' }}>
+              Класс: <b style={{ color: 'var(--color-mana-glow)' }}>{character.class}</b>
+            </span>
+          </div>
+          <button 
+            className="rpg-btn rpg-btn-mana" 
+            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.8rem 2rem' }}
+            onClick={handleParseTasks}
+            disabled={loadingAI || !messyText.trim()}
+          >
+            {loadingAI ? <RefreshCw className="heartbeat-pulse fast" size={16} /> : <Zap size={16} />}
+            {loadingAI ? "РАЗБИРАЕМ ХАОС..." : "СТРУКТУРИРОВАТЬ БЕЗДНОЙ"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (setupStage === 'review') {
+    if (!parsedList || parsedList.length === 0) {
+      return (
+        <div className="rpg-panel" style={{ maxWidth: '800px', margin: '1rem auto', textAlign: 'center', padding: '3rem' }}>
+          <p style={{ color: 'var(--color-bone-dim)' }}>В омуте хаоса ничего не найдено...</p>
+          <button className="rpg-btn" onClick={() => setSetupStage('input')}>Назад</button>
+        </div>
+      );
+    }
+
+    const currentCard = parsedList[reviewIndex];
+    const isLastCard = reviewIndex >= parsedList.length - 1;
+
+    return (
+      <div className="rpg-panel" style={{ maxWidth: '650px', margin: '1rem auto', padding: '2rem' }}>
+        <h2 className="gothic-title" style={{ fontSize: '1.4rem', marginBottom: '0.3rem', color: 'var(--color-bone)', textAlign: 'center' }}>
+          Одобрить Пакт Задач ({reviewIndex + 1} из {parsedList.length})
+        </h2>
+        <p style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)', marginBottom: '1.5rem', textAlign: 'center' }}>
+          Проверьте контракт перед вступлением в бой. Настройте детальность и определите глубину пути.
+        </p>
+
+        {loadingAI ? (
+          <div style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid var(--color-iron-light)', padding: '3rem', textAlign: 'center' }}>
+            <RefreshCw className="heartbeat-pulse fast" style={{ color: 'var(--color-mana-glow)', marginBottom: '1rem' }} size={32} />
+            <p style={{ fontFamily: 'var(--font-rpg)' }}>Бездна шепчет заклинания... Идет разделение шагов...</p>
+          </div>
+        ) : (
+          <div style={{
+            background: 'radial-gradient(circle, rgba(25, 20, 30, 0.85) 0%, rgba(12, 10, 15, 0.95) 100%)',
+            border: `2px solid ${currentCard.type === 'siege' ? 'var(--color-blood-glow)' : 'var(--color-iron-light)'}`,
+            padding: '1.5rem',
+            boxShadow: currentCard.type === 'siege' ? '0 0 15px rgba(139, 26, 26, 0.3)' : '0 5px 15px rgba(0,0,0,0.5)',
+            marginBottom: '1.5rem',
+            position: 'relative'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.8rem' }}>
+              <b style={{ color: '#fff', fontSize: '1.15rem' }}>{currentCard.title}</b>
+              <span style={{ 
+                fontSize: '0.72rem', 
+                padding: '2px 8px', 
+                background: currentCard.type === 'siege' ? 'rgba(139,26,26,0.2)' : 'rgba(255,255,255,0.05)',
+                color: currentCard.type === 'siege' ? 'var(--color-blood-glow)' : 'var(--color-bone-dim)',
+                border: `1px solid ${currentCard.type === 'siege' ? 'var(--color-blood)' : 'var(--color-iron-light)'}`
+              }}>
+                {currentCard.type === 'siege' ? '💥 ОСАДА' : currentCard.type === 'relic' ? '💎 РЕЛИКВИЯ' : currentCard.type === 'corpse' ? '💀 ДОЛГ' : '🏹 ОХОТА'}
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '1rem', marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', fontSize: '0.85rem' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-bone-dim)' }}>
+                  ⏳ Время таймера:
+                  <input 
+                    type="number" 
+                    min="1" 
+                    max="180"
+                    value={currentCard.estimatedTime || 25}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value) || 25;
+                      setParsedList(prev => prev.map((item, idx) => idx === reviewIndex ? { ...item, estimatedTime: val } : item));
+                    }}
+                    style={{
+                      width: '60px',
+                      background: 'rgba(0,0,0,0.4)',
+                      border: '1px solid var(--color-iron-light)',
+                      color: '#fff',
+                      padding: '2px 5px',
+                      textAlign: 'center',
+                      fontFamily: 'monospace'
+                    }}
+                  />
+                  <span>мин</span>
+                </label>
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-bone-dim)' }}>
+                  🚨 Дедлайн квеста:
+                  <input 
+                    type="text" 
+                    placeholder="до 18:00 / среду"
+                    value={currentCard.deadline || ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setParsedList(prev => prev.map((item, idx) => idx === reviewIndex ? { ...item, deadline: val } : item));
+                    }}
+                    style={{
+                      width: '160px',
+                      background: 'rgba(0,0,0,0.4)',
+                      border: '1px solid var(--color-iron-light)',
+                      color: '#fff',
+                      padding: '2px 5px',
+                      fontFamily: 'var(--font-rpg)',
+                      fontSize: '0.8rem'
+                    }}
+                  />
+                </label>
+              </div>
+
+              {!currentCard.deadline && (
+                <div style={{ color: '#ffb813', fontSize: '0.75rem', fontFamily: 'var(--font-rpg)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  ⚠️ Бездна не нашла дедлайн в ваших мыслях. Пожалуйста, укажите его вручную выше!
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '1rem', fontSize: '0.8rem', color: 'var(--color-bone-dim)' }}>
+                {currentCard.toxicity && (
+                  <span style={{ color: 'var(--color-blood-glow)' }}>
+                    Токсичность: <b>{currentCard.toxicity === 'scary' ? 'Страшно' : currentCard.toxicity === 'vague' ? 'Мутно' : currentCard.toxicity === 'tedious' ? 'Скучно' : 'Стандарт'}</b>
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Steps Section */}
+            <h4 style={{ fontSize: '0.85rem', color: 'var(--color-bone)', marginBottom: '6px', fontFamily: 'var(--font-rpg)' }}>Шаги прорыва:</h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '1.2rem', paddingLeft: '0.5rem', borderLeft: '1px dashed var(--color-iron-light)' }}>
+              {currentCard.steps && currentCard.steps.map((s, sIdx) => (
+                <div key={sIdx} style={{ fontSize: '0.85rem', color: 'var(--color-bone-dim)' }}>
+                  • {s}
+                </div>
+              ))}
+              {(!currentCard.steps || currentCard.steps.length === 0) && (
+                <div style={{ fontStyle: 'italic', color: 'var(--color-iron-light)', fontSize: '0.8rem' }}>Нет шагов. Нажмите кнопку ниже для авто-расширения.</div>
+              )}
+            </div>
+
+            {/* Interactive Options inside single card */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.85rem', color: 'var(--color-bone-dim)' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={currentCard.isLongJourney || false} 
+                    onChange={(e) => {
+                      const isChecked = e.target.checked;
+                      setParsedList(prev => prev.map((item, idx) => idx === reviewIndex ? { ...item, isLongJourney: isChecked } : item));
+                    }} 
+                    style={{ width: '16px', height: '16px', accentColor: 'var(--color-blood)', cursor: 'pointer' }} 
+                  />
+                  <span>Длительное путешествие</span>
+                </label>
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', color: 'var(--color-bone-dim)' }}>
+                  Режим:
+                  <select
+                    value={currentCard.executionMode || 'ask_later'}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setParsedList(prev => prev.map((item, idx) => idx === reviewIndex ? { ...item, executionMode: val } : item));
+                    }}
+                    className="rpg-input"
+                    style={{ fontSize: '0.8rem', padding: '2px 5px', height: '28px', cursor: 'pointer' }}
+                  >
+                    <option value="ask_later">❓ Спросить позже</option>
+                    <option value="timer">⏳ Таймер</option>
+                    <option value="day">🌅 В течение дня</option>
+                  </select>
+                </label>
+              </div>
+
+              <button 
+                className="rpg-btn" 
+                style={{ fontSize: '0.75rem', padding: '3px 8px', borderColor: 'var(--color-mana-glow)' }}
+                onClick={handleDetailedDeconstruction}
+                disabled={loadingAI}
+              >
+                🔮 Нужны более подробные шаги
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', marginTop: '1.5rem' }}>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button className="rpg-btn" onClick={() => setSetupStage('input')}>
+              ВЕРНУТЬСЯ
+            </button>
+            <button 
+              className="rpg-btn rpg-btn-mana"
+              style={{ fontSize: '0.8rem', padding: '4px 12px' }}
+              onClick={() => {
+                playClick();
+                handleStartCrashSequence(parsedList, true);
+              }}
+              title="Создать все задачи из дампа хаоса и перейти к выбору"
+            >
+              ⏭️ Создать все и выбрать квест
+            </button>
+          </div>
+          
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button 
+              className="rpg-btn rpg-btn-blood"
+              style={{ fontSize: '0.8rem', padding: '4px 10px' }}
+              onClick={() => {
+                playClick();
+                const updated = parsedList.filter((_, idx) => idx !== reviewIndex);
+                setParsedList(updated);
+                if (updated.length === 0) {
+                  setSetupStage('input');
+                } else if (reviewIndex >= updated.length) {
+                  // If we rejected the last card but have remaining approved tasks, start the journey!
+                  handleStartCrashSequence(updated);
+                }
+              }}
+            >
+              Отклонить карту
+            </button>
+
+            <button 
+              className="rpg-btn rpg-btn-mana" 
+              style={{ padding: '0.75rem 2rem', fontWeight: 'bold' }} 
+              onClick={() => {
+                if (isLastCard) {
+                  handleStartCrashSequence();
+                } else {
+                  playClick();
+                  setReviewIndex(reviewIndex + 1);
+                }
+              }}
+            >
+              {isLastCard ? "НАЧАТЬ ПУТЕШЕСТВИЕ" : "ОДОБРИТЬ КОНТРАКТ"}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (setupStage === 'crash') {
+    return (
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
+        background: '#000',
+        zIndex: 5000,
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: '2rem',
+        animation: 'pulse-red 3s infinite'
+      }}>
+        <div style={{ maxWidth: '650px', textAlign: 'center' }}>
+          <h1 className="gothic-title" style={{ fontSize: '2.5rem', color: 'var(--color-blood-glow)', marginBottom: '1rem', letterSpacing: '0.15em' }}>
+            НАПИШИ, ЧТОБЫ ВЫЖИТЬ
+          </h1>
+          <p style={{ fontSize: '1rem', color: 'var(--color-bone-dim)', marginBottom: '2rem' }}>
+            Повозка перевернулась и разбита в щепки! Вы очнулись в кандалах под дождем. 
+            Каргахаульские конвоиры лежат без сознания, но скверна стягивается.
+            <b> Напишите первое элементарное физическое или умственное действие, которое вы сделаете ПРЯМО СЕЙЧАС, чтобы запустить путешествие.</b>
+          </p>
+
+          <div style={{ fontSize: '1.2rem', color: '#fff', fontFamily: 'var(--font-rpg)', marginBottom: '1.5rem' }}>
+            Текущая угроза: <span style={{ color: 'var(--color-blood-glow)' }}>{activeTask?.title}</span>
+          </div>
+
+          <input
+            type="text"
+            className="rpg-input"
+            style={{ 
+              width: '100%', 
+              fontSize: '1.25rem', 
+              textAlign: 'center', 
+              padding: '1rem', 
+              border: '2px solid var(--color-blood)',
+              background: 'rgba(20, 10, 10, 0.8)',
+              color: '#fff',
+              marginBottom: '2rem'
+            }}
+            placeholder="Например: Открыть файл кода, или Дойти до раковины..."
+            value={survivalInput}
+            onChange={handleSurvivalTyping}
+            disabled={survivalCompleted}
+          />
+
+          {survivalTimerStarted && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '2rem' }}>
+              <div className={`heartbeat-pulse ${survivalTimeLeft < 60 ? 'fast' : ''}`} style={{ fontSize: '3rem', color: 'var(--color-blood-glow)', fontFamily: 'var(--font-rpg)', fontWeight: 'bold' }}>
+                {survivalTimeLeft} c
+              </div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)', marginTop: '5px', textTransform: 'uppercase', letterSpacing: '2px' }}>
+                <AlertCircle size={14} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'text-bottom' }} />
+                Стучит сердце. Пиши или проиграешь когнитивный бой!
+              </div>
+            </div>
+          )}
+
+          {survivalInput.trim().length > 2 && (
+            <button 
+              className="rpg-btn rpg-btn-blood heartbeat-pulse" 
+              style={{ fontSize: '1.3rem', padding: '1rem 3.5rem', border: '2px solid #fff', boxShadow: '0 0 25px var(--color-blood-glow)' }}
+              onClick={handleWakeUp}
+            >
+              ОЧНУТЬСЯ
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // --- ACTIVE SESSION STAGE (RPG COMBAT ARENA WITH DYNAMIC WOW CLASS SKILLS) ---
+  if (setupStage === 'active' && activeTask) {
+    const isBoss = activeTask.type === 'siege';
+    const potionCount = character.inventory?.filter(i => i.id === 'item_potion').length || 0;
+
+    // Stable seed selection of procedural lore details if not pre-configured
+    const hashStr = activeTask.title + activeTask.id;
+    let hash = 0;
+    for (let i = 0; i < hashStr.length; i++) {
+      hash = hashStr.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    hash = Math.abs(hash);
+    const variation = COMBAT_VARIATIONS[hash % COMBAT_VARIATIONS.length];
+    
+    // Choose which Weakpoint to render under enemy card based on step completion state
+    const currentWeakpoint = activeTask.combatLore?.weakPoints?.[0] || 
+      (activeTask.toxicity === 'scary' ? "Монстр боится разбития. Пройдите первый физический микро-шаг!" : 
+       activeTask.toxicity === 'tedious' ? "Враг ненавидит скорость. Сделайте один шаг быстро!" : 
+       "Враг неповоротлив: начните с самого простого физического шага.");
+
+    return (
+      <div className="rpg-panel" style={{ maxWidth: '950px', margin: '0 auto', border: `2px solid ${isBoss ? 'var(--color-blood-glow)' : 'var(--color-iron-light)'}` }}>
+        {/* Screen Flash overlays */}
+        {screenFlash && <div className={`screen-flash flash-${screenFlash}`} />}
+
+        {isBoss && (
+          <div style={{ position: 'absolute', top: '-12px', left: '50%', transform: 'translateX(-50%)', background: 'var(--color-blood)', color: '#fff', padding: '3px 15px', fontSize: '0.75rem', fontFamily: 'var(--font-rpg)', border: '1px solid var(--color-blood-glow)', zIndex: 10 }}>
+            👹 БОСС-БИТВА (ОСАДА)
+          </div>
+        )}
+
+        {/* Global HUD inside Arena */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--color-iron-light)', paddingBottom: '0.8rem', marginBottom: '1.2rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <div style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)' }}>
+            🛡️ Выносливость: <b style={{ color: '#fff' }}>{Math.floor(character.dailyWorkMinutes || 0)} / 300 мин</b>
+          </div>
+          <div style={{ display: 'flex', gap: '1rem', fontSize: '0.8rem', color: 'var(--color-bone-dim)' }}>
+            <span>❤️ Здоровье: <b style={{ color: 'var(--color-blood-glow)' }}>{Math.round(character.hp)} HP</b></span>
+            <span>🔮 Ресурс: <b style={{ color: 'var(--color-mana-glow)' }}>{Math.round(character.mana)} RP</b></span>
+          </div>
+          <div style={{ fontSize: '0.8rem', color: 'var(--color-blood-glow)' }}>
+            🚨 Угроза Скверны: {isRunning ? '⚔️ ИДЕТ СХВАТКА' : '⏸ БЕЗОПАСНЫЙ СОН'}
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1.7fr 1.3fr', gap: '1.5rem' }}>
+          
+          {/* LEFT AREA: Quest Title, Timer, and Steps */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+              <div>
+                <h1 className="gothic-title" style={{ fontSize: '1.6rem', color: isBoss ? 'var(--color-blood-glow)' : '#fff' }}>
+                  {activeTask.title}
+                </h1>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)', fontStyle: 'italic' }}>
+                    Сущность: {variation.icon} {variation.type.toUpperCase()} • Оценка: {activeTask.toxicity === 'scary' ? 'Страшная' : 'Стандарт'}
+                  </span>
+                  {activeTask.deadline && (
+                    <span style={{ fontSize: '0.8rem', color: 'var(--color-blood-glow)', fontFamily: 'var(--font-rpg)', borderLeft: '1px solid rgba(255,255,255,0.1)', paddingLeft: '8px' }}>
+                      🚨 ДЕДЛАЙН: {activeTask.deadline}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ textAlign: 'right' }}>
+                {activeTask.executionMode === 'day' ? (
+                  <div style={{ fontSize: '1.1rem', fontFamily: 'var(--font-rpg)', color: '#1db954', border: '1px solid rgba(29,185,84,0.3)', padding: '4px 10px', background: 'rgba(0,0,0,0.3)', borderRadius: '4px' }}>
+                    🌅 СВОБОДНЫЙ ПЕРЕХОД
+                  </div>
+                ) : (
+                  <div style={{ 
+                    fontSize: '2.5rem', 
+                    fontFamily: 'var(--font-rpg)', 
+                    color: timeLeft < 0 ? 'var(--color-blood-glow)' : isRunning ? '#fff' : 'var(--color-bone-dim)',
+                    textShadow: timeLeft < 0 ? '0 0 10px var(--color-blood-glow)' : 'none'
+                  }}>
+                    {formatTime(timeLeft)}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {activeTask.intent && (
+              <div style={{ background: 'rgba(0,0,0,0.4)', padding: '0.8rem 1.2rem', borderLeft: '3px solid var(--color-mana)', marginBottom: '1.2rem', fontSize: '0.85rem', fontStyle: 'italic', color: 'var(--color-bone)' }}>
+                <b>Намерение:</b> «{activeTask.intent}»
+              </div>
+            )}
+
+            {timeLeft < 0 && (
+              <div className="heartbeat-pulse" style={{ 
+                background: 'rgba(139, 26, 26, 0.15)', 
+                border: '1px solid var(--color-blood)', 
+                padding: '0.6rem 1rem', 
+                color: 'var(--color-blood-glow)', 
+                fontSize: '0.85rem', 
+                fontFamily: 'var(--font-rpg)', 
+                marginBottom: '1rem',
+                textAlign: 'center'
+              }}>
+                ⏳ СРОК ИСТЕК! Вы получили разовый штрафной удар. Завершите все шаги, чтобы одолеть врага!
+              </div>
+            )}
+
+            {/* Active Steps deconstruction */}
+            <h3 className="rpg-title" style={{ fontSize: '1rem', marginBottom: '0.6rem', color: 'var(--color-bone-dim)' }}>
+              🎯 Фазы прорыва к победе:
+            </h3>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '1.5rem' }}>
+              {sessionSteps.length > 0 ? (
+                sessionSteps.map((step) => (
+                  <div 
+                    key={step.id} 
+                    onClick={() => handleToggleStep(step.id)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.8rem',
+                      padding: '0.75rem',
+                      background: step.completed ? 'rgba(0,0,0,0.25)' : 'var(--color-iron)',
+                      border: '1px solid var(--color-iron-light)',
+                      textDecoration: step.completed ? 'line-through' : 'none',
+                      opacity: step.completed ? 0.45 : 1,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <input 
+                      type="checkbox" 
+                      checked={step.completed} 
+                      onChange={() => {}} 
+                      style={{ pointerEvents: 'none' }}
+                    />
+                    <span style={{ fontSize: '0.9rem', color: step.completed ? 'var(--color-bone-dim)' : '#fff' }}>
+                      {step.title}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <div style={{
+                  padding: '1rem',
+                  border: '1px dashed var(--color-bone-dim)',
+                  textAlign: 'center',
+                  fontStyle: 'italic',
+                  color: 'var(--color-bone-dim)',
+                  fontSize: '0.85rem'
+                }}>
+                  🔮 Бездна расшифровывает фазы прорыва квеста...
+                </div>
+              )}
+            </div>
+
+            {/* Controls */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {activeTask.executionMode === 'day' ? (
+                <div style={{
+                  padding: '0.75rem',
+                  background: 'rgba(29, 185, 84, 0.1)',
+                  border: '1px dashed #1db954',
+                  textAlign: 'center',
+                  fontFamily: 'var(--font-rpg)',
+                  color: '#1db954',
+                  fontSize: '0.85rem',
+                  borderRadius: '4px',
+                  lineHeight: '1.4'
+                }}>
+                  🌅 Свободный Переход (без урона и таймера). Нажимайте на фазы ниже по мере их завершения!
+                </div>
+              ) : (
+                <button 
+                  className={`rpg-btn ${isRunning ? 'rpg-btn-blood' : 'rpg-btn-mana'}`} 
+                  style={{ flex: 1, fontSize: '1.1rem', padding: '0.75rem' }} 
+                  onClick={toggleTimer}
+                >
+                  {isRunning ? "⏸ ПРИОСТАНОВИТЬ БИТВУ" : "⚔ НАЧАТЬ СХВАТКУ"}
+                </button>
+              )}
+
+              <button 
+                className="rpg-btn" 
+                style={{ flex: 1, fontSize: '1rem', padding: '0.6rem', borderColor: 'var(--color-iron-light)', marginTop: '0.25rem' }} 
+                onClick={handleRetreatToHub}
+              >
+                🛡️ ОТСТУПИТЬ В ШТАБ (ПАУЗА)
+              </button>
+            </div>
+          </div>
+
+          {/* RIGHT AREA: RPG Combat Arena Monster Card & Log & WOW Skills */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', position: 'relative' }}>
+            
+            {/* RPG Floating Damage float container */}
+            {damageFloats.length > 0 && (
+              <div className="damage-float-container">
+                {damageFloats.map(float => (
+                  <div key={float.id} className={`damage-float ${float.type}`}>
+                    {float.text}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* 1. Immersive Gothic Enemy Card */}
+            <div className={`gothic-monster-card ${activeTask.curseLevel > 2 ? 'cursed-border' : ''}`}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <span className="monster-sigil">{variation.icon}</span>
+                <span style={{ fontSize: '0.7rem', padding: '2px 8px', background: 'rgba(255,255,255,0.05)', color: 'var(--color-bone-dim)', border: '1px solid var(--color-iron-light)' }}>
+                  УР. {activeTask.pomodoroTime}
+                </span>
+              </div>
+              
+              <h3 className="rpg-title" style={{ fontSize: '1.15rem', color: 'var(--color-blood-glow)', marginBottom: '2px', fontFamily: 'var(--font-gothic)', letterSpacing: '1px' }}>
+                {enemyName}
+              </h3>
+              
+              {/* Enemy HP Bar */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', marginBottom: '2px', fontFamily: 'var(--font-rpg)', color: 'var(--color-bone-dim)' }}>
+                <span>ЗДОРОВЬЕ ВРАГА:</span>
+                <span style={{ color: '#fff', fontWeight: 'bold' }}>{enemyHp}%</span>
+              </div>
+              <div className="character-bar" style={{ height: '12px', marginBottom: '10px' }}>
+                <div 
+                  className="character-bar-fill hp" 
+                  style={{ width: `${enemyHp}%`, background: 'linear-gradient(to right, #7a1212, #ff2424)', boxShadow: '0 0 10px #ff2424' }} 
+                />
+              </div>
+              {/* Immersive Gothic Description */}
+              <div style={{ 
+                fontSize: '0.78rem', 
+                color: 'var(--color-bone-dim)', 
+                lineHeight: '1.45', 
+                fontStyle: 'italic', 
+                background: 'rgba(0,0,0,0.3)', 
+                borderLeft: '2px solid var(--color-blood)',
+                padding: '8px 10px', 
+                marginBottom: '10px',
+                borderRadius: '0 4px 4px 0',
+                fontFamily: 'sans-serif'
+              }}>
+                {activeTask.combatLore?.loreDescription || 
+                  (activeTask && generateEnrichedEnemyDescription(enemyName, activeTask.title, activeTask.toxicity || 'standard', variation))}
+              </div>
+      <div className="weakness-insight-box">
+                <div style={{ fontWeight: 'bold', fontSize: '0.75rem', color: '#ffb813', marginBottom: '3px', fontFamily: 'var(--font-rpg)' }}>
+                  👁️ МЫСЛИ О СЛАБОСТИ ВРАГА:
+                </div>
+                {currentWeakpoint}
+              </div>
+            </div>
+
+            {/* Simple ADHD-Optimized Actions Panel */}
+            <div style={{ 
+              background: 'rgba(0,0,0,0.3)', 
+              padding: '1rem', 
+              border: '1px solid var(--color-iron-light)', 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '0.8rem', 
+              marginTop: '0.5rem',
+              justifyContent: 'center',
+              minHeight: '120px'
+            }}>
+              <div style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', textTransform: 'uppercase', fontFamily: 'var(--font-rpg)', borderBottom: '1px dashed rgba(255,255,255,0.05)', paddingBottom: '5px' }}>
+                🎪 Действия путешествия:
+              </div>
+              <div style={{ display: 'flex', gap: '0.8rem' }}>
+                <button 
+                  className="rpg-btn" 
+                  style={{ flex: 1, fontSize: '0.85rem', padding: '10px 5px', borderColor: 'var(--color-relic-glow)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+                  onClick={() => { playClick(); setMeditationSelectOpen(true); }}
+                >
+                  🎪 ПЕРЕДЫШКА (3М)
+                </button>
+                <button 
+                  className="rpg-btn" 
+                  style={{ flex: 1, fontSize: '0.85rem', padding: '10px 5px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }} 
+                  onClick={handleExtend}
+                >
+                  ⏳ ПРОДЛИТЬ (+10М)
+                </button>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+        {renderMeditationSelect()}
+      </div>
+    );
+  }
+
+  if (setupStage === 'redemption') {
     return (
       <div className="rpg-panel rest-camp-overlay animate-fade-in" style={{ 
         maxWidth: '800px', 
@@ -1751,8 +4091,8 @@ if (setupStage === 'redemption') {
     <div className="rpg-panel" style={{ textAlign: 'center', padding: '3rem' }}>
       <Skull size={48} style={{ color: 'var(--color-blood-glow)', marginBottom: '1rem' }} />
       <h2 className="gothic-title">Путешествие пусто</h2>
-      <p style={{ color: 'var(--color-bone-dim)', marginTop: '0.5rem' }}>
-        Все текущие цели достигнуты, либо вы еще не сгенерировали своего беглеца.
+      <p style={{ color: 'var(--color-bone-dim)', marginTop: '0.5rem', fontStyle: 'italic' }}>
+        Ваша судьба ещё засветится во мраке Абаддона, Изгнанник. Враги повержены, или вы ещё не пробудили свою стезю.
       </p>
       <button className="rpg-btn rpg-btn-blood" style={{ marginTop: '1.5rem' }} onClick={() => setSetupStage('lore')}>
         НАЧАТЬ НОВОЕ ПУТЕШЕСТВИЕ

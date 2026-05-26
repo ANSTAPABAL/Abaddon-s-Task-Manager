@@ -165,6 +165,7 @@ export function rollStartingCharacter(pedestals = []) {
     perks: perks,
     shacklesBroken: false,
     intensity: "grim",
+    moralCompass: 50,
     completedTasksCount: 0,
     completedSiegesCount: 0,
     totalGoldEarned: baseGold,

@@ -38,6 +38,21 @@ body {
   min-height: 100vh;
   overflow-x: hidden;
   position: relative;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none;  /* IE and Edge */
+}
+
+body::-webkit-scrollbar {
+  display: none; /* Chrome, Safari and Opera */
+}
+
+html {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none;  /* IE and Edge */
+}
+
+html::-webkit-scrollbar {
+  display: none; /* Chrome, Safari and Opera */
 }
 
 /* Background grid and ambient dark gradient */
@@ -586,6 +601,12 @@ body::before {
   box-shadow: 0 15px 40px rgba(0, 0, 0, 1), inset 0 0 20px rgba(0, 0, 0, 0.5);
   padding: 2rem;
   position: relative;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none;  /* IE and Edge */
+}
+
+.gothic-modal-content::-webkit-scrollbar {
+  display: none; /* Chrome, Safari and Opera */
 }
 
 /* Paperdoll styling */
