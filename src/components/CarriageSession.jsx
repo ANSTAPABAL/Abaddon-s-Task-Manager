@@ -1803,11 +1803,11 @@ const handleWinActiveSession = (task) => {
     if (!editingTask) return null;
     return (
       <div className="gothic-modal-overlay" style={{ zIndex: 99999 }}>
-        <div className="gothic-modal-content" style={{ maxWidth: '850px', width: '95%', maxHeight: '96vh', overflowY: 'auto', padding: '1.25rem 2rem' }}>
+        <div className="gothic-modal-content" style={{ maxWidth: '1000px', width: '96%', maxHeight: '98vh', overflowY: 'auto', padding: '1.25rem 2.5rem' }}>
           
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-iron-light)', paddingBottom: '0.6rem', marginBottom: '0.8rem' }}>
-            <h3 className="gothic-title" style={{ fontSize: '1.2rem', color: 'var(--color-relic-glow)' }}>
-              ⚔ Свиток Контракта: {editingTask.title.slice(0, 45)}...
+            <h3 className="gothic-title" style={{ fontSize: '1.25rem', color: 'var(--color-relic-glow)' }}>
+              ⚔ Свиток Контракта: {editingTask.title.slice(0, 55)}...
             </h3>
             <button 
               className="rpg-btn" 
@@ -1821,7 +1821,7 @@ const handleWinActiveSession = (task) => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', marginBottom: '1.2rem' }}>
             
             {/* 1. Title, Type, and Time */}
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '0.8rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '2.5fr 1fr 1fr', gap: '0.8rem' }}>
               <div style={{ gridColumn: 'span 1' }}>
                 <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginBottom: '4px' }}>НАЗВАНИЕ КВЕСТА</label>
                 <textarea 
@@ -1946,7 +1946,7 @@ const handleWinActiveSession = (task) => {
                 СПИСОК ШАГОВ (ЖМИТЕ НА ТЕКСТ ДЛЯ РЕДАКТИРОВАНИЯ ИЛИ ДОБАВЬТЕ/УДАЛИТЕ):
               </label>
               
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '160px', overflowY: 'auto', marginBottom: '0.6rem' }} className="rpg-scrollbar">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '260px', overflowY: 'auto', marginBottom: '0.6rem' }} className="rpg-scrollbar">
                 {editSteps.map(s => (
                   <div 
                     key={s.id} 
