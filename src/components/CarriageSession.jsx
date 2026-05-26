@@ -335,6 +335,16 @@ export default function CarriageSession({
   const [guidedQuestions, setGuidedQuestions] = useState([]);
   const [guidedAnswers, setGuidedAnswers] = useState({});
 
+  const editTitleRef = useRef(null);
+
+  useEffect(() => {
+    const el = editTitleRef.current;
+    if (el) {
+      el.style.height = 'auto';
+      el.style.height = el.value === '' ? '40px' : `${el.scrollHeight}px`;
+    }
+  }, [editTitle]);
+
   // Sync state to parent layout
   useEffect(() => {
     if (onStateSync) {
@@ -2075,13 +2085,13 @@ const handleWinActiveSession = (task) => {
                 <div style={{ gridColumn: 'span 1' }}>
                   <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginBottom: '4px' }}>НАЗВАНИЕ КВЕСТА</label>
                   <textarea 
+                    ref={editTitleRef}
                     className="rpg-input rpg-input-auto" 
                     style={{ 
                       width: '100%', 
                       minHeight: '40px',
-                      height: '40px',
                       resize: 'none',
-                      overflowY: 'auto',
+                      overflowY: 'hidden',
                       paddingTop: '8px',
                       paddingBottom: '8px',
                       lineHeight: '1.3',

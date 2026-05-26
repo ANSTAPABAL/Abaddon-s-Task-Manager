@@ -67,18 +67,34 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
   const [chaosText, setChaosText] = useState('');
   const [chaosLoading, setChaosLoading] = useState(false);
 
+  const newTaskTitleRef = useRef(null);
+  const kanbanNewTaskTitleRef = useRef(null);
+  const editTitleRef = useRef(null);
+
   // Auto-resize task input textareas vertically to fit content instead of sliding right
   useEffect(() => {
-    const textareas = document.querySelectorAll('textarea.rpg-input-auto');
-    textareas.forEach(ta => {
-      if (ta.value === '') {
-        ta.style.height = ta.classList.contains('kanban-input') ? '35px' : '40px';
-      } else {
-        ta.style.height = 'auto';
-        ta.style.height = `${ta.scrollHeight}px`;
-      }
-    });
-  }, [newTaskTitle, editTitle]);
+    const el = newTaskTitleRef.current;
+    if (el) {
+      el.style.height = 'auto';
+      el.style.height = el.value === '' ? '40px' : `${el.scrollHeight}px`;
+    }
+  }, [newTaskTitle]);
+
+  useEffect(() => {
+    const el = kanbanNewTaskTitleRef.current;
+    if (el) {
+      el.style.height = 'auto';
+      el.style.height = el.value === '' ? '35px' : `${el.scrollHeight}px`;
+    }
+  }, [newTaskTitle]);
+
+  useEffect(() => {
+    const el = editTitleRef.current;
+    if (el) {
+      el.style.height = 'auto';
+      el.style.height = el.value === '' ? '40px' : `${el.scrollHeight}px`;
+    }
+  }, [editTitle]);
 
   const getTaskDateOptions = () => {
     const options = [];
@@ -984,14 +1000,14 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center' }}>
           <div style={{ flex: '2', minWidth: '250px' }}>
             <textarea 
+              ref={newTaskTitleRef}
               className="rpg-input rpg-input-auto rpg-scrollbar" 
               style={{ 
                 width: '100%', 
                 fontSize: '1.1rem',
                 minHeight: '40px',
-                height: '40px',
                 resize: 'none',
-                overflowY: 'auto',
+                overflowY: 'hidden',
                 paddingTop: '8px',
                 paddingBottom: '8px',
                 lineHeight: '1.3',
@@ -1501,14 +1517,14 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
             {/* Quick add within Kanban day */}
             <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1.5rem', borderTop: '1px solid var(--color-iron-light)', paddingTop: '1rem' }}>
               <textarea 
+                ref={kanbanNewTaskTitleRef}
                 className="rpg-input rpg-input-auto kanban-input rpg-scrollbar" 
                 style={{ 
                   flex: 1, 
                   fontSize: '0.85rem',
                   minHeight: '35px',
-                  height: '35px',
                   resize: 'none',
-                  overflowY: 'auto',
+                  overflowY: 'hidden',
                   paddingTop: '6px',
                   paddingBottom: '6px',
                   lineHeight: '1.3',
@@ -1624,14 +1640,14 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
                   <div>
                     <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginBottom: '4px' }}>НАЗВАНИЕ КОНТРАКТА</label>
                     <textarea 
+                      ref={editTitleRef}
                       className="rpg-input rpg-input-auto rpg-scrollbar" 
                       style={{ 
                         width: '100%', 
                         fontSize: '0.95rem',
                         minHeight: '40px',
-                        height: '40px',
                         resize: 'none',
-                        overflowY: 'auto',
+                        overflowY: 'hidden',
                         paddingTop: '8px',
                         paddingBottom: '8px',
                         lineHeight: '1.3',
