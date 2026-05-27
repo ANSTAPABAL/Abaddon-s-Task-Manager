@@ -347,6 +347,8 @@ export default function CarriageSession({
   const [prepTimerActive, setPrepTimerActive] = useState(false);
   const [prepTimeLeft, setPrepTimeLeft] = useState(100);
 
+  const [sessionLoaded, setSessionLoaded] = useState(false);
+
   // Ritual Time Manager States
   const [ritualModalOpen, setRitualModalOpen] = useState(false);
   const [ritualUnit, setRitualUnit] = useState('minutes'); // seconds, minutes, hours
@@ -1927,10 +1929,13 @@ const handleWinActiveSession = (task) => {
   useEffect(() => {
     if (setupStage !== 'lore') return; // Guard to run only during initial page load
     
+    let active = true;
+    
     // Fetch active session from local backend
     fetch('http://localhost:3001/api/active-session')
       .then(res => res.json())
       .then(data => {
+        if (!active) return;
         if (data) {
           let hasActiveCombat = false;
           
@@ -1950,6 +1955,17 @@ const handleWinActiveSession = (task) => {
               setDeadlineDmgApplied(data.combat.deadlineDmgApplied || false);
               setTicksWithoutStep(data.combat.ticksWithoutStep || 0);
               hasActiveCombat = true;
+              
+              // Restore localStorage values for client-side ticking baseline
+              if (data.combat.isRunning) {
+                localStorage.setItem('combat_timer_start_time', Date.now());
+                localStorage.setItem('combat_timer_start_value', data.combat.timeLeft);
+                localStorage.setItem('combat_time_left', data.combat.timeLeft);
+                localStorage.setItem('combat_is_running', 'true');
+              } else {
+                localStorage.setItem('combat_is_running', 'false');
+              }
+              localStorage.setItem('active_task_id', taskInTasks.id);
             }
           }
           
@@ -1981,8 +1997,10 @@ const handleWinActiveSession = (task) => {
             setHuntPayoutActive(data.hunt.huntPayoutActive || false);
           }
         }
+        setSessionLoaded(true);
       })
       .catch(err => {
+        if (!active) return;
         console.warn("Failed to load active session from backend: ", err);
         // Fallback to legacy localStorage method if server is offline
         if (character && character.race && character.class && character.hp > 0) {
@@ -2007,7 +2025,12 @@ const handleWinActiveSession = (task) => {
             setSetupStage('hub');
           }
         }
+        setSessionLoaded(true);
       });
+      
+    return () => {
+      active = false;
+    };
   }, [character, tasks, setupStage]);
 
   const syncSessionToBackend = (updates = {}) => {
@@ -2058,6 +2081,8 @@ const handleWinActiveSession = (task) => {
   // Debounced session sync to backend
   useEffect(() => {
     if (setupStage === 'lore') return; // Don't sync during initial setup loading phase
+    if (!sessionLoaded) return; // Don't sync until backend session has been fetched!
+    
     const timerId = setTimeout(() => {
       syncSessionToBackend();
     }, 2000);
@@ -2067,7 +2092,8 @@ const handleWinActiveSession = (task) => {
     ritualTimerActive, ritualTimeLeft, ritualTimeTotal,
     huntIsRunning, huntTimeSpent, huntTimerValue, huntMode,
     huntIsBreak, huntBreakTimeLeft, setupStage, enemyHp, combatLog,
-    ritualFinished, ritualBlessingText, huntPayoutActive, huntBreakEvent
+    ritualFinished, ritualBlessingText, huntPayoutActive, huntBreakEvent,
+    sessionLoaded
   ]);
 
   // 2. Generate RPG Combat Encounter from 50+ Variations

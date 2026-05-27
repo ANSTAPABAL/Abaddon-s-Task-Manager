@@ -110,6 +110,7 @@ export default function App() {
   // Settings & Env Configuration State
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [assetBookOpen, setAssetBookOpen] = useState(false);  const [characterLoaded, setCharacterLoaded] = useState(false);
+  const [tasksLoaded, setTasksLoaded] = useState(false);
 
   const [pedestals, setPedestals] = useState([]);
 
@@ -604,8 +605,12 @@ export default function App() {
           setJudgmentOpen(true);
           setJudgmentShowReschedule(false);
         }
+        setTasksLoaded(true);
       })
-      .catch(err => console.warn("Using in-memory tasks (Backend server offline)"));
+      .catch(err => {
+        console.warn("Using in-memory tasks (Backend server offline)");
+        setTasksLoaded(true);
+      });
 
     // 2. Load character stats
     fetch('http://localhost:3001/api/character')
@@ -836,7 +841,7 @@ ${contextPrompt}`;
     setActiveSessionType(mood);
   };
 
-  if (!characterLoaded) {
+  if (!characterLoaded || !tasksLoaded) {
     return (
       <div style={{ 
         display: 'flex', 
