@@ -344,6 +344,12 @@ export default function CarriageSession({
   const [guidedQuestions, setGuidedQuestions] = useState([]);
   const [guidedAnswers, setGuidedAnswers] = useState({});
 
+  // Gothic Adaptation Modal States
+  const [adaptationModalOpen, setAdaptationModalOpen] = useState(false);
+  const [adaptationTask, setAdaptationTask] = useState(null);
+  const [adaptationTaskIndex, setAdaptationTaskIndex] = useState(-1);
+  const [adaptationDeadline, setAdaptationDeadline] = useState('');
+
   const editTitleRef = useRef(null);
 
   useEffect(() => {
@@ -1545,7 +1551,7 @@ const handleWinActiveSession = (task) => {
     try {
       const result = await parseMessyTasks(messyText);
       // Initialize with isLongJourney defaults
-      const mapped = result.map(t => ({ ...t, isLongJourney: false }));
+      const mapped = result.map(t => ({ ...t, isLongJourney: !!t.isLongJourney }));
       setParsedList(mapped);
       setReviewIndex(0);
       setSetupStage('review');
@@ -2445,6 +2451,150 @@ ${qaText}
             >
               🎪 Войти в Лагерь
             </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const onSplitAdaptation = (index, dl) => {
+    const taskToSplit = parsedList[index];
+    if (!taskToSplit) return;
+    
+    const halfTime = Math.max(15, Math.round((taskToSplit.estimatedTime || 25) / 2));
+    
+    const part1 = {
+      ...taskToSplit,
+      title: `${taskToSplit.title} (Часть I: Подготовка)`,
+      estimatedTime: halfTime,
+      deadline: dl || taskToSplit.deadline || 'до конца дня',
+      isLongJourney: false,
+      isAdaptationChecked: true,
+      steps: taskToSplit.steps ? taskToSplit.steps.slice(0, Math.ceil(taskToSplit.steps.length / 2)) : []
+    };
+    
+    const part2 = {
+      ...taskToSplit,
+      title: `${taskToSplit.title} (Часть II: Завершение)`,
+      estimatedTime: halfTime,
+      steps: taskToSplit.steps ? taskToSplit.steps.slice(Math.ceil(taskToSplit.steps.length / 2)) : [],
+      deadline: dl ? `Завтра / ${dl}` : 'Завтра',
+      isLongJourney: false,
+      isAdaptationChecked: true
+    };
+    
+    setParsedList(prev => {
+      const copy = [...prev];
+      copy.splice(index, 1, part1, part2);
+      return copy;
+    });
+    playSuccess();
+  };
+
+  const onPostponeAdaptation = (index, dl) => {
+    setParsedList(prev => prev.map((item, idx) => idx === index ? { 
+      ...item, 
+      deadline: dl || 'через 2 дня', 
+      estimatedTime: Math.max(15, Math.round((item.estimatedTime || 25) / 2)),
+      isLongJourney: false,
+      isAdaptationChecked: true
+    } : item));
+    playSuccess();
+  };
+
+  const onContinueAdaptation = (index, dl) => {
+    setParsedList(prev => prev.map((item, idx) => idx === index ? { 
+      ...item, 
+      deadline: dl || item.deadline,
+      isAdaptationChecked: true
+    } : item));
+    playSuccess();
+  };
+
+  const renderAdaptationModal = () => {
+    if (!adaptationModalOpen || !adaptationTask) return null;
+
+    return (
+      <div className="gothic-modal-overlay" style={{ zIndex: 100000 }}>
+        <div className="gothic-modal-content" style={{ 
+          maxWidth: '550px', 
+          border: '2px solid var(--color-blood-glow)', 
+          boxShadow: '0 0 35px rgba(139, 26, 26, 0.75)',
+          animation: 'pulse-red 3s infinite',
+          background: 'radial-gradient(circle, #1a0f12 0%, #060203 100%)'
+        }}>
+          <h3 className="gothic-title" style={{ color: 'var(--color-blood-glow)', fontSize: '1.4rem', marginBottom: '1rem', textAlign: 'center', letterSpacing: '2px' }}>
+            🔮 ПРОТИВОСТОЯНИЕ БЕЗДНЫ
+          </h3>
+          
+          <div style={{ color: 'var(--color-bone)', fontSize: '0.95rem', marginBottom: '1.2rem', lineHeight: '1.5', fontFamily: 'Georgia, serif' }}>
+            <p style={{ marginBottom: '8px' }}>
+              Вы ставите длительный контракт или призываете его поздним вечером (после 20:00).
+            </p>
+            <p style={{ color: '#ffb813', fontStyle: 'italic', borderLeft: '2px solid #ffb813', paddingLeft: '8px', fontSize: '0.85rem' }}>
+              «Бездна рекомендует детально спланировать дедлайн или разделить его силы, дабы избежать штрафного урона разуму!»
+            </p>
+          </div>
+
+          <div style={{ background: 'rgba(0,0,0,0.5)', padding: '1rem', border: '1px solid rgba(255,255,255,0.05)', marginBottom: '1.5rem' }}>
+            <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--color-bone-dim)', marginBottom: '6px', fontFamily: 'var(--font-rpg)' }}>
+              🚨 КОНЕЦ ДЕДЛАЙНА (необязательно, но крайне рекомендуется):
+            </label>
+            <input 
+              type="text"
+              className="rpg-input"
+              style={{ width: '100%', fontSize: '0.95rem', background: '#000', color: '#fff', border: '1px solid var(--color-iron-light)' }}
+              placeholder="Например: до 18:00 / среды / через 2 дня"
+              value={adaptationDeadline}
+              onChange={(e) => setAdaptationDeadline(e.target.value)}
+            />
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+            <button 
+              className="rpg-btn rpg-btn-mana"
+              style={{ fontSize: '0.9rem', padding: '10px 15px', fontWeight: 'bold' }}
+              onClick={() => {
+                onSplitAdaptation(adaptationTaskIndex, adaptationDeadline);
+                setAdaptationModalOpen(false);
+              }}
+            >
+              🛡️ Разбить на 2 части (Рекомендуется)
+            </button>
+
+            <button 
+              className="rpg-btn"
+              style={{ fontSize: '0.9rem', padding: '10px 15px', borderColor: 'var(--color-relic-glow)', color: '#ffb813' }}
+              onClick={() => {
+                onPostponeAdaptation(adaptationTaskIndex, adaptationDeadline || 'через 2 дня');
+                setAdaptationModalOpen(false);
+              }}
+            >
+              ⏳ На 2 дня и более
+            </button>
+
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+              <button 
+                className="rpg-btn rpg-btn-blood"
+                style={{ flex: 1, fontSize: '0.85rem', padding: '8px' }}
+                onClick={() => {
+                  onContinueAdaptation(adaptationTaskIndex, adaptationDeadline);
+                  setAdaptationModalOpen(false);
+                }}
+              >
+                ✓ Продолжить
+              </button>
+              <button 
+                className="rpg-btn"
+                style={{ flex: 1, fontSize: '0.85rem', padding: '8px' }}
+                onClick={() => {
+                  playClick();
+                  setAdaptationModalOpen(false);
+                }}
+              >
+                Отмена
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -3836,6 +3986,13 @@ if (setupStage === 'resolution') {
                     onChange={(e) => {
                       const isChecked = e.target.checked;
                       setParsedList(prev => prev.map((item, idx) => idx === reviewIndex ? { ...item, isLongJourney: isChecked } : item));
+                      if (isChecked) {
+                        setAdaptationTask({ ...currentCard, isLongJourney: true });
+                        setAdaptationTaskIndex(reviewIndex);
+                        setAdaptationDeadline(currentCard.deadline || '');
+                        setAdaptationModalOpen(true);
+                        playClick();
+                      }
                     }} 
                     style={{ width: '16px', height: '16px', accentColor: 'var(--color-blood)', cursor: 'pointer' }} 
                   />
@@ -3913,11 +4070,21 @@ if (setupStage === 'resolution') {
               className="rpg-btn rpg-btn-mana" 
               style={{ padding: '0.75rem 2rem', fontWeight: 'bold' }} 
               onClick={() => {
-                if (isLastCard) {
-                  handleStartCrashSequence();
-                } else {
+                const currentHour = new Date().getHours();
+                const isLateHour = currentHour >= 20 || currentHour < 5;
+                if ((currentCard.isLongJourney || isLateHour) && !currentCard.isAdaptationChecked) {
+                  setAdaptationTask(currentCard);
+                  setAdaptationTaskIndex(reviewIndex);
+                  setAdaptationDeadline(currentCard.deadline || '');
+                  setAdaptationModalOpen(true);
                   playClick();
-                  setReviewIndex(reviewIndex + 1);
+                } else {
+                  if (isLastCard) {
+                    handleStartCrashSequence();
+                  } else {
+                    playClick();
+                    setReviewIndex(reviewIndex + 1);
+                  }
                 }
               }}
             >
@@ -3925,6 +4092,7 @@ if (setupStage === 'resolution') {
             </button>
           </div>
         </div>
+        {renderAdaptationModal()}
       </div>
     );
   }

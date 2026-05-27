@@ -76,7 +76,11 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
   const [editSteps, setEditSteps] = useState([]);
   const [newStepText, setNewStepText] = useState('');
   const [editNature, setEditNature] = useState('external');
-  const [editExecutionMode, setEditExecutionMode] = useState('ask_later');
+  // Adaptation Modal States
+  const [adaptationModalOpen, setAdaptationModalOpen] = useState(false);
+  const [adaptationTask, setAdaptationTask] = useState(null);
+  const [adaptationDeadline, setAdaptationDeadline] = useState('');
+  const [adaptationCallback, setAdaptationCallback] = useState(null);
 
   const newTaskTitleRef = useRef(null);
   const kanbanNewTaskTitleRef = useRef(null);
@@ -279,8 +283,103 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
   const [editDeconstructLoading, setEditDeconstructLoading] = useState(false);
   const [guidedStep, setGuidedStep] = useState(0); // 0 = default, 1 = answering questions, 2 = done
   const [guidedQuestions, setGuidedQuestions] = useState([]);
-  const [guidedAnswers, setGuidedAnswers] = useState({});
   const [activeMapSection, setActiveMapSection] = useState('wasteland');
+
+  const renderAdaptationModal = () => {
+    if (!adaptationModalOpen || !adaptationTask) return null;
+
+    return (
+      <div className="gothic-modal-overlay" style={{ zIndex: 100000 }}>
+        <div className="gothic-modal-content" style={{ 
+          maxWidth: '550px', 
+          border: '2px solid var(--color-blood-glow)', 
+          boxShadow: '0 0 35px rgba(139, 26, 26, 0.75)',
+          animation: 'pulse-red 3s infinite',
+          background: 'radial-gradient(circle, #1a0f12 0%, #060203 100%)'
+        }}>
+          <h3 className="gothic-title" style={{ color: 'var(--color-blood-glow)', fontSize: '1.4rem', marginBottom: '1rem', textAlign: 'center', letterSpacing: '2px' }}>
+            🔮 ПРОТИВОСТОЯНИЕ БЕЗДНЫ
+          </h3>
+          
+          <div style={{ color: 'var(--color-bone)', fontSize: '0.95rem', marginBottom: '1.2rem', lineHeight: '1.5', fontFamily: 'Georgia, serif' }}>
+            <p style={{ marginBottom: '8px' }}>
+              Вы ставите длительный контракт или призываете его поздним вечером (после 20:00).
+            </p>
+            <p style={{ color: '#ffb813', fontStyle: 'italic', borderLeft: '2px solid #ffb813', paddingLeft: '8px', fontSize: '0.85rem' }}>
+              «Бездна рекомендует детально спланировать дедлайн или разделить его силы, дабы избежать штрафного урона разуму!»
+            </p>
+          </div>
+
+          <div style={{ background: 'rgba(0,0,0,0.5)', padding: '1rem', border: '1px solid rgba(255,255,255,0.05)', marginBottom: '1.5rem' }}>
+            <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--color-bone-dim)', marginBottom: '6px', fontFamily: 'var(--font-rpg)' }}>
+              🚨 КОНЕЦ ДЕДЛАЙНА (необязательно, но крайне рекомендуется):
+            </label>
+            <input 
+              type="text"
+              className="rpg-input"
+              style={{ width: '100%', fontSize: '0.95rem', background: '#000', color: '#fff', border: '1px solid var(--color-iron-light)' }}
+              placeholder="Например: до 18:00 / среды / через 2 дня"
+              value={adaptationDeadline}
+              onChange={(e) => setAdaptationDeadline(e.target.value)}
+            />
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+            <button 
+              className="rpg-btn rpg-btn-mana"
+              style={{ fontSize: '0.9rem', padding: '10px 15px', fontWeight: 'bold' }}
+              onClick={() => {
+                if (adaptationCallback) {
+                  adaptationCallback('split', adaptationDeadline);
+                }
+                setAdaptationModalOpen(false);
+              }}
+            >
+              🛡️ Разбить на 2 части (Рекомендуется)
+            </button>
+
+            <button 
+              className="rpg-btn"
+              style={{ fontSize: '0.9rem', padding: '10px 15px', borderColor: 'var(--color-relic-glow)', color: '#ffb813' }}
+              onClick={() => {
+                if (adaptationCallback) {
+                  adaptationCallback('postpone', adaptationDeadline || 'через 2 дня');
+                }
+                setAdaptationModalOpen(false);
+              }}
+            >
+              ⏳ На 2 дня и более
+            </button>
+
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+              <button 
+                className="rpg-btn rpg-btn-blood"
+                style={{ flex: 1, fontSize: '0.85rem', padding: '8px' }}
+                onClick={() => {
+                  if (adaptationCallback) {
+                    adaptationCallback('continue', adaptationDeadline);
+                  }
+                  setAdaptationModalOpen(false);
+                }}
+              >
+                ✓ Продолжить
+              </button>
+              <button 
+                className="rpg-btn"
+                style={{ flex: 1, fontSize: '0.85rem', padding: '8px' }}
+                onClick={() => {
+                  playClick();
+                  setAdaptationModalOpen(false);
+                }}
+              >
+                Отмена
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   const renderTaskTitle = (task, fontSize = '0.9rem') => {
     return (
@@ -688,6 +787,81 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
       intent: '',
       isLongJourney: isLongJourney
     };
+
+    const currentHour = new Date().getHours();
+    const isLate = currentHour >= 20 || currentHour < 5;
+
+    if (isLongJourney || isLate) {
+      // Intercept with Gothic Adaptation Modal!
+      setAdaptationTask(newTask);
+      setAdaptationDeadline('');
+      setAdaptationModalOpen(true);
+      setAdaptationCallback(() => async (action, dl) => {
+        let finalTasks = [];
+        if (action === 'split') {
+          const halfTime = initialType === 'siege' ? 25 : 12;
+          const steps1 = localSteps.slice(0, Math.ceil(localSteps.length / 2));
+          const steps2 = localSteps.slice(Math.ceil(localSteps.length / 2));
+          
+          finalTasks.push({
+            ...newTask,
+            id: `task-${Date.now()}-1`,
+            title: `${title} (Часть I: Подготовка)`,
+            pomodoroTime: halfTime,
+            steps: steps1,
+            deadline: dl || 'до конца дня',
+            isLongJourney: false
+          });
+          finalTasks.push({
+            ...newTask,
+            id: `task-${Date.now()}-2`,
+            title: `${title} (Часть II: Завершение)`,
+            pomodoroTime: halfTime,
+            steps: steps2,
+            deadline: dl ? `Завтра / ${dl}` : 'Завтра',
+            isLongJourney: false,
+            date: dateStr
+          });
+        } else if (action === 'postpone') {
+          const mDate = new Date();
+          mDate.setDate(mDate.getDate() + 2);
+          const futureDateStr = mDate.toISOString().split('T')[0];
+          
+          finalTasks.push({
+            ...newTask,
+            deadline: dl || 'через 2 дня',
+            date: futureDateStr, // postpone 2 days
+            pomodoroTime: Math.max(15, Math.round(newTask.pomodoroTime / 2)),
+            isLongJourney: false
+          });
+        } else {
+          // continue
+          finalTasks.push({
+            ...newTask,
+            deadline: dl || '',
+            isLongJourney: isLongJourney
+          });
+        }
+
+        setTasks(prev => [...prev, ...finalTasks]);
+        setNewTaskTitle('');
+        setIsLongJourney(false);
+        playSuccess();
+
+        // Background AI classification query
+        for (const t of finalTasks) {
+          try {
+            const finalType = await classifyTaskWithAI(t.title);
+            if (finalType && finalType !== t.type) {
+              setTasks(prev => prev.map(pt => pt.id === t.id ? { ...pt, type: finalType, pomodoroTime: finalType === 'siege' ? 50 : 25 } : pt));
+            }
+          } catch (err) {
+            console.warn("AI background classification failed", err);
+          }
+        }
+      });
+      return;
+    }
 
     setTasks(prev => [...prev, newTask]);
     setNewTaskTitle('');
@@ -1849,6 +2023,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
         </div>
       )}
 
+      {renderAdaptationModal()}
     </div>
   );
 }
