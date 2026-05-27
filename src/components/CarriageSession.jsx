@@ -4483,6 +4483,29 @@ if (setupStage === 'resolution') {
                     </span>
                     <span>Макс: 5 ч (300 мин)</span>
                   </div>
+
+                  <div style={{ 
+                    marginTop: '0.6rem', 
+                    fontSize: '0.82rem', 
+                    color: '#ffb813', 
+                    fontStyle: 'italic', 
+                    background: 'rgba(255,204,0,0.05)', 
+                    padding: '8px 12px', 
+                    border: '1px dashed rgba(255,204,0,0.2)', 
+                    borderRadius: '4px',
+                    textAlign: 'left',
+                    lineHeight: '1.4'
+                  }}>
+                    {huntMode === 'pomodoro' ? (
+                      <div>
+                        📈 <b>Расчет похода:</b> за сессию в <b>{huntBreakInterval} мин</b> вы накопите <b>{(huntBreakInterval / 30).toFixed(1)}</b> перевалов (каждые 30 минут работы равны 1 перевалу для начисления опыта и золота).
+                      </div>
+                    ) : (
+                      <div>
+                        📈 <b>Расчет похода:</b> привалы будут запускаться каждые <b>{huntBreakInterval} мин</b>, принося вам <b>{(huntBreakInterval / 30).toFixed(1)}</b> перевалов в копилку наград за каждый цикл.
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
