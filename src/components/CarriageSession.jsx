@@ -4423,21 +4423,66 @@ if (setupStage === 'resolution') {
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.9rem', color: 'var(--color-bone-dim)' }}>
-                    {huntMode === 'pomodoro' ? 'ДЛИТЕЛЬНОСТЬ РАБОТЫ ДО ПРИВАЛА (МИН):' : 'ИНТЕРВАЛ ПРИВАЛА (МИН):'}
-                  </span>
-                  <select 
-                    className="rpg-input" 
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.9rem', color: 'var(--color-bone-dim)' }}>
+                      {huntMode === 'pomodoro' ? 'ДЛИТЕЛЬНОСТЬ ДО ПРИВАЛА:' : 'ИНТЕРВАЛ ПРИВАЛА:'}
+                    </span>
+                    
+                    {/* Hours and Minutes Inputs */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <input 
+                        type="number" 
+                        min="0" 
+                        max="5"
+                        value={Math.floor(huntBreakInterval / 60)}
+                        onChange={(e) => {
+                          const hrs = Math.max(0, Math.min(5, Number(e.target.value)));
+                          const mins = huntBreakInterval % 60;
+                          const total = hrs * 60 + mins;
+                          setHuntBreakInterval(Math.max(5, Math.min(300, total)));
+                        }}
+                        className="rpg-input" 
+                        style={{ width: '55px', textAlign: 'center', fontSize: '0.9rem', padding: '4px', background: '#000', color: '#fff', border: '1px solid rgba(255,204,0,0.3)' }}
+                      />
+                      <span style={{ fontSize: '0.85rem', color: 'var(--color-bone-dim)' }}>ч</span>
+                      
+                      <input 
+                        type="number" 
+                        min="0" 
+                        max="59"
+                        value={huntBreakInterval % 60}
+                        onChange={(e) => {
+                          const hrs = Math.floor(huntBreakInterval / 60);
+                          const mins = Math.max(0, Math.min(59, Number(e.target.value)));
+                          const total = hrs * 60 + mins;
+                          setHuntBreakInterval(Math.max(5, Math.min(300, total)));
+                        }}
+                        className="rpg-input" 
+                        style={{ width: '55px', textAlign: 'center', fontSize: '0.9rem', padding: '4px', background: '#000', color: '#fff', border: '1px solid rgba(255,204,0,0.3)' }}
+                      />
+                      <span style={{ fontSize: '0.85rem', color: 'var(--color-bone-dim)' }}>мин</span>
+                    </div>
+                  </div>
+
+                  {/* Range Slider from 5 to 300 minutes */}
+                  <input 
+                    type="range"
+                    min="5"
+                    max="300"
+                    step="5"
                     value={huntBreakInterval}
                     onChange={(e) => setHuntBreakInterval(Number(e.target.value))}
-                    style={{ fontSize: '0.9rem', padding: '4px 10px', background: '#000', color: '#fff', border: '1px solid rgba(255,204,0,0.2)' }}
-                  >
-                    <option value="25">{huntMode === 'pomodoro' ? '25 минут работы' : 'Перерыв каждые 25 мин'}</option>
-                    <option value="30">{huntMode === 'pomodoro' ? '30 минут работы' : 'Перерыв каждые 30 мин'}</option>
-                    <option value="45">{huntMode === 'pomodoro' ? '45 минут работы' : 'Перерыв каждые 45 мин'}</option>
-                    <option value="60">{huntMode === 'pomodoro' ? '60 минут работы' : 'Перерыв каждые 60 мин'}</option>
-                  </select>
+                    style={{ width: '100%', accentColor: 'var(--color-blood-glow, #8b1a1a)', cursor: 'pointer' }}
+                  />
+                  
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--color-bone-dim)' }}>
+                    <span>Мин: 5 мин</span>
+                    <span style={{ color: '#ffcc00', fontWeight: 'bold' }}>
+                      Выбрано: {Math.floor(huntBreakInterval / 60) > 0 ? `${Math.floor(huntBreakInterval / 60)} ч ` : ''}{huntBreakInterval % 60} мин ({huntBreakInterval} мин)
+                    </span>
+                    <span>Макс: 5 ч (300 мин)</span>
+                  </div>
                 </div>
               </div>
 
@@ -4507,13 +4552,13 @@ if (setupStage === 'resolution') {
                     }}
                   >
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                      <span style={{ fontSize: '0.7rem', color: 'var(--color-bone-dim)', textTransform: 'uppercase' }}>На охоте</span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', textTransform: 'uppercase', letterSpacing: '1px' }}>Охота</span>
                       <span style={{ fontSize: '2rem', fontFamily: 'var(--font-rpg)', color: '#fff', fontWeight: 'bold' }}>
                         {formattedTime(huntTimeSpent)}
                       </span>
                       {huntMode === 'pomodoro' && (
-                        <span style={{ fontSize: '0.9rem', color: '#ffb813', fontWeight: 'bold', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '2px' }}>
-                          До привала: {Math.floor(huntTimerValue / 60)}:{(huntTimerValue % 60).toString().padStart(2, '0')}
+                        <span style={{ fontSize: '0.85rem', color: '#ffb813', fontWeight: 'bold', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '2px' }}>
+                          Поиск добычи: {Math.floor(huntTimerValue / 60)}:{(huntTimerValue % 60).toString().padStart(2, '0')}
                         </span>
                       )}
                     </div>
