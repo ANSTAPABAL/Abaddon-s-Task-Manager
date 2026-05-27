@@ -19,6 +19,7 @@ const DATA_DIR = path.join(__dirname, 'data');
 const TASKS_FILE = path.join(DATA_DIR, 'tasks.json');
 const CHARACTER_FILE = path.join(DATA_DIR, 'character.json');
 const PEDESTALS_FILE = path.join(DATA_DIR, 'pedestals.json');
+const SESSION_FILE = path.join(DATA_DIR, 'active_session.json');
 
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR);
@@ -30,6 +31,55 @@ if (!fs.existsSync(TASKS_FILE)) {
 
 if (!fs.existsSync(PEDESTALS_FILE)) {
   fs.writeFileSync(PEDESTALS_FILE, JSON.stringify([], null, 2));
+}
+
+const DEFAULT_SESSION = {
+  combat: {
+    activeTask: null,
+    timeLeft: 0,
+    isRunning: false,
+    enemyHp: 100,
+    combatLog: [],
+    enemyName: "",
+    combatVignette: "",
+    setupStage: "hub",
+    deadlineDmgApplied: false,
+    ticksWithoutStep: 0
+  },
+  ritual: {
+    ritualTimerActive: false,
+    ritualTimeLeft: 0,
+    ritualTimeTotal: 600,
+    ritualUnit: "minutes",
+    ritualValue: 10,
+    ritualFinished: false,
+    ritualBlessingText: ""
+  },
+  hunt: {
+    huntIsRunning: false,
+    huntIsBreak: false,
+    huntMode: "pomodoro",
+    huntBreakInterval: 30,
+    huntTimerValue: 1800,
+    huntTimeSpent: 0,
+    huntTimeTotal: 0,
+    huntBreakTimeLeft: 600,
+    huntLastBreakCheckpoint: 0,
+    huntBreakEvent: null,
+    huntPayoutActive: false
+  },
+  lastTickTimestamp: 0
+};
+
+if (!fs.existsSync(SESSION_FILE)) {
+  fs.writeFileSync(SESSION_FILE, JSON.stringify(DEFAULT_SESSION, null, 2));
+}
+
+let activeSession = DEFAULT_SESSION;
+try {
+  activeSession = JSON.parse(fs.readFileSync(SESSION_FILE, 'utf8'));
+} catch (e) {
+  activeSession = DEFAULT_SESSION;
 }
 
 const classes = [
@@ -316,7 +366,7 @@ app.use('/races', express.static(path.join(__dirname, 'races')));
 
 // Serve local atmospheric MP3 files
 app.get('/tracks/fear_and_hunger.mp3', (req, res) => {
-  const filePath = path.join(__dirname, 'The Perfect Being|Fear and Hunger Atmospheric Playlist.mp3');
+  const filePath = path.join(__dirname, 'The Perfect Being｜Fear and Hunger Atmospheric Playlist.mp3');
   if (fs.existsSync(filePath)) {
     res.sendFile(filePath);
   } else {
@@ -332,6 +382,303 @@ app.get('/tracks/brown_noise.mp3', (req, res) => {
     res.status(404).send('Brown Noise track not found in root directory');
   }
 });
+
+app.get('/api/active-session', (req, res) => {
+  try {
+    res.json(activeSession);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to load active session" });
+  }
+});
+
+app.post('/api/active-session', (req, res) => {
+  try {
+    activeSession = {
+      ...activeSession,
+      ...req.body,
+      combat: { ...activeSession.combat, ...req.body.combat },
+      ritual: { ...activeSession.ritual, ...req.body.ritual },
+      hunt: { ...activeSession.hunt, ...req.body.hunt }
+    };
+    activeSession.lastTickTimestamp = Date.now();
+    fs.writeFileSync(SESSION_FILE, JSON.stringify(activeSession, null, 2));
+    res.json(activeSession);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to save active session: " + error.message });
+  }
+});
+
+const ABERCROMBIE_BREAK_EVENTS = [
+  {
+    title: "Схватка за сухарь",
+    story: "Вы присели на замшелый ствол дерева, чтобы перевести дух, как вдруг из кустов вылетел ободранный налетчик Бездны с ржавым тесаком. Схватка была короткой и грязной — вы ткнули его коленом в пах и перерубили горло. Зато в его карманах обнаружилась краюха подсохшего сыра."
+  },
+  {
+    title: "Шепот в тумане",
+    story: "Пока вы отдыхали у костерка, туман сгустился до плотности дегтя. Из темноты раздался глумливый голос Инквизитора Забвения: «Ты можешь отдохнуть, изгнанник... но долг все равно найдет тебя». Вы бросили в темноту тяжелый камень. Раздался глухой стук и отборная брань. Кажется, вы попали ему в лоб."
+  },
+  {
+    title: "Спасение бродячего гоблина",
+    story: "Вы наткнулись на гоблина-торговца, которого завалило упавшей костяной повозкой. Кряхтя и проклиная все на свете, вы навалились плечом и приподняли колесо. Гоблин выскользнул, низко поклонился, пробормотал: «Да пребудет с тобой благословение сундука!» и дал вам медную монетку."
+  },
+  {
+    title: "Философия Кольца",
+    story: "Вы сидели и тупо смотрели на ржавое кольцо на своем пальце. Вдруг оно тихо зашептало: «Знаешь, почему мы в Бездне? Потому что мы вечно откладывали великие дела ради мелких обид». Вы стряхнули пыль с кольца. Оно замолчало, но осадок остался."
+  },
+  {
+    title: "Теплая стоянка Ищеек",
+    story: "Вы наткнулись на заброшенный лагерь Ищеек Севера. Угли еще тлели. Вы подбросили сухих веток, погрели руки и нашли забытый кем-то кинжал с гравировкой: «Делай то, что должно, и будь что будет». Ваши раны затянулись от тепла."
+  },
+  {
+    title: "Встреча со старым калекой",
+    story: "Пожилой солдат с одной ногой сидел у обочины и пытался заточить тупой меч. Вы молча забрали у него точильный брусок и за пять минут помогли довести лезвие до идеального блеска. Старик кивнул: «В бою тупое оружие убивает владельца. В работе — тупые мысли»."
+  },
+  {
+    title: "Когнитивный мираж",
+    story: "Перед вашими глазами на мгновение возник величественный образ Цитадели Искупления, но стоило вам моргнуть, как он рассыпался облаком пепла. Вы поняли, что единственный путь туда — это продолжать копать землю шаг за шагом."
+  },
+  {
+    title: "Бешеная барсучья ярость",
+    story: "На вас напал бешеный барсук Бездны, светящийся ядовитой слизью. Пришлось спасаться бегством на дерево. Барсук яростно грыз кору, а вы сидели на ветке и дышали свежим воздухом. Разминка удалась."
+  }
+];
+
+setInterval(() => {
+  try {
+    const now = Date.now();
+    if (!activeSession.lastTickTimestamp) {
+      activeSession.lastTickTimestamp = now;
+      return;
+    }
+
+    const elapsedSeconds = Math.max(0, Math.floor((now - activeSession.lastTickTimestamp) / 1000));
+    activeSession.lastTickTimestamp = now;
+
+    if (elapsedSeconds === 0) return;
+
+    let sessionChanged = false;
+    let characterChanged = false;
+    let character = null;
+
+    if (fs.existsSync(CHARACTER_FILE)) {
+      try {
+        character = JSON.parse(fs.readFileSync(CHARACTER_FILE, 'utf8'));
+      } catch (err) {
+        // ignore
+      }
+    }
+
+    // 1. Tick Combat
+    if (activeSession.combat && activeSession.combat.isRunning && activeSession.combat.setupStage === 'active') {
+      activeSession.combat.timeLeft = Math.max(-3600, activeSession.combat.timeLeft - elapsedSeconds);
+      sessionChanged = true;
+
+      // Accumulate work fatigue
+      if (character) {
+        character.dailyWorkMinutes = (character.dailyWorkMinutes || 0) + (elapsedSeconds / 60);
+        characterChanged = true;
+      }
+
+      // Check deadline expired damage
+      if (activeSession.combat.timeLeft <= 0 && !activeSession.combat.deadlineDmgApplied) {
+        activeSession.combat.deadlineDmgApplied = true;
+        
+        if (character) {
+          const prevHp = character.hp;
+          character.hp = Math.max(10, character.hp - 15);
+          characterChanged = true;
+
+          activeSession.combat.combatLog = [
+            `💥 [Дедлайн] Время истекло! Противник ${activeSession.combat.enemyName || 'враг'} нанес сокрушительный удар на 15 HP за опоздание!`,
+            ...(activeSession.combat.combatLog || [])
+          ].slice(0, 8);
+
+          // Handle Character Death
+          if (character.hp <= 10 && prevHp > 10) {
+            const nextChar = getRandomStartingCharacter();
+            nextChar.intensity = character.intensity || "grim";
+            
+            // Save to pedestals
+            if (fs.existsSync(PEDESTALS_FILE)) {
+              try {
+                const pedestals = JSON.parse(fs.readFileSync(PEDESTALS_FILE, 'utf8')) || [];
+                const newLegend = {
+                  name: character.name || "Безымянный Падший",
+                  nickname: character.nickname || "Первый Изгнанник",
+                  race: character.race || "Человек",
+                  class: character.class || "Воин",
+                  level: character.level || 1,
+                  completedTasksCount: character.completedTasksCount || 0,
+                  completedSiegesCount: character.completedSiegesCount || 0,
+                  totalGoldEarned: character.totalGoldEarned || 0,
+                  totalManaSpent: character.totalManaSpent || 0,
+                  totalHpSacrificed: character.totalHpSacrificed || 0,
+                  potionsDrunk: character.potionsDrunk || 0,
+                  meditationsCount: character.meditationsCount || 0,
+                  legacyStatus: 'stained',
+                  pedestalEulogy: "Его когнитивные силы иссякли, разум сдался Бездне..."
+                };
+                pedestals.push(newLegend);
+                fs.writeFileSync(PEDESTALS_FILE, JSON.stringify(pedestals, null, 2));
+              } catch (pedErr) {
+                console.error("Failed to add stained pedestal", pedErr);
+              }
+            }
+
+            // Convert active tasks to corpses
+            if (fs.existsSync(TASKS_FILE)) {
+              try {
+                const tasks = JSON.parse(fs.readFileSync(TASKS_FILE, 'utf8'));
+                const updatedTasks = tasks.map(t => {
+                  if (t.status === 'active') {
+                    return {
+                      ...t,
+                      type: 'corpse',
+                      curseLevel: Math.min(5, (t.curseLevel || 0) + 1)
+                    };
+                  }
+                  return t;
+                });
+                fs.writeFileSync(TASKS_FILE, JSON.stringify(updatedTasks, null, 2));
+              } catch (taskErr) {
+                console.error("Failed to convert tasks to corpses", taskErr);
+              }
+            }
+
+            character = nextChar;
+            activeSession.combat = {
+              activeTask: null,
+              timeLeft: 0,
+              isRunning: false,
+              enemyHp: 100,
+              combatLog: [],
+              enemyName: "",
+              combatVignette: "",
+              setupStage: "lore",
+              deadlineDmgApplied: false,
+              ticksWithoutStep: 0
+            };
+          }
+        }
+      }
+    }
+
+    // 2. Tick Ritual Focus
+    if (activeSession.ritual && activeSession.ritual.ritualTimerActive) {
+      activeSession.ritual.ritualTimeLeft = Math.max(0, activeSession.ritual.ritualTimeLeft - elapsedSeconds);
+      sessionChanged = true;
+
+      if (activeSession.ritual.ritualTimeLeft <= 0) {
+        activeSession.ritual.ritualTimerActive = false;
+        activeSession.ritual.ritualFinished = true;
+
+        if (character) {
+          const spentMinutes = Math.ceil(activeSession.ritual.ritualTimeTotal / 60);
+          character.dailyWorkMinutes = (character.dailyWorkMinutes || 0) + spentMinutes;
+          characterChanged = true;
+        }
+
+        activeSession.ritual.ritualBlessingText = `«Твоя стойкость и прилежная работа завершена. Отмечено в Летописях Судьбы: +${Math.ceil(activeSession.ritual.ritualTimeTotal / 60)} мин. Ступай вперед!»`;
+      }
+    }
+
+    // 3. Tick Hunt
+    if (activeSession.hunt && activeSession.hunt.huntIsRunning) {
+      sessionChanged = true;
+      if (activeSession.hunt.huntIsBreak) {
+        if (activeSession.hunt.huntBreakTimeLeft > 0) {
+          activeSession.hunt.huntBreakTimeLeft = Math.max(0, activeSession.hunt.huntBreakTimeLeft - elapsedSeconds);
+          activeSession.hunt.huntTimeTotal += elapsedSeconds;
+        } else {
+          // End break
+          activeSession.hunt.huntIsBreak = false;
+          activeSession.hunt.huntBreakEvent = null;
+          if (activeSession.hunt.huntMode === 'pomodoro') {
+            const remainingWorkSecs = (activeSession.hunt.huntBreakInterval * 60) - activeSession.hunt.huntTimeSpent;
+            activeSession.hunt.huntTimerValue = Math.min(30 * 60, Math.max(0, remainingWorkSecs));
+          }
+        }
+      } else {
+        activeSession.hunt.huntTimeSpent += elapsedSeconds;
+        activeSession.hunt.huntTimeTotal += elapsedSeconds;
+
+        if (character) {
+          character.dailyWorkMinutes = (character.dailyWorkMinutes || 0) + (elapsedSeconds / 60);
+          characterChanged = true;
+        }
+
+        if (activeSession.hunt.huntTimeSpent >= activeSession.hunt.huntBreakInterval * 60) {
+          activeSession.hunt.huntIsRunning = false;
+          activeSession.hunt.huntPayoutActive = true;
+        } else if (activeSession.hunt.huntMode === 'pomodoro') {
+          if (activeSession.hunt.huntTimerValue > 0) {
+            activeSession.hunt.huntTimerValue = Math.max(0, activeSession.hunt.huntTimerValue - elapsedSeconds);
+            if (activeSession.hunt.huntTimerValue <= 0 && activeSession.hunt.huntTimeSpent < activeSession.hunt.huntBreakInterval * 60) {
+              // Trigger Break
+              activeSession.hunt.huntIsBreak = true;
+              activeSession.hunt.huntBreakTimeLeft = 600;
+              activeSession.hunt.huntLastBreakCheckpoint = activeSession.hunt.huntTimeSpent;
+
+              const xpReward = Math.random() < 0.5 ? 5 : 10;
+              if (character) {
+                character.xp += xpReward;
+                const needed = character.level * 100;
+                if (character.xp >= needed) {
+                  character.level += 1;
+                  character.xp -= needed;
+                }
+                characterChanged = true;
+              }
+
+              const randomEvent = ABERCROMBIE_BREAK_EVENTS[Math.floor(Math.random() * ABERCROMBIE_BREAK_EVENTS.length)];
+              activeSession.hunt.huntBreakEvent = {
+                xp: xpReward,
+                story: randomEvent.story,
+                title: randomEvent.title
+              };
+            }
+          }
+        } else if (activeSession.hunt.stopwatch) {
+          const diff = activeSession.hunt.huntTimeSpent - activeSession.hunt.huntLastBreakCheckpoint;
+          if (diff >= 30 * 60) {
+            // Trigger Break
+            activeSession.hunt.huntIsBreak = true;
+            activeSession.hunt.huntBreakTimeLeft = 600;
+            activeSession.hunt.huntLastBreakCheckpoint = activeSession.hunt.huntTimeSpent;
+
+            const xpReward = Math.random() < 0.5 ? 5 : 10;
+            if (character) {
+              character.xp += xpReward;
+              const needed = character.level * 100;
+              if (character.xp >= needed) {
+                character.level += 1;
+                character.xp -= needed;
+              }
+              characterChanged = true;
+            }
+
+            const randomEvent = ABERCROMBIE_BREAK_EVENTS[Math.floor(Math.random() * ABERCROMBIE_BREAK_EVENTS.length)];
+            activeSession.hunt.huntBreakEvent = {
+              xp: xpReward,
+              story: randomEvent.story,
+              title: randomEvent.title
+            };
+          }
+        }
+      }
+    }
+
+    if (characterChanged && character) {
+      fs.writeFileSync(CHARACTER_FILE, JSON.stringify(character, null, 2));
+    }
+
+    if (sessionChanged) {
+      fs.writeFileSync(SESSION_FILE, JSON.stringify(activeSession, null, 2));
+    }
+  } catch (loopErr) {
+    console.error("Error in server tick loop: ", loopErr);
+  }
+}, 1000);
 
 // Serve frontend build static files in production
 const DIST_DIR = path.join(__dirname, 'dist');

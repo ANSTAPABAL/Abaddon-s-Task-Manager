@@ -1923,33 +1923,152 @@ const handleWinActiveSession = (task) => {
     setAtmosphereMood('escape');
   };
 
-  // 1. Persistent Character Check (Skips lore setup if alive!)
+  // 1. Persistent Character Check & Session Fetch (Skips lore setup if alive!)
   useEffect(() => {
     if (setupStage !== 'lore') return; // Guard to run only during initial page load
-    if (character && character.race && character.class && character.hp > 0) {
-      const activeTaskId = localStorage.getItem('active_task_id');
-      const activeTaskInTasks = activeTaskId ? tasks.find(t => t.id === activeTaskId && t.status === 'active') : null;
-      
-      if (activeTaskInTasks) {
-        setActiveTask(activeTaskInTasks);
-        const storedTime = Number(localStorage.getItem('combat_time_left') || activeTaskInTasks.pomodoroTime * 60);
-        setTimeLeft(storedTime);
-        setSessionSteps(activeTaskInTasks.steps || []);
-        setSetupStage('active');
-        generateCombatEncounter(activeTaskInTasks);
-        
-        // Start running immediately if timer mode!
-        const isTimer = activeTaskInTasks.executionMode !== 'day';
-        localStorage.setItem('combat_timer_start_time', Date.now());
-        localStorage.setItem('combat_timer_start_value', storedTime);
-        localStorage.setItem('combat_is_running', isTimer ? 'true' : 'false');
-        setDeadlineDmgApplied(storedTime <= 0);
-        setIsRunning(isTimer);
-      } else {
-        setSetupStage('hub'); // Directly load Tasks Hub
-      }
-    }
+    
+    // Fetch active session from local backend
+    fetch('http://localhost:3001/api/active-session')
+      .then(res => res.json())
+      .then(data => {
+        if (data) {
+          let hasActiveCombat = false;
+          
+          if (data.combat && data.combat.activeTask) {
+            // Check if task is still in tasks array
+            const taskInTasks = tasks.find(t => t.id === data.combat.activeTask.id && t.status === 'active');
+            if (taskInTasks) {
+              setActiveTask(taskInTasks);
+              setTimeLeft(data.combat.timeLeft);
+              setIsRunning(data.combat.isRunning);
+              setEnemyHp(data.combat.enemyHp);
+              setCombatLog(data.combat.combatLog || []);
+              setEnemyName(data.combat.enemyName || '');
+              setCombatVignette(data.combat.combatVignette || '');
+              setSetupStage(data.combat.setupStage || 'active');
+              setSessionSteps(taskInTasks.steps || []);
+              setDeadlineDmgApplied(data.combat.deadlineDmgApplied || false);
+              setTicksWithoutStep(data.combat.ticksWithoutStep || 0);
+              hasActiveCombat = true;
+            }
+          }
+          
+          if (!hasActiveCombat && character && character.race && character.class && character.hp > 0) {
+            setSetupStage(data.combat?.setupStage === 'lore' ? 'lore' : 'hub');
+          }
+          
+          if (data.ritual) {
+            setRitualTimerActive(data.ritual.ritualTimerActive || false);
+            setRitualTimeLeft(data.ritual.ritualTimeLeft || 0);
+            setRitualTimeTotal(data.ritual.ritualTimeTotal || 600);
+            setRitualUnit(data.ritual.ritualUnit || 'minutes');
+            setRitualValue(data.ritual.ritualValue || 10);
+            setRitualFinished(data.ritual.ritualFinished || false);
+            setRitualBlessingText(data.ritual.ritualBlessingText || '');
+          }
+          
+          if (data.hunt) {
+            setHuntIsRunning(data.hunt.huntIsRunning || false);
+            setHuntIsBreak(data.hunt.huntIsBreak || false);
+            setHuntMode(data.hunt.huntMode || 'pomodoro');
+            setHuntBreakInterval(data.hunt.huntBreakInterval || 30);
+            setHuntTimerValue(data.hunt.huntTimerValue || 1800);
+            setHuntTimeSpent(data.hunt.huntTimeSpent || 0);
+            setHuntTimeTotal(data.hunt.huntTimeTotal || 0);
+            setHuntBreakTimeLeft(data.hunt.huntBreakTimeLeft || 600);
+            setHuntLastBreakCheckpoint(data.hunt.huntLastBreakCheckpoint || 0);
+            setHuntBreakEvent(data.hunt.huntBreakEvent || null);
+            setHuntPayoutActive(data.hunt.huntPayoutActive || false);
+          }
+        }
+      })
+      .catch(err => {
+        console.warn("Failed to load active session from backend: ", err);
+        // Fallback to legacy localStorage method if server is offline
+        if (character && character.race && character.class && character.hp > 0) {
+          const activeTaskId = localStorage.getItem('active_task_id');
+          const activeTaskInTasks = activeTaskId ? tasks.find(t => t.id === activeTaskId && t.status === 'active') : null;
+          
+          if (activeTaskInTasks) {
+            setActiveTask(activeTaskInTasks);
+            const storedTime = Number(localStorage.getItem('combat_time_left') || activeTaskInTasks.pomodoroTime * 60);
+            setTimeLeft(storedTime);
+            setSessionSteps(activeTaskInTasks.steps || []);
+            setSetupStage('active');
+            generateCombatEncounter(activeTaskInTasks);
+            
+            const isTimer = activeTaskInTasks.executionMode !== 'day';
+            localStorage.setItem('combat_timer_start_time', Date.now());
+            localStorage.setItem('combat_timer_start_value', storedTime);
+            localStorage.setItem('combat_is_running', isTimer ? 'true' : 'false');
+            setDeadlineDmgApplied(storedTime <= 0);
+            setIsRunning(isTimer);
+          } else {
+            setSetupStage('hub');
+          }
+        }
+      });
   }, [character, tasks, setupStage]);
+
+  const syncSessionToBackend = (updates = {}) => {
+    const currentSession = {
+      combat: {
+        activeTask: updates.activeTask !== undefined ? updates.activeTask : activeTask,
+        timeLeft: updates.timeLeft !== undefined ? updates.timeLeft : timeLeft,
+        isRunning: updates.isRunning !== undefined ? updates.isRunning : isRunning,
+        enemyHp: updates.enemyHp !== undefined ? updates.enemyHp : enemyHp,
+        combatLog: updates.combatLog !== undefined ? updates.combatLog : combatLog,
+        enemyName: updates.enemyName !== undefined ? updates.enemyName : enemyName,
+        combatVignette: updates.combatVignette !== undefined ? updates.combatVignette : combatVignette,
+        setupStage: updates.setupStage !== undefined ? updates.setupStage : setupStage,
+        deadlineDmgApplied: updates.deadlineDmgApplied !== undefined ? updates.deadlineDmgApplied : deadlineDmgApplied,
+        ticksWithoutStep: updates.ticksWithoutStep !== undefined ? updates.ticksWithoutStep : ticksWithoutStep
+      },
+      ritual: {
+        ritualTimerActive: updates.ritualTimerActive !== undefined ? updates.ritualTimerActive : ritualTimerActive,
+        ritualTimeLeft: updates.ritualTimeLeft !== undefined ? updates.ritualTimeLeft : ritualTimeLeft,
+        ritualTimeTotal: updates.ritualTimeTotal !== undefined ? updates.ritualTimeTotal : ritualTimeTotal,
+        ritualUnit: updates.ritualUnit !== undefined ? updates.ritualUnit : ritualUnit,
+        ritualValue: updates.ritualValue !== undefined ? updates.ritualValue : ritualValue,
+        ritualFinished: updates.ritualFinished !== undefined ? updates.ritualFinished : ritualFinished,
+        ritualBlessingText: updates.ritualBlessingText !== undefined ? updates.ritualBlessingText : ritualBlessingText
+      },
+      hunt: {
+        huntIsRunning: updates.huntIsRunning !== undefined ? updates.huntIsRunning : huntIsRunning,
+        huntIsBreak: updates.huntIsBreak !== undefined ? updates.huntIsBreak : huntIsBreak,
+        huntMode: updates.huntMode !== undefined ? updates.huntMode : huntMode,
+        huntBreakInterval: updates.huntBreakInterval !== undefined ? updates.huntBreakInterval : huntBreakInterval,
+        huntTimerValue: updates.huntTimerValue !== undefined ? updates.huntTimerValue : huntTimerValue,
+        huntTimeSpent: updates.huntTimeSpent !== undefined ? updates.huntTimeSpent : huntTimeSpent,
+        huntTimeTotal: updates.huntTimeTotal !== undefined ? updates.huntTimeTotal : huntTimeTotal,
+        huntBreakTimeLeft: updates.huntBreakTimeLeft !== undefined ? updates.huntBreakTimeLeft : huntBreakTimeLeft,
+        huntLastBreakCheckpoint: updates.huntLastBreakCheckpoint !== undefined ? updates.huntLastBreakCheckpoint : huntLastBreakCheckpoint,
+        huntBreakEvent: updates.huntBreakEvent !== undefined ? updates.huntBreakEvent : huntBreakEvent,
+        huntPayoutActive: updates.huntPayoutActive !== undefined ? updates.huntPayoutActive : huntPayoutActive
+      }
+    };
+    
+    fetch('http://localhost:3001/api/active-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(currentSession)
+    }).catch(err => console.warn("Failed to sync active session to backend: ", err));
+  };
+
+  // Debounced session sync to backend
+  useEffect(() => {
+    if (setupStage === 'lore') return; // Don't sync during initial setup loading phase
+    const timerId = setTimeout(() => {
+      syncSessionToBackend();
+    }, 2000);
+    return () => clearTimeout(timerId);
+  }, [
+    activeTask, timeLeft, isRunning, 
+    ritualTimerActive, ritualTimeLeft, ritualTimeTotal,
+    huntIsRunning, huntTimeSpent, huntTimerValue, huntMode,
+    huntIsBreak, huntBreakTimeLeft, setupStage, enemyHp, combatLog,
+    ritualFinished, ritualBlessingText, huntPayoutActive, huntBreakEvent
+  ]);
 
   // 2. Generate RPG Combat Encounter from 50+ Variations
   const generateCombatEncounter = (task) => {
@@ -4036,7 +4155,9 @@ if (setupStage === 'resolution') {
           minHeight: 'calc(100vh - 120px)',
           height: 'auto',
           zIndex: 50,
-          background: 'radial-gradient(circle, #1a080a 0%, #030001 100%)',
+          background: 'radial-gradient(circle, rgba(26, 8, 10, 0.75) 0%, rgba(3, 0, 1, 0.9) 100%)',
+          backdropFilter: 'blur(6px)',
+          WebkitBackdropFilter: 'blur(6px)',
           animation: prepTimerActive ? 'pulse-red 1.5s infinite alternate' : 'none'
         }}
       >
@@ -4179,7 +4300,9 @@ if (setupStage === 'resolution') {
           minHeight: 'calc(100vh - 120px)',
           height: 'auto',
           zIndex: 50,
-          background: 'radial-gradient(circle, #0e0514 0%, #020003 100%)',
+          background: 'radial-gradient(circle, rgba(14, 5, 20, 0.75) 0%, rgba(2, 0, 3, 0.9) 100%)',
+          backdropFilter: 'blur(6px)',
+          WebkitBackdropFilter: 'blur(6px)',
           animation: ritualTimerActive ? `pulse-red ${pulseSpeed} infinite alternate` : 'none'
         }}
       >
@@ -4386,6 +4509,13 @@ if (setupStage === 'resolution') {
       return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     };
 
+    const breakCount = Math.floor(huntBreakInterval / 30);
+    const breakPlural = (() => {
+      if (breakCount % 10 === 1 && breakCount % 100 !== 11) return 'перевал';
+      if ([2, 3, 4].includes(breakCount % 10) && ![12, 13, 14].includes(breakCount % 100)) return 'перевала';
+      return 'перевалов';
+    })();
+
     return (
       <div 
         className="gothic-modal-overlay" 
@@ -4397,7 +4527,9 @@ if (setupStage === 'resolution') {
           minHeight: 'calc(100vh - 120px)',
           height: 'auto',
           zIndex: 50,
-          background: 'radial-gradient(circle, #0e0a05 0%, #020100 100%)'
+          background: 'radial-gradient(circle, rgba(14, 10, 5, 0.75) 0%, rgba(2, 1, 0, 0.9) 100%)',
+          backdropFilter: 'blur(6px)',
+          WebkitBackdropFilter: 'blur(6px)'
         }}
       >
         <div 
@@ -4447,7 +4579,7 @@ if (setupStage === 'resolution') {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: '0.9rem', color: 'var(--color-bone-dim)' }}>
-                        ДЛИТЕЛЬНОСТЬ ДО ПРИВАЛА:
+                        Длительность забега:
                       </span>
                       
                       {/* Hours and Minutes Inputs */}
@@ -4512,24 +4644,10 @@ if (setupStage === 'resolution') {
                       fontWeight: 'bold',
                       textAlign: 'center'
                     }}>
-                      📈 Расчет похода: {(huntBreakInterval / 30).toFixed(1)} перевалов
+                      Расчет похода: {breakCount} {breakPlural}
                     </div>
                   </div>
-                ) : (
-                  <div style={{ 
-                    fontSize: '0.9rem', 
-                    color: 'var(--color-bone-dim)', 
-                    lineHeight: '1.5', 
-                    fontStyle: 'italic', 
-                    textAlign: 'left',
-                    background: 'rgba(255, 204, 0, 0.03)',
-                    border: '1px dashed rgba(255, 204, 0, 0.15)',
-                    padding: '12px',
-                    borderRadius: '4px'
-                  }}>
-                    ⏱️ <b>Режим Секундомера:</b> таймер будет вести непрерывный отсчет времени работы вверх. Вы можете прерваться на 10-минутный привал с Аберкромби-событиями в любой момент вручную по кнопке «Стартовать привал пораньше». Награды начисляются пропорционально общему времени.
-                  </div>
-                )}
+                ) : null}
               </div>
 
               <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
@@ -4539,7 +4657,7 @@ if (setupStage === 'resolution') {
                   style={{ background: 'var(--color-blood)', borderColor: 'var(--color-blood-glow)', color: '#fff', fontWeight: 'bold' }}
                   onClick={handleStartHunt}
                 >
-                  🏹 НАЧАТЬ ОХОТУ НА ВРЕМЯ
+                  Начать охоту
                 </button>
               </div>
             </div>

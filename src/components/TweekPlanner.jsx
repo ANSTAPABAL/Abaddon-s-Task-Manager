@@ -1635,10 +1635,46 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
 
       {/* NESTED KANBAN DAY BOARD MODAL */}
       {activeKanbanDay && (
-        <div className="gothic-modal-overlay">
-          <div className="gothic-modal-content" style={{ maxWidth: '900px', width: '95%' }}>
+        <div className="gothic-modal-overlay" onClick={() => { playClick(); setActiveKanbanDay(null); }}>
+          <div className="gothic-modal-content" style={{ maxWidth: '900px', width: '95%', position: 'relative' }} onClick={(e) => e.stopPropagation()}>
+            
+            {/* Beautiful Gothic Close Button */}
+            <button
+              onClick={() => { playClick(); setActiveKanbanDay(null); }}
+              style={{
+                position: 'absolute',
+                top: '15px',
+                right: '15px',
+                background: 'rgba(0, 0, 0, 0.3)',
+                border: '1px solid rgba(255, 204, 0, 0.25)',
+                color: '#ffcc00',
+                borderRadius: '4px',
+                width: '32px',
+                height: '32px',
+                fontSize: '1rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.2s',
+                zIndex: 10
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = 'var(--color-blood-glow)';
+                e.currentTarget.style.color = '#ff4d4d';
+                e.currentTarget.style.boxShadow = '0 0 8px var(--color-blood-glow)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = 'rgba(255, 204, 0, 0.25)';
+                e.currentTarget.style.color = '#ffcc00';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+              title="Закрыть"
+            >
+              ✕
+            </button>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-iron-light)', paddingBottom: '0.8rem', marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-iron-light)', paddingBottom: '0.8rem', marginBottom: '1rem', paddingRight: '45px' }}>
               <div>
                 <h3 className="gothic-title" style={{ fontSize: '1.3rem', color: '#fff' }}>
                   🛡 Военный Совет: {activeKanbanDay}
@@ -1647,13 +1683,6 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
                   Управляйте активной фазой сражений за этот конкретный день.
                 </span>
               </div>
-              <button
-                className="rpg-btn"
-                style={{ padding: '4px 10px' }}
-                onClick={() => { playClick(); setActiveKanbanDay(null); }}
-              >
-                ЗАКРЫТЬ
-              </button>
             </div>
 
             {/* Kanban Grid */}
@@ -1771,9 +1800,45 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
       {/* TASK EDITING PARCHMENT MODAL */}
       {editingTask && (
         <div className="gothic-modal-overlay" onClick={() => setEditingTask(null)}>
-          <div className="gothic-modal-content" style={{ maxWidth: '680px', width: '90%', maxHeight: '90vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
+          <div className="gothic-modal-content" style={{ maxWidth: '680px', width: '90%', maxHeight: '90vh', overflowY: 'auto', position: 'relative' }} onClick={(e) => e.stopPropagation()}>
+            
+            {/* Beautiful Gothic Close Button */}
+            <button
+              onClick={() => setEditingTask(null)}
+              style={{
+                position: 'absolute',
+                top: '15px',
+                right: '15px',
+                background: 'rgba(0, 0, 0, 0.3)',
+                border: '1px solid rgba(255, 204, 0, 0.25)',
+                color: '#ffcc00',
+                borderRadius: '4px',
+                width: '32px',
+                height: '32px',
+                fontSize: '1rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.2s',
+                zIndex: 10
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = 'var(--color-blood-glow)';
+                e.currentTarget.style.color = '#ff4d4d';
+                e.currentTarget.style.boxShadow = '0 0 8px var(--color-blood-glow)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = 'rgba(255, 204, 0, 0.25)';
+                e.currentTarget.style.color = '#ffcc00';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+              title="Закрыть"
+            >
+              ✕
+            </button>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-iron-light)', paddingBottom: '0.8rem', marginBottom: '1.2rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-iron-light)', paddingBottom: '0.8rem', marginBottom: '1.2rem', paddingRight: '45px' }}>
               <h3 className="gothic-title" style={{ fontSize: '1.2rem', color: 'var(--color-relic-glow)' }}>
                 ⚔ Свиток Контракта: {editingTask.title.slice(0, 30)}...
               </h3>
