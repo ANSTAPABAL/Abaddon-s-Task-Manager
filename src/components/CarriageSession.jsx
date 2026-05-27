@@ -1713,6 +1713,35 @@ ${qaText}
     }
   };
 
+  const handleSplitReviewTask = (index) => {
+    const taskToSplit = parsedList[index];
+    if (!taskToSplit) return;
+    
+    const halfTime = Math.max(15, Math.round((taskToSplit.estimatedTime || 25) / 2));
+    
+    const part1 = {
+      ...taskToSplit,
+      title: `${taskToSplit.title} (Часть I: Подготовка)`,
+      estimatedTime: halfTime,
+      steps: taskToSplit.steps ? taskToSplit.steps.slice(0, Math.ceil(taskToSplit.steps.length / 2)) : []
+    };
+    
+    const part2 = {
+      ...taskToSplit,
+      title: `${taskToSplit.title} (Часть II: Завершение)`,
+      estimatedTime: halfTime,
+      steps: taskToSplit.steps ? taskToSplit.steps.slice(Math.ceil(taskToSplit.steps.length / 2)) : [],
+      deadline: 'Завтра'
+    };
+    
+    setParsedList(prev => {
+      const copy = [...prev];
+      copy.splice(index, 1, part1, part2);
+      return copy;
+    });
+    playSuccess();
+  };
+
   const handleStartCrashSequence = (listToUse = null, skipCombat = false) => {
     playClick();
     const todayStr = new Date().toISOString().split('T')[0];
@@ -3629,6 +3658,10 @@ if (setupStage === 'resolution') {
     const currentCard = parsedList[reviewIndex];
     const isLastCard = reviewIndex >= parsedList.length - 1;
 
+    const currentHour = new Date().getHours();
+    const isLateHour = currentHour >= 20 || currentHour < 5;
+    const failuresLessons = tasks ? tasks.filter(t => t.runeOfReturn && t.runeOfReturn.futureAdvice).map(t => t.runeOfReturn.futureAdvice) : [];
+
     return (
       <div className="rpg-panel" style={{ maxWidth: '650px', margin: '1rem auto', padding: '2rem' }}>
         <h2 className="gothic-title" style={{ fontSize: '1.4rem', marginBottom: '0.3rem', color: 'var(--color-bone)', textAlign: 'center' }}>
@@ -3741,6 +3774,57 @@ if (setupStage === 'resolution') {
                 <div style={{ fontStyle: 'italic', color: 'var(--color-iron-light)', fontSize: '0.8rem' }}>Нет шагов. Нажмите кнопку ниже для авто-расширения.</div>
               )}
             </div>
+
+            {/* AI Warning & Actions for Late Hour / Long Journey */}
+            {(currentCard.isLongJourney || isLateHour) && (
+              <div style={{ 
+                background: 'rgba(139, 26, 26, 0.15)', 
+                border: '1px solid var(--color-blood)', 
+                padding: '0.8rem', 
+                borderRadius: '4px',
+                marginBottom: '1rem',
+                fontSize: '0.85rem'
+              }}>
+                <div style={{ color: 'var(--color-blood-glow)', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '5px' }}>
+                  <span>🔮 Провидение Бездны (Анализ риска провала):</span>
+                </div>
+                {isLateHour ? (
+                  <p style={{ color: 'var(--color-bone-dim)', margin: '0 0 8px 0', fontSize: '0.8rem' }}>
+                    Внимание! Уже поздний вечер (после 20:00). Ставить длительную задачу на сегодня рискованно — это может привести к просрочке и потере HP разума.
+                  </p>
+                ) : (
+                  <p style={{ color: 'var(--color-bone-dim)', margin: '0 0 8px 0', fontSize: '0.8rem' }}>
+                    Вы объявили этот квест Длительным путешествием. Для таких тяжелых контрактов Бездна рекомендует детально спланировать дедлайн или разделить его силы.
+                  </p>
+                )}
+
+                {failuresLessons.length > 0 && (
+                  <div style={{ fontStyle: 'italic', fontSize: '0.78rem', color: '#ffb813', marginBottom: '8px', paddingLeft: '5px', borderLeft: '2px solid #ffb813' }}>
+                    ⚠️ Урок из ваших прошлых промахов: "{failuresLessons[failuresLessons.length - 1]}" (рекомендуется планировать время и не ставить задачи поздно).
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '8px' }}>
+                  <button 
+                    className="rpg-btn" 
+                    style={{ fontSize: '0.75rem', padding: '3px 8px' }}
+                    onClick={() => handleSplitReviewTask(reviewIndex)}
+                  >
+                    🛡️ Разбить на 2 части
+                  </button>
+                  <button 
+                    className="rpg-btn" 
+                    style={{ fontSize: '0.75rem', padding: '3px 8px' }}
+                    onClick={() => {
+                      playClick();
+                      setParsedList(prev => prev.map((item, idx) => idx === reviewIndex ? { ...item, deadline: 'через 2 дня', estimatedTime: Math.max(15, Math.round(item.estimatedTime / 2)) } : item));
+                    }}
+                  >
+                    ⏳ На 2 дня и более
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Interactive Options inside single card */}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1rem', alignItems: 'center', justifyContent: 'space-between' }}>
