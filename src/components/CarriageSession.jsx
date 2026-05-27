@@ -396,9 +396,27 @@ export default function CarriageSession({
   // Sync state to parent layout
   useEffect(() => {
     if (onStateSync) {
-      onStateSync({ activeTask, timeLeft, isRunning });
+      onStateSync({ 
+        activeTask, 
+        timeLeft, 
+        isRunning,
+        ritualTimerActive,
+        ritualTimeLeft,
+        ritualTimeTotal,
+        huntIsRunning,
+        huntTimeSpent,
+        huntTimerValue,
+        huntMode,
+        huntIsBreak,
+        huntBreakTimeLeft
+      });
     }
-  }, [activeTask, timeLeft, isRunning, onStateSync]);
+  }, [
+    activeTask, timeLeft, isRunning, 
+    ritualTimerActive, ritualTimeLeft, ritualTimeTotal,
+    huntIsRunning, huntTimeSpent, huntTimerValue, huntMode,
+    huntIsBreak, huntBreakTimeLeft, onStateSync
+  ]);
 
   // Preparation Timer Effect
   useEffect(() => {
@@ -3991,7 +4009,13 @@ if (setupStage === 'resolution') {
       <div 
         className="gothic-modal-overlay" 
         style={{ 
-          zIndex: 999999,
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          minHeight: 'calc(100vh - 120px)',
+          height: 'auto',
+          zIndex: 50,
           background: 'radial-gradient(circle, #1a080a 0%, #030001 100%)',
           animation: prepTimerActive ? 'pulse-red 1.5s infinite alternate' : 'none'
         }}
@@ -4128,7 +4152,13 @@ if (setupStage === 'resolution') {
       <div 
         className="gothic-modal-overlay" 
         style={{ 
-          zIndex: 999999,
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          minHeight: 'calc(100vh - 120px)',
+          height: 'auto',
+          zIndex: 50,
           background: 'radial-gradient(circle, #0e0514 0%, #020003 100%)',
           animation: ritualTimerActive ? `pulse-red ${pulseSpeed} infinite alternate` : 'none'
         }}
@@ -4155,7 +4185,7 @@ if (setupStage === 'resolution') {
           }}
         >
           <h2 className="gothic-title" style={{ fontSize: '1.6rem', color: '#9b5de5', marginBottom: '1.5rem', textShadow: '0 0 10px rgba(155, 93, 229, 0.4)' }}>
-            🔮 СВЯЩЕННЫЙ РИТУАЛ ВРЕМЕНИ 🔮
+            🔮 РИТУАЛ 🔮
           </h2>
 
           {!ritualTimerActive && !ritualFinished && (
@@ -4226,7 +4256,7 @@ if (setupStage === 'resolution') {
                   style={{ borderColor: '#9b5de5', color: '#ffb813', fontWeight: 'bold' }}
                   onClick={handleStartRitual}
                 >
-                  🔮 ЗАПУСТИТЬ РИТУАЛ ВРЕМЕНИ
+                  🔮 ЗАПУСТИТЬ РИТУАЛ
                 </button>
               </div>
             </div>
@@ -4340,7 +4370,13 @@ if (setupStage === 'resolution') {
       <div 
         className="gothic-modal-overlay" 
         style={{ 
-          zIndex: 999999,
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          minHeight: 'calc(100vh - 120px)',
+          height: 'auto',
+          zIndex: 50,
           background: 'radial-gradient(circle, #0e0a05 0%, #020100 100%)'
         }}
       >
@@ -4388,16 +4424,19 @@ if (setupStage === 'resolution') {
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.9rem', color: 'var(--color-bone-dim)' }}>ИНТЕРВАЛ ПРИВАЛА (МИН):</span>
+                  <span style={{ fontSize: '0.9rem', color: 'var(--color-bone-dim)' }}>
+                    {huntMode === 'pomodoro' ? 'ДЛИТЕЛЬНОСТЬ РАБОТЫ ДО ПРИВАЛА (МИН):' : 'ИНТЕРВАЛ ПРИВАЛА (МИН):'}
+                  </span>
                   <select 
                     className="rpg-input" 
                     value={huntBreakInterval}
                     onChange={(e) => setHuntBreakInterval(Number(e.target.value))}
                     style={{ fontSize: '0.9rem', padding: '4px 10px', background: '#000', color: '#fff', border: '1px solid rgba(255,204,0,0.2)' }}
                   >
-                    <option value="25">Перерыв каждые 25 мин</option>
-                    <option value="30">Перерыв каждые 30 мин</option>
-                    <option value="45">Перерыв каждые 45 мин</option>
+                    <option value="25">{huntMode === 'pomodoro' ? '25 минут работы' : 'Перерыв каждые 25 мин'}</option>
+                    <option value="30">{huntMode === 'pomodoro' ? '30 минут работы' : 'Перерыв каждые 30 мин'}</option>
+                    <option value="45">{huntMode === 'pomodoro' ? '45 минут работы' : 'Перерыв каждые 45 мин'}</option>
+                    <option value="60">{huntMode === 'pomodoro' ? '60 минут работы' : 'Перерыв каждые 60 мин'}</option>
                   </select>
                 </div>
               </div>

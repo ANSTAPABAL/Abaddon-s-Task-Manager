@@ -120,16 +120,35 @@ export default function App() {
   const [activeSessionSync, setActiveSessionSync] = useState({
     activeTask: null,
     timeLeft: 0,
-    isRunning: false
+    isRunning: false,
+    ritualTimerActive: false,
+    ritualTimeLeft: 0,
+    ritualTimeTotal: 0,
+    huntIsRunning: false,
+    huntTimeSpent: 0,
+    huntTimerValue: 0,
+    huntMode: 'pomodoro',
+    huntIsBreak: false,
+    huntBreakTimeLeft: 0
   });
 
   const handleTimerStateSync = useCallback((syncData) => {
     setActiveSessionSync(prev => {
-      const activeTaskChanged = prev.activeTask?.id !== syncData.activeTask?.id;
-      const timeLeftChanged = prev.timeLeft !== syncData.timeLeft;
-      const isRunningChanged = prev.isRunning !== syncData.isRunning;
+      const hasChanged = 
+        prev.activeTask?.id !== syncData.activeTask?.id ||
+        prev.timeLeft !== syncData.timeLeft ||
+        prev.isRunning !== syncData.isRunning ||
+        prev.ritualTimerActive !== syncData.ritualTimerActive ||
+        prev.ritualTimeLeft !== syncData.ritualTimeLeft ||
+        prev.ritualTimeTotal !== syncData.ritualTimeTotal ||
+        prev.huntIsRunning !== syncData.huntIsRunning ||
+        prev.huntTimeSpent !== syncData.huntTimeSpent ||
+        prev.huntTimerValue !== syncData.huntTimerValue ||
+        prev.huntMode !== syncData.huntMode ||
+        prev.huntIsBreak !== syncData.huntIsBreak ||
+        prev.huntBreakTimeLeft !== syncData.huntBreakTimeLeft;
       
-      if (!activeTaskChanged && !timeLeftChanged && !isRunningChanged) {
+      if (!hasChanged) {
         return prev;
       }
       return syncData;
@@ -1155,11 +1174,20 @@ ${contextPrompt}`;
           activeTask={activeSessionSync.activeTask}
           timeLeft={activeSessionSync.timeLeft}
           isRunning={activeSessionSync.isRunning}
+          ritualTimerActive={activeSessionSync.ritualTimerActive}
+          ritualTimeLeft={activeSessionSync.ritualTimeLeft}
+          ritualTimeTotal={activeSessionSync.ritualTimeTotal}
+          huntIsRunning={activeSessionSync.huntIsRunning}
+          huntTimeSpent={activeSessionSync.huntTimeSpent}
+          huntTimerValue={activeSessionSync.huntTimerValue}
+          huntMode={activeSessionSync.huntMode}
+          huntIsBreak={activeSessionSync.huntIsBreak}
+          huntBreakTimeLeft={activeSessionSync.huntBreakTimeLeft}
         />
 
         {/* Main Tab Controller Grid */}
         <main style={{ flex: 1, paddingBottom: '3rem' }}>
-          <div style={{ display: activeTab === 'escape' ? 'block' : 'none' }}>
+          <div style={{ display: activeTab === 'escape' ? 'block' : 'none', position: 'relative', minHeight: 'calc(100vh - 120px)' }}>
             <CarriageSession 
               character={character}
               setCharacter={setCharacter}

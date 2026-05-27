@@ -17,7 +17,16 @@ export default function Navigation({
   character,
   activeTask,
   timeLeft,
-  isRunning
+  isRunning,
+  ritualTimerActive = false,
+  ritualTimeLeft = 0,
+  ritualTimeTotal = 0,
+  huntIsRunning = false,
+  huntTimeSpent = 0,
+  huntTimerValue = 0,
+  huntMode = 'pomodoro',
+  huntIsBreak = false,
+  huntBreakTimeLeft = 0
 }) {
   const { playClick } = useAudio();
   const portraitUrl = getRacePortraitUrl(character.race);
@@ -154,49 +163,147 @@ export default function Navigation({
         padding: '0.5rem 0.8rem',
         boxShadow: '0 8px 32px rgba(0, 0, 0, 0.65), inset 0 0 10px rgba(255, 255, 255, 0.02)'
       }}>
-        {activeTab !== 'escape' && activeTask && (
-          <div 
-            className={isTimeCritical ? "pulsating-red-frame" : "golden-frame"} 
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.6rem',
-              borderRadius: '6px',
-              padding: '4px 10px',
-              height: '32px',
-              marginRight: '0.4rem',
-              boxSizing: 'border-box'
-            }}
-          >
-            {/* Timer */}
-            <span style={{
-              fontFamily: 'monospace',
-              fontSize: '1rem',
-              fontWeight: 'bold',
-              color: isTimeCritical ? '#ff2424' : 'var(--color-relic-glow, #ffb813)',
-              textShadow: isTimeCritical ? '0 0 6px #ff2424' : 'none'
-            }}>
-              {formattedTime}
-            </span>
-            
-            {/* Divider */}
-            <span style={{ color: 'rgba(230, 223, 211, 0.25)' }}>|</span>
-            
-            {/* Task Name */}
-            <span style={{
-              fontSize: '0.72rem',
-              color: '#fff',
-              fontWeight: 'bold',
-              textDecoration: 'underline',
-              maxWidth: '280px',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              letterSpacing: '0.5px'
-            }} title={activeTask.title}>
-              {activeTask.title}
-            </span>
-          </div>
+        {activeTab !== 'escape' && (
+          <>
+            {activeTask && (
+              <div 
+                className={isTimeCritical ? "pulsating-red-frame" : "golden-frame"} 
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.6rem',
+                  borderRadius: '6px',
+                  padding: '4px 10px',
+                  height: '32px',
+                  marginRight: '0.4rem',
+                  boxSizing: 'border-box'
+                }}
+              >
+                {/* Timer */}
+                <span style={{
+                  fontFamily: 'monospace',
+                  fontSize: '1rem',
+                  fontWeight: 'bold',
+                  color: isTimeCritical ? '#ff2424' : 'var(--color-relic-glow, #ffb813)',
+                  textShadow: isTimeCritical ? '0 0 6px #ff2424' : 'none'
+                }}>
+                  {formattedTime}
+                </span>
+                
+                {/* Divider */}
+                <span style={{ color: 'rgba(230, 223, 211, 0.25)' }}>|</span>
+                
+                {/* Task Name */}
+                <span style={{
+                  fontSize: '0.72rem',
+                  color: '#fff',
+                  fontWeight: 'bold',
+                  textDecoration: 'underline',
+                  maxWidth: '280px',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  letterSpacing: '0.5px'
+                }} title={activeTask.title}>
+                  {activeTask.title}
+                </span>
+              </div>
+            )}
+
+            {!activeTask && ritualTimerActive && (
+              <div 
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.6rem',
+                  borderRadius: '6px',
+                  padding: '4px 10px',
+                  height: '32px',
+                  marginRight: '0.4rem',
+                  boxSizing: 'border-box',
+                  border: '1.5px solid #9b5de5',
+                  background: 'rgba(15, 10, 22, 0.8)',
+                  animation: 'pulse-purple-glow 1.5s infinite alternate'
+                }}
+              >
+                <span style={{
+                  fontFamily: 'monospace',
+                  fontSize: '1rem',
+                  fontWeight: 'bold',
+                  color: '#ffb813',
+                  textShadow: '0 0 5px rgba(255, 184, 19, 0.5)'
+                }}>
+                  {(() => {
+                    const m = Math.floor(ritualTimeLeft / 60).toString().padStart(2, '0');
+                    const s = (ritualTimeLeft % 60).toString().padStart(2, '0');
+                    return `${m}:${s}`;
+                  })()}
+                </span>
+                <span style={{ color: 'rgba(155, 93, 229, 0.4)' }}>|</span>
+                <span style={{
+                  fontSize: '0.75rem',
+                  color: '#9b5de5',
+                  fontWeight: 'bold',
+                  textShadow: '0 0 8px rgba(155, 93, 229, 0.5)',
+                  letterSpacing: '1px'
+                }}>
+                  🔮 РИТУАЛ
+                </span>
+              </div>
+            )}
+
+            {!activeTask && !ritualTimerActive && huntIsRunning && (
+              <div 
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.6rem',
+                  borderRadius: '6px',
+                  padding: '4px 10px',
+                  height: '32px',
+                  marginRight: '0.4rem',
+                  boxSizing: 'border-box',
+                  border: huntIsBreak ? '1.5px solid #2ed573' : '1.5px solid var(--color-blood-glow, #8b1a1a)',
+                  background: huntIsBreak ? 'rgba(10, 22, 15, 0.8)' : 'rgba(22, 10, 10, 0.8)',
+                  animation: huntIsBreak ? 'pulse-green-glow 1.5s infinite alternate' : 'pulse-red-glow 1.5s infinite alternate'
+                }}
+              >
+                <span style={{
+                  fontFamily: 'monospace',
+                  fontSize: '1rem',
+                  fontWeight: 'bold',
+                  color: huntIsBreak ? '#2ed573' : '#ff4d4d',
+                  textShadow: huntIsBreak ? '0 0 5px rgba(46, 213, 115, 0.5)' : '0 0 5px rgba(255, 77, 77, 0.5)'
+                }}>
+                  {(() => {
+                    if (huntIsBreak) {
+                      const m = Math.floor(huntBreakTimeLeft / 60).toString().padStart(2, '0');
+                      const s = (huntBreakTimeLeft % 60).toString().padStart(2, '0');
+                      return `${m}:${s}`;
+                    } else if (huntMode === 'pomodoro') {
+                      const m = Math.floor(huntTimerValue / 60).toString().padStart(2, '0');
+                      const s = (huntTimerValue % 60).toString().padStart(2, '0');
+                      return `${m}:${s}`;
+                    } else {
+                      const m = Math.floor(huntTimeSpent / 60).toString().padStart(2, '0');
+                      const s = (huntTimeSpent % 60).toString().padStart(2, '0');
+                      return `${m}:${s}`;
+                    }
+                  })()}
+                </span>
+                <span style={{ color: huntIsBreak ? 'rgba(46, 213, 115, 0.4)' : 'rgba(139, 26, 26, 0.4)' }}>|</span>
+                <span style={{
+                  fontSize: '0.75rem',
+                  color: huntIsBreak ? '#2ed573' : '#ff4d4d',
+                  fontWeight: 'bold',
+                  textShadow: huntIsBreak ? '0 0 8px rgba(46, 213, 115, 0.5)' : '0 0 8px rgba(255, 77, 77, 0.5)',
+                  letterSpacing: '1px'
+                }}>
+                  {huntIsBreak ? '⛺ ПРИВАЛ' : '🏹 ОХОТА'}
+                </span>
+              </div>
+            )}
+          </>
         )}
         <button 
           style={getButtonStyle('escape')}
