@@ -76,6 +76,11 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
   const [editSteps, setEditSteps] = useState([]);
   const [newStepText, setNewStepText] = useState('');
   const [editNature, setEditNature] = useState('external');
+  const [editDeadline, setEditDeadline] = useState('');
+  const [editExecutionMode, setEditExecutionMode] = useState('ask_later');
+  const [editIsSurvival, setEditIsSurvival] = useState(false);
+  const [isSurvivalMode, setIsSurvivalMode] = useState(false);
+  const [isChaosSurvivalMode, setIsChaosSurvivalMode] = useState(false);
   // Adaptation Modal States
   const [adaptationModalOpen, setAdaptationModalOpen] = useState(false);
   const [adaptationTask, setAdaptationTask] = useState(null);
@@ -191,6 +196,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
             date: t.deadline ? todayDateStr : null, // if they have a deadline, add to today, else backlog
             pomodoroTime: t.estimatedTime || (initialType === 'siege' ? 50 : 25),
             pomodoroSpent: 0,
+            isSurvival: isChaosSurvivalMode,
             toxicity: t.toxicity || 'standard',
             barrierType: null,
             curseLevel: 0,
@@ -507,8 +513,9 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
     const targetTask = tasks.find(t => t.id === taskId);
     if (!targetTask) return;
 
-    if (character.hp <= 2) {
-      alert("Ваш разум слишком слаб для этой жертвы! Требуется 2 HP.");
+    const hpPenalty = targetTask.isSurvival ? 15 : 2;
+    if (character.hp <= hpPenalty) {
+      alert(`Ваш разум слишком слаб для этой жертвы! Требуется ${hpPenalty} HP.`);
       return;
     }
 
@@ -536,12 +543,12 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
 
       setCharacter(prev => ({
         ...prev,
-        hp: Math.max(1, prev.hp - 2),
-        totalHpSacrificed: (prev.totalHpSacrificed || 0) + 2
+        hp: Math.max(1, prev.hp - hpPenalty),
+        totalHpSacrificed: (prev.totalHpSacrificed || 0) + hpPenalty
       }));
 
       const destLabel = destination === 'tomorrow' ? 'на завтра' : 'в Бэклог';
-      setRitualMessage(`💀 Задача «${targetTask.title}» изгнана ${destLabel}! Потеряно 2 HP. Скверна задачи возросла.`);
+      setRitualMessage(`💀 Задача «${targetTask.title}» изгнана ${destLabel}! Потеряно ${hpPenalty} HP. Скверна задачи возросла.`);
       setTimeout(() => setRitualMessage(''), 5000);
       setTaskToPushId('');
 
@@ -570,6 +577,8 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
     setNewStepText('');
     setEditNature(task.nature || 'external');
     setEditExecutionMode(task.executionMode || 'ask_later');
+    setEditDeadline(task.deadline || '');
+    setEditIsSurvival(task.isSurvival || false);
   };
 
   // --- EDIT MODAL AI DECONSTRUCTORS ---
@@ -659,7 +668,9 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
       intent: editIntent,
       steps: editSteps,
       nature: editNature,
-      executionMode: editExecutionMode
+      executionMode: editExecutionMode,
+      deadline: editDeadline,
+      isSurvival: editIsSurvival
     } : t));
     setEditingTask(null);
   };
@@ -785,7 +796,8 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
       createdAt: Date.now(),
       steps: localSteps,
       intent: '',
-      isLongJourney: isLongJourney
+      isLongJourney: isLongJourney,
+      isSurvival: isSurvivalMode
     };
 
     const currentHour = new Date().getHours();
@@ -846,6 +858,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
         setTasks(prev => [...prev, ...finalTasks]);
         setNewTaskTitle('');
         setIsLongJourney(false);
+        setIsSurvivalMode(false);
         playSuccess();
 
         // Background AI classification query
@@ -867,6 +880,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
     setNewTaskTitle('');
     const wasLong = isLongJourney;
     setIsLongJourney(false); // reset
+    setIsSurvivalMode(false); // reset
     playSuccess();
 
     if (wasLong) {
@@ -933,13 +947,16 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
     setCharacter(prev => {
       const target = tasks.find(t => t.id === taskId);
       const isSiege = target?.type === 'siege';
-      const reward = isSiege ? 50 : target?.type === 'relic' ? 35 : 15;
+      const isSurvival = target?.isSurvival || false;
+      const baseReward = isSiege ? 50 : target?.type === 'relic' ? 35 : 15;
+      const reward = baseReward * (isSurvival ? 2 : 1);
       const nextXp = prev.xp + reward;
       const xpNeeded = prev.level * 100;
 
       let nextLevel = prev.level;
       let remXp = nextXp;
-      let goldReward = 2; // base gold from planner
+      const baseGold = 2; // base gold from planner
+      const goldReward = baseGold * (isSurvival ? 2 : 1);
       let levelUpGold = 0;
 
       if (remXp >= xpNeeded) {
@@ -1228,7 +1245,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
             )}
           </div>
 
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.9rem', color: 'var(--color-bone-dim)' }}>
               <input
                 type="checkbox"
@@ -1237,6 +1254,15 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
                 style={{ width: '18px', height: '18px', accentColor: 'var(--color-blood)', cursor: 'pointer' }}
               />
               <span>Длительное путешествие</span>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.9rem', color: '#ff4d4d', fontWeight: 'bold' }}>
+              <input
+                type="checkbox"
+                checked={isSurvivalMode}
+                onChange={(e) => setIsSurvivalMode(e.target.checked)}
+                style={{ width: '18px', height: '18px', accentColor: '#ff4d4d', cursor: 'pointer' }}
+              />
+              <span>💀 Вопрос жизни и смерти</span>
             </label>
           </div>
 
@@ -1284,15 +1310,26 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
               onChange={(e) => setChaosText(e.target.value)}
               disabled={chaosLoading}
             />
-            <button
-              className="rpg-btn rpg-btn-mana"
-              style={{ alignSelf: 'flex-end', display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 20px', fontSize: '0.85rem' }}
-              onClick={handleChaosDumpParse}
-              disabled={chaosLoading || !chaosText.trim()}
-            >
-              {chaosLoading ? <RefreshCw className="heartbeat-pulse fast" size={14} /> : <span>🔮</span>}
-              <span>{chaosLoading ? 'РАСШИФРОВКА ХАОСА...' : 'РАСШИФРОВАТЬ СХВАТКИ БЕЗДНОЙ'}</span>
-            </button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.8rem' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.9rem', color: '#ff4d4d', fontWeight: 'bold' }}>
+                <input
+                  type="checkbox"
+                  checked={isChaosSurvivalMode}
+                  onChange={(e) => setIsChaosSurvivalMode(e.target.checked)}
+                  style={{ width: '18px', height: '18px', accentColor: '#ff4d4d', cursor: 'pointer' }}
+                />
+                <span>💀 Вопрос жизни и смерти для всех извлеченных задач</span>
+              </label>
+              <button
+                className="rpg-btn rpg-btn-mana"
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 20px', fontSize: '0.85rem' }}
+                onClick={handleChaosDumpParse}
+                disabled={chaosLoading || !chaosText.trim()}
+              >
+                {chaosLoading ? <RefreshCw className="heartbeat-pulse fast" size={14} /> : <span>🔮</span>}
+                <span>{chaosLoading ? 'РАСШИФРОВКА ХАОСА...' : 'РАСШИФРОВАТЬ СХВАТКИ БЕЗДНОЙ'}</span>
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -1862,7 +1899,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
                 </div>
 
                 {/* Nature and Execution Mode selectors */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.8rem' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginBottom: '4px' }}>ПРИРОДА ЗАДАЧИ</label>
                     <select
@@ -1871,8 +1908,8 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
                       value={editNature}
                       onChange={(e) => setEditNature(e.target.value)}
                     >
-                      <option value="internal">🧿 Внутренний Обет (для себя)</option>
-                      <option value="external">⚔️ Внешняя Схватка (для мира)</option>
+                      <option value="internal">🧿 Обет (внутренний)</option>
+                      <option value="external">⚔️ Схватка (внешний)</option>
                     </select>
                   </div>
                   <div>
@@ -1883,11 +1920,35 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
                       value={editExecutionMode}
                       onChange={(e) => setEditExecutionMode(e.target.value)}
                     >
-                      <option value="timer">⏳ Таймер (Печать Времени)</option>
-                      <option value="day">🌅 В течение дня (Свободный Переход)</option>
-                      <option value="ask_later">❓ Спросить позже (Шепот Сомнений)</option>
+                      <option value="timer">⏳ Таймер</option>
+                      <option value="day">🌅 Весь день</option>
+                      <option value="ask_later">❓ Спросить позже</option>
                     </select>
                   </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginBottom: '4px' }}>КРАЙНИЙ СРОК (ДЕДЛАЙН)</label>
+                    <input
+                      type="text"
+                      className="rpg-input"
+                      style={{ width: '100%', fontSize: '0.9rem' }}
+                      placeholder="Напр. 15:00 или Срочно"
+                      value={editDeadline}
+                      onChange={(e) => setEditDeadline(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {/* Survival toggle inside task edit modal */}
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.9rem', color: '#ff4d4d', fontWeight: 'bold' }}>
+                    <input
+                      type="checkbox"
+                      checked={editIsSurvival}
+                      onChange={(e) => setEditIsSurvival(e.target.checked)}
+                      style={{ width: '18px', height: '18px', accentColor: '#ff4d4d', cursor: 'pointer' }}
+                    />
+                    <span>💀 Вопрос жизни и смерти (Жизнь и смерть на задачу)</span>
+                  </label>
                 </div>
 
                 {/* 2. Intent Field ("Зачем мне это сегодня") */}

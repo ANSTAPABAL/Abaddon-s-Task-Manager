@@ -338,6 +338,39 @@ export default function CarriageSession({
   const [editDeconstructLoading, setEditDeconstructLoading] = useState(false);
   const [editAiEditPrompt, setEditAiEditPrompt] = useState('');
   const [editAiEditActive, setEditAiEditActive] = useState(false);
+  const [editIsSurvival, setEditIsSurvival] = useState(false);
+
+  // Preparation (Prepare for Battle) overlay states
+  const [prepTask, setPrepTask] = useState(null);
+  const [prepExecutionMode, setPrepExecutionMode] = useState(null);
+  const [prepActionInput, setPrepActionInput] = useState('');
+  const [prepTimerActive, setPrepTimerActive] = useState(false);
+  const [prepTimeLeft, setPrepTimeLeft] = useState(100);
+
+  // Ritual Time Manager States
+  const [ritualModalOpen, setRitualModalOpen] = useState(false);
+  const [ritualUnit, setRitualUnit] = useState('minutes'); // seconds, minutes, hours
+  const [ritualValue, setRitualValue] = useState(10);
+  const [ritualTimeTotal, setRitualTimeTotal] = useState(600); // total seconds
+  const [ritualTimeLeft, setRitualTimeLeft] = useState(0);
+  const [ritualTimerActive, setRitualTimerActive] = useState(false);
+  const [ritualFinished, setRitualFinished] = useState(false);
+  const [ritualBlessingText, setRitualBlessingText] = useState('');
+  const [ritualBlessingLoading, setRitualBlessingLoading] = useState(false);
+
+  // Hunt Time Manager States
+  const [huntModalOpen, setHuntModalOpen] = useState(false);
+  const [huntMode, setHuntMode] = useState('pomodoro'); // pomodoro (Расчет по времени), stopwatch (Узы со временем)
+  const [huntBreakInterval, setHuntBreakInterval] = useState(30); // in minutes
+  const [huntTimerValue, setHuntTimerValue] = useState(1800); // countdown value in seconds (default 30 mins)
+  const [huntTimeSpent, setHuntTimeSpent] = useState(0); // active work seconds spent
+  const [huntTimeTotal, setHuntTimeTotal] = useState(0); // total session seconds
+  const [huntIsRunning, setHuntIsRunning] = useState(false);
+  const [huntIsBreak, setHuntIsBreak] = useState(false);
+  const [huntBreakTimeLeft, setHuntBreakTimeLeft] = useState(600); // 10 minutes break in seconds
+  const [huntLastBreakCheckpoint, setHuntLastBreakCheckpoint] = useState(0);
+  const [huntBreakEvent, setHuntBreakEvent] = useState(null);
+  const [huntPayoutActive, setHuntPayoutActive] = useState(false);
 
   // Guided Deconstruction (ADHD Interview) States inside Edit Modal
   const [guidedStep, setGuidedStep] = useState(0); // 0 = default, 1 = answering questions, 2 = done
@@ -366,6 +399,30 @@ export default function CarriageSession({
       onStateSync({ activeTask, timeLeft, isRunning });
     }
   }, [activeTask, timeLeft, isRunning, onStateSync]);
+
+  // Preparation Timer Effect
+  useEffect(() => {
+    let timerId = null;
+    if (prepTimerActive) {
+      if (prepTimeLeft > 0) {
+        timerId = setInterval(() => {
+          setPrepTimeLeft(prev => prev - 1);
+        }, 1000);
+      } else {
+        // Countdown expired! Automatically start combat session
+        setPrepTimerActive(false);
+        playSuccess();
+        actuallyStartCombat(prepTask, prepExecutionMode);
+        setPrepTask(null);
+        setPrepExecutionMode(null);
+        setPrepActionInput('');
+        setPrepTimeLeft(100);
+      }
+    }
+    return () => {
+      if (timerId) clearInterval(timerId);
+    };
+  }, [prepTimerActive, prepTimeLeft, prepTask, prepExecutionMode]);
   
   // Active RPG Combat Arena States
   const [enemyName, setEnemyName] = useState('Призрак Прокрастинации');
@@ -525,7 +582,25 @@ ${legacyPromptContext}
       });
       if (!response.ok) throw new Error('AI offline');
       const data = await response.json();
-      setResolutionText(data.choices[0].message.content.trim());
+      const generatedText = data.choices[0].message.content.trim();
+      setResolutionText(generatedText);
+      
+      // Sync chronicle back to the defeated enemy
+      if (type === 'victory') {
+        setCharacter(prev => {
+          const updatedDefeated = prev.defeatedEnemies ? [...prev.defeatedEnemies] : [];
+          if (updatedDefeated.length > 0) {
+            updatedDefeated[updatedDefeated.length - 1] = {
+              ...updatedDefeated[updatedDefeated.length - 1],
+              aiChronicle: generatedText
+            };
+          }
+          return {
+            ...prev,
+            defeatedEnemies: updatedDefeated
+          };
+        });
+      }
       playSuccess();
     } catch (e) {
       const lastLegend = pedestals && pedestals.length > 0 ? pedestals[pedestals.length - 1] : null;
@@ -541,23 +616,34 @@ ${legacyPromptContext}
         }
       }
 
+      let textToUse = "";
       if (isAmbush) {
-        setResolutionText(`Ты завершил контракт «${task?.title || ''}», одолев врага «${enemy}», но твое промедление привело к трагедии. Придя на встречу, ты наткнулся лишь на растерзанный труп «${npcName}», окруженный шакалами Бездны. 
-
-В ярости ты врубился в строй разбойников. Земля пропиталась грязной кровью, когда последний бандит испустил дух. Запах гари и сырого мяса еще долго будет преследовать тебя, а в карманах нападавших нашлось лишь 10 XP и 5 золотых монет.`);
+        textToUse = `Ты завершил контракт «${task?.title || ''}», одолев врага «${enemy}», но твое промедление привело к трагедии. Придя на встречу, ты наткнулся лишь на растерзанный труп «${npcName}», окруженный шакалами Бездны. \n\nВ ярости ты врубился в строй разбойников. Земля пропиталась грязной кровью, когда последний бандит испустил дух. Запах гари и сырого мяса еще долго будет преследовать тебя, а в карманах нападавших нашлось лишь 10 XP и 5 золотых монет.`;
       } else {
         const fallbacks = {
-          victory: `Удар пришелся точно в цель. Зазубренное лезвие вошло по самую рукоять, и эта сука «${enemy}» наконец-то испустила дух, захлебнувшись собственной когнитивной желчью. Твой клинок дымится, а вокруг оседает вонючая тень.${heritageVictoryLine}
-
-Ты стоишь по колено в грязи, тяжело дыша, но оковы спали. Голова чиста от дерьма и страхов. ${isLargeQuest || isPastDebt ? 'Этот чертов триумф заставляет тебя вновь поверить в себя, ублюдок, после всей этой бесконечной череды провалов!' : 'Ты победил эту тварь, а значит, и весь остальной мир подождет, пока ты вытираешь кровь с лица.'}`,
-          flee: `Пришлось улепетывать. Тварь «${enemy}» оказалась слишком проворной, а ноги вязли в липкой жиже Бездны. Привкус поражения горчит во рту, как протухший эль.
-
-Но хрен там плавал — ты все еще жив. Спрячься в лагере, залижи раны, погрей задницу у костра и возвращайся. Следующий раунд будет за нами, ублюдок.`,
-          death: `Лицо встретилось с холодной грязью. Хруст костей, гогот «${enemy}» над ухом и темнота. Твой разум расколот на куски, а костлявая уже тянет свои лапы.${heritageDeathLine}
-
-Но сдохнуть сегодня не получилось. Ты очнулся у костра в лагере. Голова трещит, все тело ноет, но ты дышишь. Поднимайся из дерьма, Изгнанник. Нам еще нужно отплатить этой твари.`
+          victory: `Удар пришелся точно в цель. Зазубренное лезвие вошло по самую рукоять, и эта сука «${enemy}» наконец-то испустила дух, захлебнувшись собственной когнитивной желчью. Твой клинок дымится, а вокруг оседает вонючая тень.${heritageVictoryLine}\n\nТы стоишь по колено в грязи, тяжело дыша, но оковы спали. Голова чиста от дерьма и страхов. ${isLargeQuest || isPastDebt ? 'Этот чертов триумф заставляет тебя вновь поверить в себя, ублюдок, после всей этой бесконечной череды провалов!' : 'Ты победил эту тварь, а значит, и весь остальной мир подождет, пока ты вытираешь кровь с лица.'}`,
+          flee: `Пришлось улепетывать. Тварь «${enemy}» оказалась слишком проворной, а ноги вязли в липкой жиже Бездны. Привкус поражения горчит во рту, как протухший эль.\n\nНо хрен там плавал — ты все еще жив. Спрячься в лагере, залижи раны, погрей задницу у костра и возвращайся. Следующий раунд будет за нами, ублюдок.`,
+          death: `Лицо встретилось с холодной грязью. Хруст костей, гогот «${enemy}» над ухом и темнота. Твой разум расколот на куски, а костлявая уже тянет свои лапы.${heritageDeathLine}\n\nНо сдохнуть сегодня не получилось. Ты очнулся у костра в лагере. Голова трещит, все тело ноет, но ты дышишь. Поднимайся из дерьма, Изгнанник. Нам еще нужно отплатить этой твари.`
         };
-        setResolutionText(fallbacks[type] || fallbacks.victory);
+        textToUse = fallbacks[type] || fallbacks.victory;
+      }
+      setResolutionText(textToUse);
+
+      // Sync fallback chronicle back to the defeated enemy
+      if (type === 'victory') {
+        setCharacter(prev => {
+          const updatedDefeated = prev.defeatedEnemies ? [...prev.defeatedEnemies] : [];
+          if (updatedDefeated.length > 0) {
+            updatedDefeated[updatedDefeated.length - 1] = {
+              ...updatedDefeated[updatedDefeated.length - 1],
+              aiChronicle: textToUse
+            };
+          }
+          return {
+            ...prev,
+            defeatedEnemies: updatedDefeated
+          };
+        });
       }
     } finally {
       setResolutionLoading(false);
@@ -753,6 +839,7 @@ ${legacyPromptContext}
     setGuidedAnswers({});
     setEditAiEditPrompt('');
     setEditAiEditActive(false);
+    setEditIsSurvival(task.isSurvival || false);
   };
 
   const handleSaveEdit = () => {
@@ -769,7 +856,8 @@ ${legacyPromptContext}
           steps: editSteps,
           deadline: editDeadline,
           nature: editNature,
-          executionMode: editExecutionMode
+          executionMode: editExecutionMode,
+          isSurvival: editIsSurvival
         };
       }
       return t;
@@ -962,40 +1050,357 @@ ${legacyPromptContext}
     setEditSteps(prev => prev.map(s => s.id === stepId ? { ...s, title: text } : s));
   };
 
+  // --- RITUAL TIME SUPPORT FUNCTIONS ---
+  const handleStartRitual = () => {
+    playClick();
+    let totalSecs = 600; // default 10 mins
+    if (ritualUnit === 'seconds') {
+      totalSecs = Number(ritualValue);
+    } else if (ritualUnit === 'minutes') {
+      totalSecs = Number(ritualValue) * 60;
+    } else if (ritualUnit === 'hours') {
+      totalSecs = Number(ritualValue) * 3600;
+    }
+
+    // Clamp between 5 seconds and 5 hours (18000s)
+    totalSecs = Math.max(5, Math.min(18000, totalSecs));
+
+    setRitualTimeTotal(totalSecs);
+    setRitualTimeLeft(totalSecs);
+    setRitualTimerActive(true);
+    setRitualFinished(false);
+    setRitualBlessingText('');
+  };
+
+  const handleFinishRitual = async (naturalComplete = true) => {
+    playSuccess();
+    setRitualTimerActive(false);
+    setRitualFinished(true);
+
+    const spentSecs = naturalComplete ? ritualTimeTotal : (ritualTimeTotal - ritualTimeLeft);
+    const spentMinutes = Math.ceil(spentSecs / 60);
+
+    // Sync active minutes spent to dailyWorkMinutes
+    setCharacter(prev => ({
+      ...prev,
+      dailyWorkMinutes: (prev.dailyWorkMinutes || 0) + spentMinutes
+    }));
+
+    setRitualBlessingLoading(true);
+    setRitualBlessingText('');
+
+    try {
+      const systemPrompt = `Ты — Древний ИИ Бездны во вселенной Абаддона. Игрок завершил священный Ритуал Времени (сосредоточенной работы).
+Напиши короткое, вдохновляющее и немного готическое благословение (3-4 предложения), адаптированное под контекст его персонажа:
+- Раса: ${character.race || 'Человек'}
+- Класс: ${character.class || 'Воин'}
+- Уровень: ${character.level}
+- Биография: ${character.bio || 'Нет'}
+- Побежденные враги: ${JSON.stringify(character.defeatedEnemies || [])}
+- Золото: ${character.gold}, Дух: ${character.willpower || 100}
+
+Сделай благословение пафосным, в стиле мрачного фэнтези (Fear & Hunger, Darkest Dungeon), упомянув его победы над конкретными врагами (если они есть) или его расовые/классовые черты. Благослови его на новые свершения и похвали его верность Времени! Пиши на русском языке.`;
+
+      const response = await fetch('http://localhost:3001/api/ai/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: `Ритуал длился ${spentMinutes} минут. Выдай благословение!` }
+          ]
+        })
+      });
+
+      if (!response.ok) throw new Error();
+      const data = await response.json();
+      let text = data.choices[0].message.content.trim();
+      if (text.startsWith("```json")) text = text.slice(7);
+      if (text.endsWith("```")) text = text.slice(0, -3);
+      setRitualBlessingText(text);
+    } catch (err) {
+      setRitualBlessingText(`«Твоя расовая стойкость ${character.race || 'героя'} и концентрация ${character.class || 'искателя'} пронзили туман Бездны. Отрезок времени в ${spentMinutes} мин зачтен в Летопись Судьбы. Ступай вперед, отмеченный благословением Времени!»`);
+    } finally {
+      setRitualBlessingLoading(false);
+    }
+  };
+
+  // Ritual Ticking Effect
+  useEffect(() => {
+    let intervalId = null;
+    if (ritualTimerActive && ritualTimeLeft > 0) {
+      intervalId = setInterval(() => {
+        setRitualTimeLeft(prev => {
+          if (prev <= 1) {
+            clearInterval(intervalId);
+            setRitualTimerActive(false);
+            handleFinishRitual(true);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [ritualTimerActive, ritualTimeLeft]);
+
+
+  // --- HUNT TIME SUPPORT FUNCTIONS & NARRATIVES ---
+  const ABERCROMBIE_BREAK_EVENTS = [
+    {
+      title: "Схватка за сухарь",
+      story: "Вы присели на замшелый ствол дерева, чтобы перевести дух, как вдруг из кустов вылетел ободранный налетчик Бездны с ржавым тесаком. Схватка была короткой и грязной — вы ткнули его коленом в пах и перерубили горло. Зато в его карманах обнаружилась краюха подсохшего сыра."
+    },
+    {
+      title: "Шепот в тумане",
+      story: "Пока вы отдыхали у костерка, туман сгустился до плотности дегтя. Из темноты раздался глумливый голос Инквизитора Забвения: «Ты можешь отдохнуть, изгнанник... но долг все равно найдет тебя». Вы бросили в темноту тяжелый камень. Раздался глухой стук и отборная брань. Кажется, вы попали ему в лоб."
+    },
+    {
+      title: "Спасение бродячего гоблина",
+      story: "Вы наткнулись на гоблина-торговца, которого завалило упавшей костяной повозкой. Кряхтя и проклиная все на свете, вы навалились плечом и приподняли колесо. Гоблин выскользнул, низко поклонился, пробормотал: «Да пребудет с тобой благословение сундука!» и дал вам медную монетку."
+    },
+    {
+      title: "Философия Кольца",
+      story: "Вы сидели и тупо смотрели на ржавое кольцо на своем пальце. Вдруг оно тихо зашептало: «Знаешь, почему мы в Бездне? Потому что мы вечно откладывали великие дела ради мелких обид». Вы стряхнули пыль с кольца. Оно замолчало, но осадок остался."
+    },
+    {
+      title: "Теплая стоянка Ищеек",
+      story: "Вы наткнулись на заброшенный лагерь Ищеек Севера. Угли еще тлели. Вы подбросили сухих веток, погрели руки и нашли забытый кем-то кинжал с гравировкой: «Делай то, что должно, и будь что будет». Ваши раны затянулись от тепла."
+    },
+    {
+      title: "Встреча со старым калекой",
+      story: "Пожилой солдат с одной ногой сидел у обочины и пытался заточить тупой меч. Вы молча забрали у него точильный брусок и за пять минут помогли довести лезвие до идеального блеска. Старик кивнул: «В бою тупое оружие убивает владельца. В работе — тупые мысли»."
+    },
+    {
+      title: "Когнитивный мираж",
+      story: "Перед вашими глазами на мгновение возник величественный образ Цитадели Искупления, но стоило вам моргнуть, как он рассыпался облаком пепла. Вы поняли, что единственный путь туда — это продолжать копать землю шаг за шагом."
+    },
+    {
+      title: "Бешеная барсучья ярость",
+      story: "На вас напал бешеный барсук Бездны, светящийся ядовитой слизью. Пришлось спасаться бегством на дерево. Барсук яростно грыз кору, а вы сидели на ветке и дышали свежим воздухом. Разминка удалась."
+    }
+  ];
+
+  const handleStartHunt = () => {
+    playClick();
+    setHuntIsRunning(true);
+    setHuntIsBreak(false);
+    setHuntBreakEvent(null);
+    setHuntPayoutActive(false);
+    
+    if (huntMode === 'pomodoro') {
+      setHuntTimerValue(huntBreakInterval * 60);
+    }
+  };
+
+  const triggerHuntBreak = () => {
+    playBoneCrack();
+    setHuntIsBreak(true);
+    setHuntBreakTimeLeft(600); // 10 minutes break
+    setHuntLastBreakCheckpoint(huntTimeSpent);
+
+    const xpReward = Math.random() < 0.5 ? 5 : 10;
+    setCharacter(prev => {
+      const nextXp = prev.xp + xpReward;
+      const needed = prev.level * 100;
+      let nextLvl = prev.level;
+      let rx = nextXp;
+      if (rx >= needed) {
+        nextLvl += 1;
+        rx -= needed;
+      }
+      return {
+        ...prev,
+        level: nextLvl,
+        xp: rx
+      };
+    });
+
+    const randomEvent = ABERCROMBIE_BREAK_EVENTS[Math.floor(Math.random() * ABERCROMBIE_BREAK_EVENTS.length)];
+    setHuntBreakEvent({
+      xp: xpReward,
+      story: randomEvent.story,
+      title: randomEvent.title
+    });
+  };
+
+  const handleEndHuntBreak = () => {
+    playSuccess();
+    setHuntIsBreak(false);
+    setHuntBreakEvent(null);
+    if (huntMode === 'pomodoro') {
+      setHuntTimerValue(huntBreakInterval * 60);
+    }
+  };
+
+  const handleSelectHuntPayout = (payoutType) => {
+    playSuccess();
+    const spentMinutes = Math.floor(huntTimeSpent / 60);
+    const intervals = spentMinutes / 30; // base reward per 30 minutes
+
+    // Add work fatigue
+    setCharacter(prev => ({
+      ...prev,
+      dailyWorkMinutes: (prev.dailyWorkMinutes || 0) + spentMinutes
+    }));
+
+    if (payoutType === 'free_travel') {
+      // Free play awards: Full Gold, XP, Morale!
+      const xpEarned = Math.round(intervals * 25);
+      const goldEarned = Math.round(intervals * 5);
+      const moraleEarned = Math.round(intervals * 5);
+
+      setCharacter(prev => {
+        const nextXp = prev.xp + xpEarned;
+        const needed = prev.level * 100;
+        let nextLvl = prev.level;
+        let rx = nextXp;
+        if (rx >= needed) {
+          nextLvl += 1;
+          rx -= needed;
+        }
+        return {
+          ...prev,
+          level: nextLvl,
+          xp: rx,
+          gold: (prev.gold || 0) + goldEarned,
+          moralCompass: Math.min(100, (prev.moralCompass || 50) + moraleEarned),
+          totalGoldEarned: (prev.totalGoldEarned || 0) + goldEarned
+        };
+      });
+
+      spawnFloater(`+${xpEarned} XP`, "heal-hp");
+      if (goldEarned > 0) spawnFloater(`+${goldEarned} Золото`, "fatigue-recovery");
+      if (moraleEarned > 0) spawnFloater(`+${moraleEarned} Мораль`, "restore-mp");
+
+      alert(`🏆 Награда Вольных путешествий начислена! Получено: +${xpEarned} XP, +${goldEarned} Золота, +${moraleEarned} Морального компаса за ${spentMinutes} мин работы!`);
+    } else {
+      // Doing standard tasks: no gold/morale, but gives 0.25 XP and some willpower spirit!
+      const xpEarned = Math.round(intervals * 25 * 0.25);
+      const spiritEarned = Math.round(intervals * 5);
+
+      setCharacter(prev => {
+        const nextXp = prev.xp + xpEarned;
+        const needed = prev.level * 100;
+        let nextLvl = prev.level;
+        let rx = nextXp;
+        if (rx >= needed) {
+          nextLvl += 1;
+          rx -= needed;
+        }
+        return {
+          ...prev,
+          level: nextLvl,
+          xp: rx,
+          willpower: Math.min(100, (prev.willpower || 100) + spiritEarned)
+        };
+      });
+
+      spawnFloater(`+${xpEarned} XP`, "heal-hp");
+      if (spiritEarned > 0) spawnFloater(`+${spiritEarned} Дух`, "restore-mp");
+
+      alert(`🕯️ Ритуальный бонус задач получен! Получено: +${xpEarned} XP, +${spiritEarned} Силы духа за ${spentMinutes} мин прилежной работы!`);
+    }
+
+    // Reset hunt state
+    setHuntModalOpen(false);
+    setHuntIsRunning(false);
+    setHuntIsBreak(false);
+    setHuntBreakEvent(null);
+    setHuntPayoutActive(false);
+    setHuntTimeSpent(0);
+    setHuntTimeTotal(0);
+  };
+
+  // Hunt Ticking Effect
+  useEffect(() => {
+    let timerId = null;
+    if (huntIsRunning) {
+      if (huntIsBreak) {
+        if (huntBreakTimeLeft > 0) {
+          timerId = setInterval(() => {
+            setHuntBreakTimeLeft(prev => prev - 1);
+            setHuntTimeTotal(prev => prev + 1);
+          }, 1000);
+        } else {
+          handleEndHuntBreak();
+        }
+      } else {
+        timerId = setInterval(() => {
+          setHuntTimeSpent(prev => prev + 1);
+          setHuntTimeTotal(prev => prev + 1);
+
+          if (huntMode === 'pomodoro') {
+            setHuntTimerValue(prev => {
+              if (prev <= 1) {
+                setTimeout(() => triggerHuntBreak(), 0);
+                return 0;
+              }
+              return prev - 1;
+            });
+          } else {
+            setHuntTimeSpent(currentSpent => {
+              const diff = currentSpent - huntLastBreakCheckpoint;
+              if (diff >= huntBreakInterval * 60) {
+                setTimeout(() => triggerHuntBreak(), 0);
+              }
+              return currentSpent;
+            });
+          }
+        }, 1000);
+      }
+    }
+    return () => {
+      if (timerId) clearInterval(timerId);
+    };
+  }, [huntIsRunning, huntIsBreak, huntBreakTimeLeft, huntMode, huntTimerValue, huntBreakInterval, huntLastBreakCheckpoint]);
+
+
+  const actuallyStartCombat = (task, mode) => {
+    setActiveTask(task);
+    const initialTime = task.timeLeft !== undefined ? task.timeLeft : task.pomodoroTime * 60;
+    setTimeLeft(initialTime);
+    setSessionSteps(task.steps || []);
+    setSetupStage('active');
+    generateCombatEncounter(task);
+    localStorage.setItem('active_task_id', task.id);
+    localStorage.setItem('combat_time_left', initialTime);
+    setDeadlineDmgApplied(false);
+    if (mode === 'timer') {
+      localStorage.setItem('combat_timer_start_time', Date.now());
+      localStorage.setItem('combat_timer_start_value', initialTime);
+      localStorage.setItem('combat_is_running', 'true');
+      setIsRunning(true);
+    } else {
+      localStorage.setItem('combat_is_running', 'false');
+      setIsRunning(false);
+    }
+    setAtmosphereMood(task.type === 'siege' ? 'siege' : 'hunt');
+    if (playActiveSessionTrack) playActiveSessionTrack(task.type === 'siege' ? 'siege' : 'hunt');
+    
+    // Async enrich lore and steps using AI!
+    enrichTaskAndLore(task);
+  };
+
   const handleStartCombatSession = (task) => {
     resolutionTriggeredRef.current = false;
-    const runStart = (mode) => {
-      setActiveTask(task);
-      const initialTime = task.timeLeft !== undefined ? task.timeLeft : task.pomodoroTime * 60;
-      setTimeLeft(initialTime);
-      setSessionSteps(task.steps || []);
-      setSetupStage('active');
-      generateCombatEncounter(task);
-      localStorage.setItem('active_task_id', task.id);
-      localStorage.setItem('combat_time_left', initialTime);
-      setDeadlineDmgApplied(false);
-      if (mode === 'timer') {
-        localStorage.setItem('combat_timer_start_time', Date.now());
-        localStorage.setItem('combat_timer_start_value', initialTime);
-        localStorage.setItem('combat_is_running', 'true');
-        setIsRunning(true);
-      } else {
-        localStorage.setItem('combat_is_running', 'false');
-        setIsRunning(false);
-      }
-      setAtmosphereMood(task.type === 'siege' ? 'siege' : 'hunt');
-      if (playActiveSessionTrack) playActiveSessionTrack(task.type === 'siege' ? 'siege' : 'hunt');
-      
-      // Async enrich lore and steps using AI!
-      enrichTaskAndLore(task);
+    
+    const triggerPrep = (mode) => {
+      setPrepTask(task);
+      setPrepExecutionMode(mode);
+      setPrepActionInput('');
+      setPrepTimerActive(false);
+      setPrepTimeLeft(100);
     };
 
     if (!task.executionMode || task.executionMode === 'ask_later') {
       requestTaskExecutionModeSelect(task, (chosenMode) => {
-        runStart(chosenMode);
+        triggerPrep(chosenMode);
       });
     } else {
-      runStart(task.executionMode);
+      triggerPrep(task.executionMode);
     }
   };
 
@@ -1140,8 +1545,33 @@ const handleWinActiveSession = (task) => {
     setResolutionNpc(randNpc);
     
     const isSiege = task?.type === 'siege';
-    const expReward = isAmbush ? 10 : (isSiege ? 60 : 25);
-    const goldReward = isAmbush ? 5 : (isSiege ? 15 : 5);
+    const isSurvival = task?.isSurvival || false;
+    const rewardMultiplier = isSurvival ? 2 : 1;
+    const expReward = (isAmbush ? 10 : (isSiege ? 60 : 25)) * rewardMultiplier;
+    const goldReward = (isAmbush ? 5 : (isSiege ? 15 : 5)) * rewardMultiplier;
+
+    // Create Defeated Enemy Object
+    const hashStrForIcon = (enemyName || "") + (task?.id || '');
+    let hashVal = 0;
+    for (let i = 0; i < hashStrForIcon.length; i++) {
+      hashVal = hashStrForIcon.charCodeAt(i) + ((hashVal << 5) - hashVal);
+    }
+    hashVal = Math.abs(hashVal);
+    const variationForIcon = COMBAT_VARIATIONS[hashVal % COMBAT_VARIATIONS.length];
+    const enemyIcon = task?.combatLore?.enemyIcon || variationForIcon?.icon || "⚔️";
+
+    const defeatedEnemyObj = {
+      id: `enemy-${Date.now()}`,
+      name: enemyName,
+      taskTitle: task?.title || "",
+      steps: task?.steps?.map(s => ({ title: s.title, completed: s.completed })) || [],
+      estimatedTime: task?.pomodoroTime || 25,
+      aiChronicle: "", // Will be filled dynamically by resolution text
+      defeatedAt: new Date().toLocaleDateString('ru-RU') + ' в ' + new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
+      icon: enemyIcon,
+      nature: task?.nature || "external",
+      type: task?.type || "hunt"
+    };
     
     setCharacter(prev => {
       const nextXp = prev.xp + expReward;
@@ -1166,10 +1596,13 @@ const handleWinActiveSession = (task) => {
       
       const updatedBio = [...(prev.biography || [])];
       if (isAmbush) {
-        updatedBio.push(`На месте встречи Изгнанник обнаружил лишь растерзанное тело ${randNpc.name}. Ему пришлось вступить в бой с устроившими засаду бандитами Бездны. Разбойники перебиты, с их тел снято +10 XP и +5 Золота.`);
+        updatedBio.push(`На месте встречи Изгнанник обнаружил лишь растерзанное тело ${randNpc.name}. Ему пришлось вступить в бой с устроившими засаду бандитами Бездны. Разбойники перебиты, с их тел снято +${expReward} XP и +${earnedGold} Золота.`);
       } else {
-        updatedBio.push(`Выполнен контракт: "${task?.title || ''}". Встречен ${randNpc.name}. Получено +${expReward} XP и +${earnedGold} Золота.`);
+        const modeText = isSurvival ? " [Жизнь и Смерть]" : "";
+        updatedBio.push(`Выполнен контракт${modeText}: "${task?.title || ''}". Встречен ${randNpc.name}. Получено +${expReward} XP и +${earnedGold} Золота.`);
       }
+
+      const existingDefeated = prev.defeatedEnemies || [];
 
       return {
         ...prev,
@@ -1181,7 +1614,8 @@ const handleWinActiveSession = (task) => {
         completedTasksCount: (prev.completedTasksCount || 0) + 1,
         completedSiegesCount: (prev.completedSiegesCount || 0) + (isSiege ? 1 : 0),
         totalGoldEarned: (prev.totalGoldEarned || 0) + earnedGold,
-        biography: updatedBio
+        biography: updatedBio,
+        defeatedEnemies: [...existingDefeated, defeatedEnemyObj]
       };
     });
 
@@ -1223,8 +1657,24 @@ const handleWinActiveSession = (task) => {
     setResolutionNpc(randNpc);
 
     const isSiege = task.type === 'siege';
-    const expReward = isAmbush ? 10 : (isSiege ? 60 : 25);
-    const goldReward = isAmbush ? 5 : (isSiege ? 15 : 5);
+    const isSurvival = task.isSurvival || false;
+    const rewardMultiplier = isSurvival ? 2 : 1;
+    const expReward = (isAmbush ? 10 : (isSiege ? 60 : 25)) * rewardMultiplier;
+    const goldReward = (isAmbush ? 5 : (isSiege ? 15 : 5)) * rewardMultiplier;
+
+    // Create Defeated Enemy Object
+    const defeatedEnemyObj = {
+      id: `enemy-${Date.now()}`,
+      name: eName,
+      taskTitle: task.title,
+      steps: task.steps?.map(s => ({ title: s.title, completed: s.completed })) || [],
+      estimatedTime: task.pomodoroTime || 25,
+      aiChronicle: "", // Will be filled dynamically by resolution text
+      defeatedAt: new Date().toLocaleDateString('ru-RU') + ' в ' + new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
+      icon: task.combatLore?.enemyIcon || variation?.icon || "⚔️",
+      nature: task.nature || "external",
+      type: task.type || "hunt"
+    };
 
     setCharacter(prev => {
       const nextXp = prev.xp + expReward;
@@ -1249,10 +1699,13 @@ const handleWinActiveSession = (task) => {
 
       const updatedBio = [...(prev.biography || [])];
       if (isAmbush) {
-        updatedBio.push(`На месте встречи Изгнанник обнаружил лишь растерзанное тело ${randNpc.name}. Ему пришлось вступить в бой с устроившими засаду бандитами Бездны. Разбойники перебиты, с их тел снято +10 XP и +5 Золота.`);
+        updatedBio.push(`На месте встречи Изгнанник обнаружил лишь растерзанное тело ${randNpc.name}. Ему пришлось вступить в бой с устроившими засаду бандитами Бездны. Разбойники перебиты, с их тел снято +${expReward} XP и +${earnedGold} Золота.`);
       } else {
-        updatedBio.push(`Выполнен контракт: "${task.title}". Встречен ${randNpc.name}. Получено +${expReward} XP и +${earnedGold} Золота.`);
+        const modeText = isSurvival ? " [Жизнь и Смерть]" : "";
+        updatedBio.push(`Выполнен контракт${modeText}: "${task.title}". Встречен ${randNpc.name}. Получено +${expReward} XP и +${earnedGold} Золота.`);
       }
+
+      const existingDefeated = prev.defeatedEnemies || [];
 
       return {
         ...prev,
@@ -1264,7 +1717,8 @@ const handleWinActiveSession = (task) => {
         completedTasksCount: (prev.completedTasksCount || 0) + 1,
         completedSiegesCount: (prev.completedSiegesCount || 0) + (isSiege ? 1 : 0),
         totalGoldEarned: (prev.totalGoldEarned || 0) + earnedGold,
-        biography: updatedBio
+        biography: updatedBio,
+        defeatedEnemies: [...existingDefeated, defeatedEnemyObj]
       };
     });
 
@@ -1282,26 +1736,50 @@ const handleWinActiveSession = (task) => {
     playClick();
     const tomorrowStr = getVirtualTomorrowStr();
     setTasks(prev => prev.map(t => t.id === task.id ? { ...t, date: tomorrowStr } : t));
-    spawnFloater("На завтра", "heal-hp");
+    
+    if (task.isSurvival) {
+      setCharacter(prev => ({
+        ...prev,
+        hp: Math.max(1, prev.hp - 15),
+        totalHpSacrificed: (prev.totalHpSacrificed || 0) + 15
+      }));
+      triggerFlash('blood');
+      spawnFloater("-15 HP (Перенос)!", "enemy-strike");
+    } else {
+      spawnFloater("На завтра", "heal-hp");
+    }
   };
 
   const handleMoveToBacklog = (task) => {
     playClick();
     setTasks(prev => prev.map(t => t.id === task.id ? { ...t, date: null } : t));
-    spawnFloater("В бэклог", "heal-hp");
+    
+    if (task.isSurvival) {
+      setCharacter(prev => ({
+        ...prev,
+        hp: Math.max(1, prev.hp - 15),
+        totalHpSacrificed: (prev.totalHpSacrificed || 0) + 15
+      }));
+      triggerFlash('blood');
+      spawnFloater("-15 HP (Перенос)!", "enemy-strike");
+    } else {
+      spawnFloater("В бэклог", "heal-hp");
+    }
   };
 
   const handleEscapeFate = (task) => {
     playBoneCrack();
     setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: 'buried' } : t));
+    
+    const penaltyDmg = task.isSurvival ? 30 : 15;
     setCharacter(prev => ({
       ...prev,
-      hp: Math.max(1, prev.hp - 15),
+      hp: Math.max(1, prev.hp - penaltyDmg),
       moralCompass: Math.max(0, (prev.moralCompass || 50) - 10),
-      totalHpSacrificed: (prev.totalHpSacrificed || 0) + 15
+      totalHpSacrificed: (prev.totalHpSacrificed || 0) + penaltyDmg
     }));
     triggerFlash('blood');
-    spawnFloater("-15 HP!", "enemy-strike");
+    spawnFloater(`-${penaltyDmg} HP!`, "enemy-strike");
     spawnFloater("-10 Мораль", "enemy-strike");
   };
 
@@ -2743,6 +3221,19 @@ ${qaText}
                 </div>
               </div>
 
+              {/* Survival toggle inside CarriageSession task edit modal */}
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.9rem', color: '#ff4d4d', fontWeight: 'bold' }}>
+                  <input
+                    type="checkbox"
+                    checked={editIsSurvival}
+                    onChange={(e) => setEditIsSurvival(e.target.checked)}
+                    style={{ width: '18px', height: '18px', accentColor: '#ff4d4d', cursor: 'pointer' }}
+                  />
+                  <span>💀 Вопрос жизни и смерти (Жизнь и смерть на задачу)</span>
+                </label>
+              </div>
+
               {/* 2. Intent Field ("Зачем мне это сегодня") */}
               <div>
                 <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginBottom: '4px' }}>
@@ -3489,6 +3980,606 @@ if (setupStage === 'resolution') {
     );
   }
 
+  const renderPreparationOverlay = () => {
+    if (!prepTask) return null;
+
+    const isSurvival = prepTask.isSurvival || false;
+    const combatsynonym = prepTask.combatLore?.visualType || prepTask.visualType || 'схватка';
+    const enemyName = prepTask.combatLore?.enemyName || "Враг Бездны";
+
+    return (
+      <div 
+        className="gothic-modal-overlay" 
+        style={{ 
+          zIndex: 999999,
+          background: 'radial-gradient(circle, #1a080a 0%, #030001 100%)',
+          animation: prepTimerActive ? 'pulse-red 1.5s infinite alternate' : 'none'
+        }}
+      >
+        <div 
+          className="gothic-modal-content" 
+          style={{ 
+            maxWidth: '650px', 
+            width: '90%', 
+            border: isSurvival ? '3px solid #ff4d4d' : '2px solid var(--color-blood-glow)',
+            boxShadow: isSurvival ? '0 0 45px rgba(255, 77, 77, 0.8)' : '0 0 30px rgba(139, 26, 26, 0.5)',
+            background: '#090506',
+            textAlign: 'center',
+            padding: '2.5rem'
+          }}
+        >
+          <h2 className="gothic-title" style={{ fontSize: '1.8rem', color: '#ff4d4d', marginBottom: '1.2rem', textShadow: '0 0 10px rgba(255, 77, 77, 0.5)' }}>
+            🚨 ПОДГОТОВИТЬСЯ К БОЮ! 🚨
+          </h2>
+          
+          <div style={{ background: 'rgba(255, 77, 77, 0.03)', border: '1px solid rgba(255, 77, 77, 0.1)', padding: '1rem', marginBottom: '1.5rem', borderRadius: '4px' }}>
+            <h3 style={{ fontSize: '1.2rem', color: '#ffcc00', marginBottom: '6px', fontFamily: 'var(--font-rpg)' }}>
+              ⚔️ {prepTask.title}
+            </h3>
+            <p style={{ fontSize: '0.85rem', color: 'var(--color-bone-dim)', fontStyle: 'italic', marginBottom: '4px' }}>
+              Тип квеста: {combatsynonym.toUpperCase()} | Противник: {enemyName}
+            </p>
+            {isSurvival && (
+              <p style={{ fontSize: '0.9rem', color: '#ff4d4d', fontWeight: 'bold', margin: '4px 0 0 0' }}>
+                💀 РЕЖИМ ЖИЗНИ И СМЕРТИ АКТИВЕН! (+100% XP и Золота, -30 HP при провале)
+              </p>
+            )}
+          </div>
+
+          {!prepTimerActive ? (
+            <div>
+              <p style={{ fontSize: '0.95rem', color: 'var(--color-bone)', lineHeight: '1.5', marginBottom: '1.5rem', fontFamily: 'Georgia, serif' }}>
+                Чтобы открыть портал сражения и запустить таймер, запишите <strong>одно конкретное физическое действие</strong>, которое вы совершите прямо сейчас, чтобы начать (например: открыть файл с кодом, взять ручку, открыть вкладку браузера):
+              </p>
+              
+              <input 
+                type="text"
+                className="rpg-input"
+                style={{ width: '100%', fontSize: '1rem', padding: '12px', border: '1px solid #ff4d4d', textAlign: 'center', background: '#000', color: '#fff', marginBottom: '1.5rem' }}
+                placeholder="Впишите стартовое физическое действие..."
+                value={prepActionInput}
+                onChange={(e) => setPrepActionInput(e.target.value)}
+              />
+
+              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+                <button
+                  className="rpg-btn"
+                  style={{ background: '#2c1e21', color: 'var(--color-bone-dim)', borderColor: 'var(--color-iron-light)' }}
+                  onClick={() => {
+                    playClick();
+                    setPrepTask(null);
+                    setPrepExecutionMode(null);
+                    setPrepActionInput('');
+                  }}
+                >
+                  🛡️ Отступить в лагерь
+                </button>
+                <button
+                  className="rpg-btn rpg-btn-blood"
+                  style={{ fontWeight: 'bold' }}
+                  disabled={!prepActionInput.trim()}
+                  onClick={() => {
+                    playClick();
+                    setPrepTimerActive(true);
+                    setPrepTimeLeft(100);
+                  }}
+                >
+                  ⚔️ СОБРАТЬСЯ!
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="animate-fade-in">
+              <p style={{ fontSize: '1rem', color: '#ff4d4d', fontWeight: 'bold', marginBottom: '1rem', fontFamily: 'var(--font-rpg)' }}>
+                РИТУАЛ ГОТОВНОСТИ ЗАПУЩЕН! ВЫПОЛНИТЕ ДЕЙСТВИЕ:
+              </p>
+              <p style={{ fontSize: '1.25rem', color: '#fff', border: '1px dashed rgba(255,255,255,0.15)', padding: '0.8rem 1.5rem', background: '#000', margin: '0 auto 1.5rem auto', maxWidth: '500px', borderRadius: '4px', textShadow: '0 0 10px rgba(255,255,255,0.5)' }}>
+                👉 {prepActionInput}
+              </p>
+
+              {/* Ticking 100 seconds timer */}
+              <div style={{ fontSize: '3rem', fontFamily: 'var(--font-rpg)', color: '#ff4d4d', fontWeight: 'bold', marginBottom: '1rem', animation: 'heartbeat-animation 1s infinite' }}>
+                {prepTimeLeft} <span style={{ fontSize: '1.2rem' }}>секунд</span>
+              </div>
+              <p style={{ fontSize: '0.85rem', color: 'var(--color-bone-dim)', fontStyle: 'italic', marginBottom: '2rem' }}>
+                Таймер страха запущен. Совершите это действие прямо сейчас, пока время не истекло!
+              </p>
+
+              <button
+                className="rpg-btn rpg-btn-mana"
+                style={{ fontSize: '1.1rem', padding: '12px 35px', fontWeight: 'bold', color: '#ffcc00', borderColor: 'var(--color-relic-glow)', boxShadow: '0 0 25px rgba(255, 184, 19, 0.4)' }}
+                onClick={() => {
+                  playSuccess();
+                  setPrepTimerActive(false);
+                  actuallyStartCombat(prepTask, prepExecutionMode);
+                  setPrepTask(null);
+                  setPrepExecutionMode(null);
+                  setPrepActionInput('');
+                  setPrepTimeLeft(100);
+                }}
+              >
+                ⚔️ ВСТУПИТЬ В БОЙ!
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderRitualScreen = () => {
+    if (!ritualModalOpen) return null;
+
+    const formattedTime = (secs) => {
+      const h = Math.floor(secs / 3600);
+      const m = Math.floor((secs % 3600) / 60);
+      const s = secs % 60;
+      if (h > 0) {
+        return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+      }
+      return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    };
+
+    const pctLeft = ritualTimeTotal > 0 ? (ritualTimeLeft / ritualTimeTotal) * 100 : 100;
+    const isUnder30 = ritualTimerActive && pctLeft < 30;
+    const pulseSpeed = isUnder30 ? `${(ritualTimeLeft / (ritualTimeTotal * 0.3)) * 1.0 + 0.15}s` : '1.5s';
+
+    return (
+      <div 
+        className="gothic-modal-overlay" 
+        style={{ 
+          zIndex: 999999,
+          background: 'radial-gradient(circle, #0e0514 0%, #020003 100%)',
+          animation: ritualTimerActive ? `pulse-red ${pulseSpeed} infinite alternate` : 'none'
+        }}
+      >
+        {isUnder30 && (
+          <style dangerouslySetInnerHTML={{__html: `
+            @keyframes pulse-red {
+              0% { box-shadow: inset 0 0 30px rgba(139, 26, 26, 0.3); }
+              100% { box-shadow: inset 0 0 100px rgba(255, 0, 0, ${0.4 + (1 - pctLeft / 30) * 0.6}); }
+            }
+          `}} />
+        )}
+
+        <div 
+          className="gothic-modal-content" 
+          style={{ 
+            maxWidth: '650px', 
+            width: '90%', 
+            border: '2px solid #9b5de5',
+            boxShadow: '0 0 35px rgba(155, 93, 229, 0.4), inset 0 0 15px rgba(0,0,0,0.6)',
+            background: '#09050e',
+            textAlign: 'center',
+            padding: '2.5rem'
+          }}
+        >
+          <h2 className="gothic-title" style={{ fontSize: '1.6rem', color: '#9b5de5', marginBottom: '1.5rem', textShadow: '0 0 10px rgba(155, 93, 229, 0.4)' }}>
+            🔮 СВЯЩЕННЫЙ РИТУАЛ ВРЕМЕНИ 🔮
+          </h2>
+
+          {!ritualTimerActive && !ritualFinished && (
+            <div className="animate-fade-in">
+              <p style={{ fontSize: '0.95rem', color: 'var(--color-bone-dim)', lineHeight: '1.5', marginBottom: '1.5rem', fontFamily: 'Georgia, serif' }}>
+                Изгнанник, ритуал времени — это обет абсолютной тишины и концентрации. Выберите длительность от 5 секунд до 5 часов. Ползунок и ввод минут связаны воедино!
+              </p>
+
+              <div style={{ background: 'rgba(0,0,0,0.4)', padding: '1.5rem', border: '1px solid rgba(155, 93, 229, 0.15)', borderRadius: '4px', marginBottom: '2rem' }}>
+                <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', alignItems: 'center', marginBottom: '1rem' }}>
+                  <span style={{ fontSize: '0.9rem', color: 'var(--color-bone-dim)', textTransform: 'uppercase' }}>Величина:</span>
+                  <input 
+                    type="number"
+                    className="rpg-input"
+                    style={{ width: '80px', fontSize: '1rem', padding: '5px', textAlign: 'center', background: '#000', color: '#fff', border: '1px solid #9b5de5' }}
+                    value={ritualValue}
+                    min={ritualUnit === 'seconds' ? 5 : 1}
+                    max={ritualUnit === 'seconds' ? 60 : ritualUnit === 'minutes' ? 300 : 5}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setRitualValue(val);
+                    }}
+                  />
+                  
+                  <select
+                    className="rpg-input"
+                    style={{ fontSize: '0.9rem', padding: '5px', background: '#000', color: '#fff', border: '1px solid #9b5de5' }}
+                    value={ritualUnit}
+                    onChange={(e) => {
+                      const unit = e.target.value;
+                      setRitualUnit(unit);
+                      if (unit === 'seconds') setRitualValue(10);
+                      else if (unit === 'minutes') setRitualValue(10);
+                      else if (unit === 'hours') setRitualValue(1);
+                    }}
+                  >
+                    <option value="seconds">Секунды</option>
+                    <option value="minutes">Минуты</option>
+                    <option value="hours">Часы</option>
+                  </select>
+                </div>
+
+                <input 
+                  type="range"
+                  min={ritualUnit === 'seconds' ? 5 : 1}
+                  max={ritualUnit === 'seconds' ? 60 : ritualUnit === 'minutes' ? 300 : 5}
+                  value={ritualValue}
+                  onChange={(e) => setRitualValue(Number(e.target.value))}
+                  style={{ width: '100%', accentColor: '#9b5de5', cursor: 'pointer' }}
+                />
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginTop: '8px' }}>
+                  <span>Мин: {ritualUnit === 'seconds' ? 5 : 1}</span>
+                  <span style={{ color: '#9b5de5', fontWeight: 'bold' }}>Выбрано: {ritualValue} {ritualUnit === 'seconds' ? 'сек' : ritualUnit === 'minutes' ? 'мин' : 'час'}</span>
+                  <span>Макс: {ritualUnit === 'seconds' ? 60 : ritualUnit === 'minutes' ? 300 : 5}</span>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+                <button 
+                  className="rpg-btn"
+                  onClick={() => setRitualModalOpen(false)}
+                >
+                  Отмена
+                </button>
+                <button 
+                  className="rpg-btn rpg-btn-mana"
+                  style={{ borderColor: '#9b5de5', color: '#ffb813', fontWeight: 'bold' }}
+                  onClick={handleStartRitual}
+                >
+                  🔮 ЗАПУСТИТЬ РИТУАЛ ВРЕМЕНИ
+                </button>
+              </div>
+            </div>
+          )}
+
+          {ritualTimerActive && (
+            <div className="animate-fade-in">
+              <div 
+                style={{ 
+                  width: '180px', 
+                  height: '180px', 
+                  border: '3px solid #9b5de5', 
+                  borderRadius: '50%', 
+                  margin: '0 auto 2rem auto', 
+                  display: 'flex', 
+                  justifyContent: 'center', 
+                  alignItems: 'center',
+                  background: 'rgba(0,0,0,0.6)',
+                  boxShadow: isUnder30 ? '0 0 35px rgba(255,0,0,0.8)' : '0 0 20px rgba(155, 93, 229, 0.3)',
+                  animation: isUnder30 ? `heartbeat-animation 0.6s infinite` : 'none'
+                }}
+              >
+                <span style={{ fontSize: '2.5rem', fontFamily: 'var(--font-rpg)', color: isUnder30 ? '#ff4d4d' : '#9b5de5', fontWeight: 'bold' }}>
+                  {formattedTime(ritualTimeLeft)}
+                </span>
+              </div>
+
+              <p style={{ fontSize: '0.9rem', color: 'var(--color-bone-dim)', fontStyle: 'italic', marginBottom: '2rem' }}>
+                {isUnder30 ? '🔥 Время горит! Концентрируйтесь изо всех сил!' : '🔮 Ритуал активен. Дышите глубоко и сфокусируйтесь на работе...'}
+              </p>
+
+              <button 
+                className="rpg-btn rpg-btn-blood"
+                style={{ padding: '8px 25px' }}
+                onClick={() => handleFinishRitual(false)}
+              >
+                🕯️ ЗАВЕРШИТЬ РИТУАЛ РАНЬШЕ
+              </button>
+            </div>
+          )}
+
+          {ritualFinished && (
+            <div className="animate-fade-in">
+              <div 
+                style={{ 
+                  background: 'radial-gradient(circle, #22142e 0%, #0d0514 100%)',
+                  border: '1px solid #9b5de5', 
+                  padding: '1.5rem', 
+                  marginBottom: '2rem', 
+                  borderRadius: '4px',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.8), inset 0 0 15px rgba(155,93,229,0.1)'
+                }}
+              >
+                <h3 className="gothic-title" style={{ fontSize: '1rem', color: '#ffb813', marginBottom: '1rem' }}>
+                  📜 ЛЕТОПИСЬ БЛАГОСЛОВЕНИЯ БЕЗДНЫ
+                </h3>
+
+                {ritualBlessingLoading ? (
+                  <div style={{ padding: '2rem' }}>
+                    <RefreshCw className="heartbeat-pulse fast" style={{ color: 'var(--color-mana-glow)', marginBottom: '1rem' }} size={24} />
+                    <p style={{ fontStyle: 'italic', fontSize: '0.85rem', color: 'var(--color-bone-dim)' }}>
+                      «Древние духи ткут строки вечности для вашей души...»
+                    </p>
+                  </div>
+                ) : (
+                  <p 
+                    style={{ 
+                      fontSize: '0.92rem', 
+                      color: '#e6dfd3', 
+                      lineHeight: '1.5', 
+                      fontFamily: 'Georgia, serif', 
+                      fontStyle: 'italic',
+                      whiteSpace: 'pre-wrap',
+                      textAlign: 'left'
+                    }}
+                  >
+                    {ritualBlessingText}
+                  </p>
+                )}
+              </div>
+
+              <button 
+                className="rpg-btn rpg-btn-mana"
+                style={{ borderColor: 'var(--color-relic-glow)', color: '#ffb813', fontSize: '1.05rem', padding: '10px 30px' }}
+                onClick={() => {
+                  setRitualModalOpen(false);
+                  setRitualFinished(false);
+                  setRitualBlessingText('');
+                }}
+              >
+                ✓ ПРИНЯТЬ БЛАГОСЛОВЕНИЕ И ВЕРНУТЬСЯ
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderHuntScreen = () => {
+    if (!huntModalOpen) return null;
+
+    const formattedTime = (secs) => {
+      const h = Math.floor(secs / 3600);
+      const m = Math.floor((secs % 3600) / 60);
+      const s = secs % 60;
+      return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    };
+
+    return (
+      <div 
+        className="gothic-modal-overlay" 
+        style={{ 
+          zIndex: 999999,
+          background: 'radial-gradient(circle, #0e0a05 0%, #020100 100%)'
+        }}
+      >
+        <div 
+          className="gothic-modal-content" 
+          style={{ 
+            maxWidth: '650px', 
+            width: '90%', 
+            border: '2px solid var(--color-blood-glow)',
+            boxShadow: '0 0 35px rgba(139, 26, 26, 0.4), inset 0 0 15px rgba(0,0,0,0.6)',
+            background: '#0a0605',
+            textAlign: 'center',
+            padding: '2.5rem'
+          }}
+        >
+          <h2 className="gothic-title" style={{ fontSize: '1.5rem', color: '#ffcc00', marginBottom: '1.5rem', textShadow: '0 0 10px rgba(255, 204, 0, 0.3)' }}>
+            🏹 ОХОТА НА УЗЫ ВРЕМЕНИ (ПОМОДОРО) 🏹
+          </h2>
+
+          {!huntIsRunning && !huntPayoutActive && (
+            <div className="animate-fade-in">
+              <p style={{ fontSize: '0.95rem', color: 'var(--color-bone-dim)', lineHeight: '1.5', marginBottom: '1.5rem', fontFamily: 'Georgia, serif' }}>
+                Охота на узы времени совмещает Pomodoro и Stopwatch со случайными Абсолютно Gritty приключениями в стиле Джо Аберкромби. Заработайте золото, мораль и тонны опыта!
+              </p>
+
+              <div style={{ background: 'rgba(0,0,0,0.4)', padding: '1.5rem', border: '1px solid rgba(255, 204, 0, 0.15)', borderRadius: '4px', marginBottom: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.9rem', color: 'var(--color-bone-dim)' }}>РЕЖИМ СЕАНСА:</span>
+                  <div style={{ display: 'flex', border: '1px solid var(--color-iron-light)', borderRadius: '4px', overflow: 'hidden' }}>
+                    <button 
+                      className={`rpg-btn ${huntMode === 'pomodoro' ? 'active' : ''}`}
+                      style={{ fontSize: '0.75rem', padding: '5px 12px', background: huntMode === 'pomodoro' ? 'rgba(255,204,0,0.2)' : 'transparent', color: huntMode === 'pomodoro' ? '#ffcc00' : 'var(--color-bone-dim)' }}
+                      onClick={() => setHuntMode('pomodoro')}
+                    >
+                      Расчет по времени
+                    </button>
+                    <button 
+                      className={`rpg-btn ${huntMode === 'stopwatch' ? 'active' : ''}`}
+                      style={{ fontSize: '0.75rem', padding: '5px 12px', background: huntMode === 'stopwatch' ? 'rgba(255,204,0,0.2)' : 'transparent', color: huntMode === 'stopwatch' ? '#ffcc00' : 'var(--color-bone-dim)' }}
+                      onClick={() => setHuntMode('stopwatch')}
+                    >
+                      Узы со временем
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.9rem', color: 'var(--color-bone-dim)' }}>ИНТЕРВАЛ ПРИВАЛА (МИН):</span>
+                  <select 
+                    className="rpg-input" 
+                    value={huntBreakInterval}
+                    onChange={(e) => setHuntBreakInterval(Number(e.target.value))}
+                    style={{ fontSize: '0.9rem', padding: '4px 10px', background: '#000', color: '#fff', border: '1px solid rgba(255,204,0,0.2)' }}
+                  >
+                    <option value="25">Перерыв каждые 25 мин</option>
+                    <option value="30">Перерыв каждые 30 мин</option>
+                    <option value="45">Перерыв каждые 45 мин</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+                <button className="rpg-btn" onClick={() => setHuntModalOpen(false)}>Отмена</button>
+                <button 
+                  className="rpg-btn"
+                  style={{ background: 'var(--color-blood)', borderColor: 'var(--color-blood-glow)', color: '#fff', fontWeight: 'bold' }}
+                  onClick={handleStartHunt}
+                >
+                  🏹 НАЧАТЬ ОХОТУ НА ВРЕМЯ
+                </button>
+              </div>
+            </div>
+          )}
+
+          {huntIsRunning && (
+            <div className="animate-fade-in">
+              {huntIsBreak ? (
+                <div 
+                  style={{ 
+                    background: 'radial-gradient(circle, #33201a 0%, #150d0a 100%)',
+                    border: '2px solid var(--color-relic-glow)', 
+                    padding: '1.5rem', 
+                    borderRadius: '4px',
+                    boxShadow: '0 8px 30px rgba(0,0,0,0.9), inset 0 0 15px rgba(255,184,19,0.15)',
+                    textAlign: 'left',
+                    marginBottom: '2rem'
+                  }}
+                >
+                  <h3 className="rpg-title" style={{ fontSize: '1.1rem', color: '#ffb813', borderBottom: '1px solid rgba(255,184,19,0.2)', paddingBottom: '0.5rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>⛺ Привал: {huntBreakEvent?.title || 'Отдых'}</span>
+                    <span style={{ fontSize: '0.85rem', color: '#2ed573' }}>🎁 +{huntBreakEvent?.xp} XP получен!</span>
+                  </h3>
+                  
+                  <p style={{ fontSize: '0.92rem', color: '#e6dfd3', lineHeight: '1.5', fontFamily: 'Georgia, serif', fontStyle: 'italic', marginBottom: '1.5rem' }}>
+                    {huntBreakEvent?.story}
+                  </p>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ fontSize: '1.25rem', fontFamily: 'var(--font-rpg)', color: '#ffd700' }}>
+                      Осталось на привале: {Math.floor(huntBreakTimeLeft / 60)}:{(huntBreakTimeLeft % 60).toString().padStart(2, '0')}
+                    </div>
+                    <button 
+                      className="rpg-btn"
+                      style={{ fontSize: '0.75rem', padding: '4px 12px' }}
+                      onClick={handleEndHuntBreak}
+                    >
+                      ⛺ СВЕРНУТЬ ПРИВАЛ ДОСРОЧНО
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div 
+                    style={{ 
+                      width: '180px', 
+                      height: '180px', 
+                      border: '3px solid var(--color-blood-glow)', 
+                      borderRadius: '50%', 
+                      margin: '0 auto 1.5rem auto', 
+                      display: 'flex', 
+                      justifyContent: 'center', 
+                      alignItems: 'center',
+                      background: 'rgba(0,0,0,0.6)',
+                      boxShadow: '0 0 20px rgba(139, 26, 26, 0.4)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--color-bone-dim)', textTransform: 'uppercase' }}>На охоте</span>
+                      <span style={{ fontSize: '2rem', fontFamily: 'var(--font-rpg)', color: '#fff', fontWeight: 'bold' }}>
+                        {formattedTime(huntTimeSpent)}
+                      </span>
+                      {huntMode === 'pomodoro' && (
+                        <span style={{ fontSize: '0.9rem', color: '#ffb813', fontWeight: 'bold', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '2px' }}>
+                          До привала: {Math.floor(huntTimerValue / 60)}:{(huntTimerValue % 60).toString().padStart(2, '0')}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <p style={{ fontSize: '0.9rem', color: 'var(--color-bone-dim)', fontStyle: 'italic', marginBottom: '2rem' }}>
+                    🏹 Вы выслеживаете прокрастинацию в густых зарослях времени... Оставайтесь сфокусированными!
+                  </p>
+
+                  <div style={{ display: 'flex', gap: '0.8rem', justifyContent: 'center' }}>
+                    <button 
+                      className="rpg-btn"
+                      style={{ background: 'rgba(255,184,19,0.08)', borderColor: 'var(--color-relic-glow)', color: '#ffb813' }}
+                      onClick={triggerHuntBreak}
+                    >
+                      ⛺ СТАРТОВАТЬ ПРИВАЛ ПОРАНЬШЕ
+                    </button>
+                    <button 
+                      className="rpg-btn rpg-btn-blood"
+                      onClick={() => setHuntPayoutActive(true)}
+                    >
+                      🏹 СВЕРНУТЬ ОХОТУ И РАЗДЕЛИТЬ ТРОФЕИ
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {huntPayoutActive && (
+            <div className="animate-fade-in" style={{ textAlign: 'left' }}>
+              <div style={{ background: 'rgba(0,0,0,0.5)', padding: '1.5rem', border: '1px solid var(--color-iron-light)', borderRadius: '4px', marginBottom: '1.5rem' }}>
+                <h3 className="gothic-title" style={{ fontSize: '1.05rem', color: '#ffb813', marginBottom: '0.8rem', textAlign: 'center' }}>
+                  💰 РАЗДЕЛ ТРОФЕЕВ БЕЗДНЫ 💰
+                </h3>
+                <p style={{ fontSize: '0.95rem', color: '#e6dfd3', lineHeight: '1.5', textAlign: 'center', marginBottom: '1rem', fontStyle: 'italic', fontFamily: 'Georgia, serif' }}>
+                  «Бездна пристально смотрит на плоды твоего труда, Путешественник...»
+                </p>
+                <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '0.8rem', fontSize: '0.85rem', color: 'var(--color-bone-dim)', textAlign: 'center' }}>
+                  Вы провели в сессии: <strong>{Math.floor(huntTimeSpent / 60)} мин</strong>. Укажите честный характер ваших трудов:
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div 
+                  className="rpg-panel" 
+                  style={{ padding: '1rem 1.5rem', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.05)', background: 'radial-gradient(circle, #100f13 0%, #060507 100%)' }}
+                  onClick={() => handleSelectHuntPayout('tasks')}
+                >
+                  <h4 className="rpg-title" style={{ color: '#2ed573', fontSize: '1.1rem', marginBottom: '4px' }}>
+                    🛡️ Я делал текущие задачи из Свитка Дел
+                  </h4>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)', lineHeight: '1.4' }}>
+                    Я работал над задачами, которые уже занесены в мой ежедневный свиток. (Награда: 0.25 от обычного опыта + Сила Духа для маны. Честно, без двойных начислений!).
+                  </p>
+                </div>
+
+                <div 
+                  className="rpg-panel" 
+                  style={{ padding: '1rem 1.5rem', cursor: 'pointer', border: '1px solid var(--color-relic-glow)', background: 'radial-gradient(circle, #2b1f0c 0%, #0e0a03 100%)' }}
+                  onClick={() => handleSelectHuntPayout('free_travel')}
+                >
+                  <h4 className="rpg-title" style={{ color: '#ffd700', fontSize: '1.1rem', marginBottom: '4px' }}>
+                    🏕️ Вольные путешествия, которые не удостоились летописи
+                  </h4>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)', lineHeight: '1.4' }}>
+                    Я занимался творчеством, уборкой, личными целями или неучтенными делами вне летописи. (Награда: Полное RPG золото, рост Морального компаса и куча опыта!).
+                  </p>
+                </div>
+
+                <button 
+                  className="rpg-btn" 
+                  style={{ alignSelf: 'center', marginTop: '0.5rem' }} 
+                  onClick={() => setHuntPayoutActive(false)}
+                >
+                  Вернуться к сессии
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // Intercept and render Battle Preparation Screen if prepTask is set
+  if (prepTask) {
+    return renderPreparationOverlay();
+  }
+
+  // Intercept and render Ritual Time Screen if ritualModalOpen is true
+  if (ritualModalOpen) {
+    return renderRitualScreen();
+  }
+
+  // Intercept and render Hunt Time Screen if huntModalOpen is true
+  if (huntModalOpen) {
+    return renderHuntScreen();
+  }
+
+  // Intercept and render Battle Preparation Screen if prepTask is set
+  if (prepTask) {
+    return renderPreparationOverlay();
+  }
+
   // HUB STAGE: "Текущий статус задач" (Tasks daily overview screen instead of forced text dump)
   if (setupStage === 'hub') {
     const todayStr = new Date().toISOString().split('T')[0];
@@ -3508,10 +4599,32 @@ if (setupStage === 'resolution') {
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
             <button 
               className="rpg-btn" 
+              style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px', borderColor: 'var(--color-blood-glow)', color: '#ffb813' }}
+              onClick={() => { playClick(); setHuntModalOpen(true); }}
+            >
+              🏹 Время Охоты
+            </button>
+            <button 
+              className="rpg-btn" 
+              style={{ 
+                fontSize: '0.8rem', 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '4px', 
+                borderColor: '#9b5de5', 
+                color: '#ff4d4d',
+                animation: ritualTimerActive && (ritualTimeLeft < ritualTimeTotal * 0.3) ? 'pulse-red 0.5s infinite alternate' : 'none'
+              }}
+              onClick={() => { playClick(); setRitualModalOpen(true); }}
+            >
+              🔮 Время Ритуала
+            </button>
+            <button 
+              className="rpg-btn" 
               style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}
               onClick={() => { playClick(); setMeditationSelectOpen(true); }}
             >
-              🎪 Войти в Лагерь (Медитация)
+              🎪 Войти в Лагерь
             </button>
             <button 
               className="rpg-btn" 

@@ -23,7 +23,9 @@ const getMoralCompassInfo = (moral) => {
 export default function CharacterSheet({ character, setCharacter, tasks, setTasks, requestDeconstruction, pedestals = [], savePedestals }) {
   const { playClick, playBoneCrack, playSuccess } = useAudio();
   const [selectedTask, setSelectedTask] = useState(null);
-  const [sheetTab, setSheetTab] = useState('sheet'); // sheet, pedestals
+  const [sheetTab, setSheetTab] = useState('sheet'); // sheet, pedestals, trophies
+  const [recapEnemyId, setRecapEnemyId] = useState(null);
+  const [pedestalPage, setPedestalPage] = useState(1);
   
   // Guided Deconstruction (ADHD Interview) States
   const [guidedModalOpen, setGuidedModalOpen] = useState(false);
@@ -252,11 +254,11 @@ export default function CharacterSheet({ character, setCharacter, tasks, setTask
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
       {/* Top Sheet Tabs */}
-      <div style={{ display: 'flex', gap: '5px', background: '#0a090c', padding: '3px', border: '1px solid var(--color-iron-light)', maxWidth: '420px', alignSelf: 'flex-start' }}>
+      <div style={{ display: 'flex', gap: '5px', background: '#0a090c', padding: '3px', border: '1px solid var(--color-iron-light)', width: '100%', alignSelf: 'flex-start' }}>
         <button 
           onClick={() => { playClick(); setSheetTab('sheet'); }}
           style={{
-            flex: 1, padding: '8px 15px', fontSize: '0.8rem', fontFamily: 'var(--font-rpg)', background: sheetTab === 'sheet' ? 'var(--color-iron)' : 'none',
+            flex: 1, padding: '8px 10px', fontSize: '0.78rem', fontFamily: 'var(--font-rpg)', background: sheetTab === 'sheet' ? 'var(--color-iron)' : 'none',
             border: 'none', color: sheetTab === 'sheet' ? 'var(--color-relic-glow)' : 'var(--color-bone-dim)', borderBottom: sheetTab === 'sheet' ? '2px solid var(--color-relic)' : 'none', cursor: 'pointer',
             fontWeight: 'bold'
           }}
@@ -264,18 +266,28 @@ export default function CharacterSheet({ character, setCharacter, tasks, setTask
           👤 ПЕРСОНАЖ & ЛАВКА
         </button>
         <button 
+          onClick={() => { playClick(); setSheetTab('trophies'); }}
+          style={{
+            flex: 1, padding: '8px 10px', fontSize: '0.78rem', fontFamily: 'var(--font-rpg)', background: sheetTab === 'trophies' ? 'var(--color-iron)' : 'none',
+            border: 'none', color: sheetTab === 'trophies' ? '#ff4d4d' : 'var(--color-bone-dim)', borderBottom: sheetTab === 'trophies' ? '2px solid #ff4d4d' : 'none', cursor: 'pointer',
+            fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center'
+          }}
+        >
+          ⚔️ ТРОФЕИ ({character.defeatedEnemies?.length || 0})
+        </button>
+        <button 
           onClick={() => { playClick(); setSheetTab('pedestals'); }}
           style={{
-            flex: 1, padding: '8px 15px', fontSize: '0.8rem', fontFamily: 'var(--font-rpg)', background: sheetTab === 'pedestals' ? 'var(--color-iron)' : 'none',
+            flex: 1, padding: '8px 10px', fontSize: '0.78rem', fontFamily: 'var(--font-rpg)', background: sheetTab === 'pedestals' ? 'var(--color-iron)' : 'none',
             border: 'none', color: sheetTab === 'pedestals' ? 'var(--color-mana-glow)' : 'var(--color-bone-dim)', borderBottom: sheetTab === 'pedestals' ? '2px solid var(--color-mana)' : 'none', cursor: 'pointer',
             fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center'
           }}
         >
-          🏛️ ЗАЛ ПЬЕДЕСТАЛОВ ({pedestals.length})
+          🏛️ ПЬЕДЕСТАЛЫ ({pedestals.length})
         </button>
       </div>
 
-      {sheetTab === 'sheet' ? (
+      {sheetTab === 'sheet' && (
         <div style={{ display: 'grid', gridTemplateColumns: '1.25fr 1.75fr', gap: '1.5rem' }}>
           {/* LEFT COLUMN: Character Paperdoll, Inventory Backpack, and Merchant Shop */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -592,9 +604,79 @@ export default function CharacterSheet({ character, setCharacter, tasks, setTask
         </div>
       </div>
 
-
         </div>
-      ) : (
+      )}
+
+      {sheetTab === 'trophies' && (
+        <div className="rpg-panel" style={{ background: 'radial-gradient(circle, #120e15 0%, #050306 100%)', border: '2px solid var(--color-relic-glow)', padding: '1.5rem' }}>
+          <h2 className="gothic-title" style={{ fontSize: '1.6rem', color: 'var(--color-relic-glow)', textAlign: 'center', marginBottom: '1rem' }}>
+            ⚔️ Бестиарий Побежденных Врагов
+          </h2>
+          <p style={{ color: 'var(--color-bone-dim)', fontSize: '0.82rem', textAlign: 'center', maxWidth: '600px', margin: '0 auto 1.5rem auto', lineHeight: '1.4', fontStyle: 'italic' }}>
+            Каждая поверженная тварь — это запечатанный контракт, преодоленный страх провала или прорванная осада апатии. Ваш клинок помнит каждого из них...
+          </p>
+
+          {(!character.defeatedEnemies || character.defeatedEnemies.length === 0) ? (
+            <div style={{ border: '1px dashed #4a3e31', padding: '2rem', textAlign: 'center', background: 'rgba(0,0,0,0.2)', maxWidth: '450px', margin: '0 auto' }}>
+              <Skull size={32} style={{ color: 'var(--color-iron-light)', marginBottom: '0.8rem' }} />
+              <p style={{ fontSize: '0.85rem', color: 'var(--color-bone-dim)', fontStyle: 'italic', margin: 0 }}>
+                Ваша сталь еще не омыта кровью когнитивных тварей. Начните квест в Походном Штабе, чтобы одолеть своего первого врага!
+              </p>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+              {[...character.defeatedEnemies].reverse().map((enemy) => (
+                <div 
+                  key={enemy.id}
+                  style={{
+                    background: '#0a080d',
+                    border: '1px solid var(--color-iron-light)',
+                    borderLeft: `3px solid ${enemy.type === 'siege' ? 'var(--color-blood)' : 'var(--color-relic)'}`,
+                    padding: '1rem',
+                    boxShadow: '0 4px 10px rgba(0,0,0,0.6)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.6rem',
+                    transition: 'transform 0.2s',
+                    position: 'relative'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-3px)'}
+                  onMouseLeave={(e) => e.currentTarget.style.transform = 'none'}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <span style={{ fontSize: '1.5rem' }}>{enemy.icon}</span>
+                      <h4 className="gothic-title" style={{ fontSize: '1rem', color: enemy.type === 'siege' ? 'var(--color-blood-glow)' : 'var(--color-relic-glow)', margin: 0 }}>
+                        {enemy.name}
+                      </h4>
+                    </div>
+                    <span style={{ fontSize: '0.65rem', background: 'rgba(255,255,255,0.05)', padding: '2px 6px', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--color-bone-dim)' }}>
+                      {enemy.nature === 'internal' ? '🧿 Обет' : '⚔️ Схватка'}
+                    </span>
+                  </div>
+
+                  <div style={{ fontSize: '0.72rem', color: 'var(--color-bone-dim)', borderTop: '1px dashed rgba(255,255,255,0.05)', paddingTop: '0.4rem' }}>
+                    • Контракт: <b>«{enemy.taskTitle}»</b>
+                  </div>
+                  <div style={{ fontSize: '0.68rem', color: 'var(--color-iron-light)' }}>
+                    Побежден: {enemy.defeatedAt}
+                  </div>
+
+                  <button 
+                    className="rpg-btn"
+                    style={{ fontSize: '0.7rem', padding: '4px 0', width: '100%', border: '1px solid #4a3e31', background: 'none' }}
+                    onClick={() => { playClick(); setRecapEnemyId(enemy.id); }}
+                  >
+                    📜 Рекап квеста и Летопись
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {sheetTab === 'pedestals' && (
         /* Persistent Hall of Pedestals (Legends Gallery) */
         <div className="rpg-panel" style={{ background: 'radial-gradient(circle, #0e0a0f 0%, #050406 100%)', border: '2px solid var(--color-relic-glow)', padding: '2rem' }}>
           <h2 className="gothic-title" style={{ fontSize: '1.8rem', color: 'var(--color-relic-glow)', textAlign: 'center', marginBottom: '1.5rem', letterSpacing: '0.1em' }}>
@@ -745,88 +827,120 @@ export default function CharacterSheet({ character, setCharacter, tasks, setTask
                       })}
                     </div>
 
-                    {rest.length > 0 && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
-                        <div style={{ borderBottom: '1px dashed var(--color-iron-light)', paddingBottom: '0.5rem', textAlign: 'left' }}>
-                          <h4 className="gothic-title" style={{ fontSize: '1.2rem', color: 'var(--color-bone-dim)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                            ⚓ ДРУГИЕ ДУХИ БЕЗДНЫ (ПАВШИЕ ИЛИ ВОЗНЕСШИЕСЯ)
-                          </h4>
-                          <span style={{ fontSize: '0.68rem', color: 'var(--color-iron-light)' }}>Упорядочены по очкам славы и заслугам</span>
-                        </div>
+                    {rest.length > 0 && (() => {
+                      const pedestalsPerPage = 3;
+                      const totalPedestalPages = Math.ceil(rest.length / pedestalsPerPage);
+                      const displayedRest = rest.slice((pedestalPage - 1) * pedestalsPerPage, pedestalPage * pedestalsPerPage);
+                      
+                      return (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
+                          <div style={{ borderBottom: '1px dashed var(--color-iron-light)', paddingBottom: '0.5rem', textAlign: 'left' }}>
+                            <h4 className="gothic-title" style={{ fontSize: '1.2rem', color: 'var(--color-bone-dim)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                              ⚓ ЛЕТОПИСЬ ИЗГНАННИКОВ (ДРУГИЕ ДУХИ)
+                            </h4>
+                            <span style={{ fontSize: '0.68rem', color: 'var(--color-iron-light)' }}>Упорядочены по очкам славы и заслугам</span>
+                          </div>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
-                          {rest.map((legend, idx) => {
-                            const isStained = legend.legacyStatus === 'stained';
-                            const cardBorder = isStained 
-                              ? 'linear-gradient(to bottom, #cf142b, #8b0000, #220000) 1'
-                              : 'linear-gradient(to bottom, #d4af37, #aa820a, #1a1505) 1';
-                            const cardShadow = isStained
-                              ? '0 5px 15px rgba(139,0,0,0.3), inset 0 0 10px rgba(139,0,0,0.05)'
-                              : '0 5px 15px rgba(0,0,0,0.6), inset 0 0 10px rgba(212,175,55,0.02)';
-                            const icon = isStained ? '☠️' : '☀️';
-                            const label = isStained ? 'ЗАПЯТНАННОЕ ИМЯ' : `ЛЕГЕНДА #${idx + 4}`;
-                            const titleColor = isStained ? '#ff4d4d' : '#ffb813';
-                            const scrollBg = isStained
-                              ? 'radial-gradient(circle, #1c0e0e 0%, #0d0505 100%)'
-                              : 'radial-gradient(circle, #1a1613 0%, #0d0b09 100%)';
-                            const scrollBorder = isStained ? '#5c1a1a' : '#4a3e31';
-                            const scrollText = isStained ? '#dfc5c5' : '#cbbba5';
-                            const scrollTitleColor = isStained ? '#ff4d4d' : '#ffb813';
-                            const scrollTitle = isStained ? '📜 Печать Тлена / Летопись Падения:' : '📜 Летопись Искупления ИИ:';
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                            {displayedRest.map((legend, idx) => {
+                              const globalIdx = (pedestalPage - 1) * pedestalsPerPage + idx;
+                              const isStained = legend.legacyStatus === 'stained';
+                              const cardBorder = isStained 
+                                ? 'linear-gradient(to bottom, #cf142b, #8b0000, #220000) 1'
+                                : 'linear-gradient(to bottom, #d4af37, #aa820a, #1a1505) 1';
+                              const cardShadow = isStained
+                                ? '0 5px 15px rgba(139,0,0,0.3), inset 0 0 10px rgba(139,0,0,0.05)'
+                                : '0 5px 15px rgba(0,0,0,0.6), inset 0 0 10px rgba(212,175,55,0.02)';
+                              const icon = isStained ? '☠️' : '☀️';
+                              const label = isStained ? 'ЗАПЯТНАННОЕ ИМЯ' : `ЛЕГЕНДА #${globalIdx + 4}`;
+                              const titleColor = isStained ? '#ff4d4d' : '#ffb813';
+                              const scrollBg = isStained
+                                ? 'radial-gradient(circle, #1c0e0e 0%, #0d0505 100%)'
+                                : 'radial-gradient(circle, #1a1613 0%, #0d0b09 100%)';
+                              const scrollBorder = isStained ? '#5c1a1a' : '#4a3e31';
+                              const scrollText = isStained ? '#dfc5c5' : '#cbbba5';
+                              const scrollTitleColor = isStained ? '#ff4d4d' : '#ffb813';
+                              const scrollTitle = isStained ? '📜 Печать Тлена / Летопись Падения:' : '📜 Летопись Искупления ИИ:';
 
-                            return (
-                              <div 
-                                key={idx} 
-                                style={{
-                                  background: '#0a080c',
-                                  border: '2px solid',
-                                  borderImage: cardBorder,
-                                  padding: '1.2rem',
-                                  boxShadow: cardShadow,
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  gap: '0.8rem'
-                                }}
-                              >
-                                <div style={{ borderBottom: '1px solid ' + (isStained ? '#5c1a1a' : '#4a3e31'), paddingBottom: '0.6rem' }}>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <span style={{ fontSize: '1.2rem' }}>{icon}</span>
-                                    <span style={{ fontSize: '0.7rem', color: titleColor, fontFamily: 'var(--font-rpg)', fontWeight: 'bold' }}>{label}</span>
-                                  </div>
-                                  <h3 className="gothic-title" style={{ fontSize: '1.15rem', color: titleColor, marginTop: '4px', margin: 0 }}>
-                                    {legend.name}
-                                  </h3>
-                                  {legend.nickname && (
-                                    <div style={{ fontSize: '0.68rem', color: 'var(--color-bone-dim)', fontStyle: 'italic', marginTop: '1px' }}>
-                                      «{legend.nickname}»
+                              return (
+                                <div 
+                                  key={idx} 
+                                  style={{
+                                    background: '#0a080c',
+                                    border: '2px solid',
+                                    borderImage: cardBorder,
+                                    padding: '1.2rem',
+                                    boxShadow: cardShadow,
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '0.8rem'
+                                  }}
+                                >
+                                  <div style={{ borderBottom: '1px solid ' + (isStained ? '#5c1a1a' : '#4a3e31'), paddingBottom: '0.6rem' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                      <span style={{ fontSize: '1.2rem' }}>{icon}</span>
+                                      <span style={{ fontSize: '0.7rem', color: titleColor, fontFamily: 'var(--font-rpg)', fontWeight: 'bold' }}>{label}</span>
                                     </div>
-                                  )}
-                                  <div style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginTop: '4px' }}>
-                                    {legend.race} • {legend.class} • <b>Уровень {legend.level}</b>
+                                    <h3 className="gothic-title" style={{ fontSize: '1.15rem', color: titleColor, marginTop: '4px', margin: 0 }}>
+                                      {legend.name}
+                                    </h3>
+                                    {legend.nickname && (
+                                      <div style={{ fontSize: '0.68rem', color: 'var(--color-bone-dim)', fontStyle: 'italic', marginTop: '1px' }}>
+                                        «{legend.nickname}»
+                                      </div>
+                                    )}
+                                    <div style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', marginTop: '4px' }}>
+                                      {legend.race} • {legend.class} • <b>Уровень {legend.level}</b>
+                                    </div>
+                                  </div>
+
+                                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.4rem', fontSize: '0.7rem', color: 'var(--color-bone-dim)', background: 'rgba(0,0,0,0.3)', padding: '6px', border: '1px solid var(--color-iron-light)', textAlign: 'left' }}>
+                                    <div>📜 Квесты: <b>{legend.completedTasksCount || 0} шт</b></div>
+                                    <div>👹 Боссы: <b>{legend.completedSiegesCount || 0} шт</b></div>
+                                    <div>🪙 Золото: <b>{legend.totalGoldEarned || 0}</b></div>
+                                    <div>🔮 Ур: <b>{legend.level || 1}</b></div>
+                                  </div>
+
+                                  <div style={{ background: scrollBg, border: '1px solid ' + scrollBorder, padding: '0.8rem', color: scrollText, textAlign: 'left' }}>
+                                    <h4 style={{ fontSize: '0.75rem', fontFamily: 'var(--font-rpg)', borderBottom: '1px solid ' + (isStained ? '#441414' : '#33281e'), paddingBottom: '3px', marginBottom: '6px', color: scrollTitleColor, textTransform: 'uppercase', margin: 0 }}>
+                                      {scrollTitle}
+                                    </h4>
+                                    <div style={{ fontSize: '0.7rem', lineHeight: '1.35', overflowY: 'auto', maxHeight: '100px', textAlign: 'justify', whiteSpace: 'pre-line' }} className="rpg-scrollbar">
+                                      {legend.pedestalEulogy}
+                                    </div>
                                   </div>
                                 </div>
+                              );
+                            })}
+                          </div>
 
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.4rem', fontSize: '0.7rem', color: 'var(--color-bone-dim)', background: 'rgba(0,0,0,0.3)', padding: '6px', border: '1px solid var(--color-iron-light)', textAlign: 'left' }}>
-                                  <div>📜 Квесты: <b>{legend.completedTasksCount || 0} шт</b></div>
-                                  <div>👹 Боссы: <b>{legend.completedSiegesCount || 0} шт</b></div>
-                                  <div>🪙 Золото: <b>{legend.totalGoldEarned || 0}</b></div>
-                                  <div>🔮 Ур: <b>{legend.level || 1}</b></div>
-                                </div>
-
-                                <div style={{ background: scrollBg, border: '1px solid ' + scrollBorder, padding: '0.8rem', color: scrollText, textAlign: 'left' }}>
-                                  <h4 style={{ fontSize: '0.75rem', fontFamily: 'var(--font-rpg)', borderBottom: '1px solid ' + (isStained ? '#441414' : '#33281e'), paddingBottom: '3px', marginBottom: '6px', color: scrollTitleColor, textTransform: 'uppercase', margin: 0 }}>
-                                    {scrollTitle}
-                                  </h4>
-                                  <div style={{ fontSize: '0.7rem', lineHeight: '1.35', overflowY: 'auto', maxHeight: '100px', textAlign: 'justify', whiteSpace: 'pre-line' }} className="rpg-scrollbar">
-                                    {legend.pedestalEulogy}
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
+                          {/* Pagination Controls */}
+                          {totalPedestalPages > 1 && (
+                            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem', marginTop: '1.5rem' }}>
+                              <button 
+                                className="rpg-btn" 
+                                disabled={pedestalPage === 1}
+                                onClick={() => { playClick(); setPedestalPage(prev => Math.max(1, prev - 1)); }}
+                                style={{ opacity: pedestalPage === 1 ? 0.4 : 1, padding: '4px 12px', fontSize: '0.8rem' }}
+                              >
+                                ◀ Прошлое
+                              </button>
+                              <span style={{ fontSize: '0.85rem', color: 'var(--color-bone-dim)', fontFamily: 'var(--font-rpg)' }}>
+                                Свиток {pedestalPage} из {totalPedestalPages}
+                              </span>
+                              <button 
+                                className="rpg-btn" 
+                                disabled={pedestalPage === totalPedestalPages}
+                                onClick={() => { playClick(); setPedestalPage(prev => Math.min(totalPedestalPages, prev + 1)); }}
+                                style={{ opacity: pedestalPage === totalPedestalPages ? 0.4 : 1, padding: '4px 12px', fontSize: '0.8rem' }}
+                              >
+                                Будущее ▶
+                              </button>
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    )}
+                      );
+                    })()}
                   </div>
                 );
               })()}
@@ -844,6 +958,110 @@ export default function CharacterSheet({ character, setCharacter, tasks, setTask
           )}
         </div>
       )}
+
+      {/* QUEST RECAP PARCHMENT MODAL */}
+      {recapEnemyId && (() => {
+        const enemy = character.defeatedEnemies?.find(e => e.id === recapEnemyId);
+        if (!enemy) return null;
+        return (
+          <div className="gothic-modal-overlay animate-fade-in" style={{ zIndex: 110000 }}>
+            <div className="parchment-contract" style={{
+              maxWidth: '600px',
+              width: '94%',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              padding: '2rem',
+              position: 'relative',
+              background: '#eeddbb',
+              color: '#2a1a08',
+              boxShadow: '0 10px 40px rgba(0, 0, 0, 0.9)',
+              borderRadius: '4px',
+              border: '3px double #5c4033'
+            }}>
+              <div className="dagger-pin" style={{ top: '-15px' }} />
+              
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #5c4033', paddingBottom: '0.5rem', marginBottom: '1rem' }}>
+                <h3 className="gothic-title" style={{ fontSize: '1.25rem', color: '#5c4033', margin: 0, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <span>{enemy.icon}</span>
+                  <span>Летопись Победы над «{enemy.name}»</span>
+                </h3>
+                <button 
+                  className="rpg-btn" 
+                  style={{
+                    background: '#5c4033',
+                    color: '#eeddbb',
+                    borderColor: '#2a1a08',
+                    padding: '2px 8px',
+                    fontSize: '0.75rem'
+                  }}
+                  onClick={() => { playClick(); setRecapEnemyId(null); }}
+                >
+                  Закрыть
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', fontFamily: 'Georgia, serif' }}>
+                <div style={{ fontSize: '0.9rem', color: '#4a321f', borderBottom: '1px dashed rgba(92,64,51,0.3)', paddingBottom: '0.5rem' }}>
+                  <b>Контракт:</b> «{enemy.taskTitle}» <br />
+                  <b>Время сражения:</b> {enemy.estimatedTime} минут <br />
+                  <b>Характер Скверны:</b> {enemy.nature === 'internal' ? 'Внутренний Обет' : 'Внешняя Схватка'} ({enemy.type === 'siege' ? 'Осада' : enemy.type === 'relic' ? 'Реликвия' : 'Охота'})
+                </div>
+
+                <div>
+                  <h4 style={{ fontSize: '0.9rem', color: '#5c4033', fontWeight: 'bold', margin: '0 0 6px 0' }}>✓ Пройденные шаги:</h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', background: 'rgba(0,0,0,0.03)', padding: '8px', border: '1px solid rgba(92,64,51,0.2)' }}>
+                    {enemy.steps && enemy.steps.length > 0 ? (
+                      enemy.steps.map((step, idx) => (
+                        <div key={idx} style={{ display: 'flex', gap: '6px', alignItems: 'flex-start', fontSize: '0.82rem', lineHeight: '1.3' }}>
+                          <span>{step.completed ? '☑' : '☐'}</span>
+                          <span style={{ textDecoration: step.completed ? 'none' : 'line-through', opacity: step.completed ? 1 : 0.6 }}>
+                            {step.title}
+                          </span>
+                        </div>
+                      ))
+                    ) : (
+                      <div style={{ fontStyle: 'italic', fontSize: '0.8rem', color: '#5c4033' }}>Шаги не зафиксированы.</div>
+                    )}
+                  </div>
+                </div>
+
+                <div style={{ borderTop: '1px solid #5c4033', paddingTop: '0.8rem', marginTop: '0.4rem' }}>
+                  <h4 style={{ fontSize: '0.9rem', color: '#5c4033', fontWeight: 'bold', margin: '0 0 6px 0', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    📜 Свиток Летописца Бездны:
+                  </h4>
+                  <p style={{
+                    fontSize: '0.88rem',
+                    lineHeight: '1.5',
+                    color: '#221408',
+                    fontStyle: 'italic',
+                    margin: 0,
+                    whiteSpace: 'pre-line',
+                    textAlign: 'justify'
+                  }}>
+                    {enemy.aiChronicle || "«Летопись этого сражения затерялась во времени Бездны. Но духи шепчут о величии твоего подвига...»"}
+                  </p>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1.5rem' }}>
+                <button 
+                  className="rpg-btn" 
+                  style={{
+                    background: '#5c4033',
+                    color: '#eeddbb',
+                    borderColor: '#2a1a08',
+                    padding: '6px 20px',
+                    fontSize: '0.85rem'
+                  }}
+                  onClick={() => { playClick(); setRecapEnemyId(null); }}
+                >
+                  Да будет так
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

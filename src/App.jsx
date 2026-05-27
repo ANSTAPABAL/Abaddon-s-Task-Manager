@@ -673,6 +673,7 @@ export default function App() {
 4. "weakPoints": массив из 2 инсайтов о психологических и поведенческих слабостях этого врага/задачи (например: ["Монстр боится правила 5 минут...", "Враг слеп к вашей активности..."]).
 5. "randomEvent": жуткое или допаминовое случайное событие-модификатор боя (например: "Густой туман Бездны скрывает шкалу здоровья", "Допаминовая вспышка: удвоенный опыт за этот бой!", "Скрежет цепей ускоряет таймер страха").
 6. "deadline": найди в тексте пользователя срок выполнения, дедлайн, время или день (например: "до среды", "до 18:00", "завтра утром", "до конца дня"), извлеки его и кратко запиши (например: "Среда", "18:00", "Завтра"). Если срок в тексте не упомянут или не ясен, запиши null.
+7. "estimatedTime": ОБЯЗАТЕЛЬНО проанализируй текст на наличие времени (например, "займет полчаса", "буду делать 45 минут", "делать 2 часа"). Если пользователь указал реальное время, переведи его в минуты (например, 30, 45, 120) и запиши. Если пользователь написал что-то примерное ("примерно часок", "полдня", "минут сорок") или написал "не знаю", или вообще не указал время, ты ДОЛЖЕН рассчитать и подставить реалистичное среднее время (например, 25-30 минут для простых задач "hunt", 45-60 минут для интеллектуальных "relic", 90-120 минут для сложных "siege" и Осад). Поле "estimatedTime" всегда должно быть числом (минуты) и никогда не null или undefined!
 
 ТЕКУЩИЙ КОНТЕКСТ ВРЕМЕНИ И ОШИБОК (АНАЛИЗ И ОБУЧЕНИЕ):
 - Текущее время постановки задач: ${new Date().toLocaleTimeString()} (Час: ${currentHour}).
@@ -1290,10 +1291,10 @@ ${contextPrompt}`;
                   e.currentTarget.style.borderColor = '#1db954';
                 }}
               >
-                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🌅</div>
-                <h3 className="gothic-title" style={{ fontSize: '1.25rem', color: '#1db954', marginBottom: '0.8rem' }}>Свободный Переход</h3>
+                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🎯</div>
+                <h3 className="gothic-title" style={{ fontSize: '1.25rem', color: '#1db954', marginBottom: '0.8rem' }}>До Дедлайна</h3>
                 <p style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)', lineHeight: '1.4' }}>
-                  Путь созерцания. Без ограничения по времени и урона. Вычеркивайте шаги в свободном ритме в течение дня, духи не торопят вас.
+                  Путь созерцания. Без ограничения по времени и урона. Вычеркивайте шаги в свободном ритме до наступления дедлайна, духи не торопят вас.
                 </p>
               </div>
 
@@ -1521,9 +1522,12 @@ ${contextPrompt}`;
                     onClick={() => {
                       playClick();
                       const task = judgmentTasks[judgmentIndex];
+                      const isSurvival = task.isSurvival || false;
                       const isSiege = task.type === 'siege';
-                      const exp = isSiege ? 60 : 25;
-                      const gold = isSiege ? 15 : 5;
+                      const baseExp = isSiege ? 60 : 25;
+                      const baseGold = isSiege ? 15 : 5;
+                      const exp = baseExp * (isSurvival ? 2 : 1);
+                      const gold = baseGold * (isSurvival ? 2 : 1);
 
                        // Complete task
                       setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: 'completed' } : t));
@@ -1566,12 +1570,15 @@ ${contextPrompt}`;
                     style={{ background: '#e74c3c', color: '#fff', borderColor: '#c0392b', padding: '8px 25px' }}
                     onClick={() => {
                       playClick();
+                      const task = judgmentTasks[judgmentIndex];
+                      const isSurvival = task?.isSurvival || false;
+                      const hpPenalty = isSurvival ? 30 : 10;
                       // HP damage and Moral Compass loss
                       setCharacter(c => ({
                         ...c,
-                        hp: Math.max(10, c.hp - 10),
+                        hp: Math.max(1, c.hp - hpPenalty),
                         moralCompass: Math.max(0, (c.moralCompass || 50) - 10),
-                        totalHpSacrificed: (c.totalHpSacrificed || 0) + 10
+                        totalHpSacrificed: (c.totalHpSacrificed || 0) + hpPenalty
                       }));
                       setJudgmentShowReschedule(true);
                     }}
@@ -1583,7 +1590,7 @@ ${contextPrompt}`;
             ) : (
               <div>
                 <p style={{ fontSize: '0.95rem', color: '#8b0000', marginBottom: '1.5rem', fontWeight: 'bold' }}>
-                  💥 Вы теряете 10 HP здоровья разума! <br />
+                  💥 Вы теряете {judgmentTasks[judgmentIndex]?.isSurvival ? 30 : 10} HP здоровья разума! <br />
                   Куда перенесем этот оскверненный контракт?
                 </p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>

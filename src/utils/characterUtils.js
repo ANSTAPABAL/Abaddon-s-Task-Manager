@@ -173,7 +173,8 @@ export function rollStartingCharacter(pedestals = []) {
     totalHpSacrificed: 0,
     potionsDrunk: 0,
     meditationsCount: 0,
-    biography: [startingBio]
+    biography: [startingBio],
+    defeatedEnemies: []
   };
 }
 
