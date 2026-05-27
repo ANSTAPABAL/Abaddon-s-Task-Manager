@@ -4393,7 +4393,7 @@ if (setupStage === 'resolution') {
           }}
         >
           <h2 className="gothic-title" style={{ fontSize: '1.5rem', color: '#ffcc00', marginBottom: '1.5rem', textShadow: '0 0 10px rgba(255, 204, 0, 0.3)' }}>
-            🏹 ОХОТА 🏹
+            ОХОТА
           </h2>
 
           {!huntIsRunning && !huntPayoutActive && (
