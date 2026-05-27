@@ -336,6 +336,8 @@ export default function CarriageSession({
   const [editNature, setEditNature] = useState('external');
   const [editExecutionMode, setEditExecutionMode] = useState('ask_later');
   const [editDeconstructLoading, setEditDeconstructLoading] = useState(false);
+  const [editAiEditPrompt, setEditAiEditPrompt] = useState('');
+  const [editAiEditActive, setEditAiEditActive] = useState(false);
 
   // Guided Deconstruction (ADHD Interview) States inside Edit Modal
   const [guidedStep, setGuidedStep] = useState(0); // 0 = default, 1 = answering questions, 2 = done
@@ -743,6 +745,8 @@ ${legacyPromptContext}
     setEditExecutionMode(task.executionMode || 'ask_later');
     setGuidedStep(0);
     setGuidedAnswers({});
+    setEditAiEditPrompt('');
+    setEditAiEditActive(false);
   };
 
   const handleSaveEdit = () => {
@@ -880,6 +884,49 @@ ${legacyPromptContext}
       playSuccess();
     } catch (e) {
       alert("Ошибка ритуала: " + e.message);
+    } finally {
+      setEditDeconstructLoading(false);
+    }
+  };
+
+  const handleEditAiEditSubmit = async () => {
+    if (!editTitle.trim() || !editAiEditPrompt.trim()) return;
+    setEditDeconstructLoading(true);
+    playClick();
+    try {
+      const stepTitles = editSteps.map(s => s.title);
+      const prompt = `Пользователь хочет скорректировать задачу: «${editTitle}» с текущими шагами: ${stepTitles.length > 0 ? stepTitles.join(', ') : 'нет'}.
+Инструкция пользователя по изменению: «${editAiEditPrompt}».
+Перепиши название задачи и её шаги на основе этой инструкции. Выведи ответ строго в формате JSON:
+{
+  "title": "Новое название задачи",
+  "steps": ["шаг 1", "шаг 2", ...]
+}`;
+      const response = await fetch('http://localhost:3001/api/ai/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: [{ role: 'user', content: prompt }] })
+      });
+      if (!response.ok) throw new Error('AI Tunnel offline');
+      const data = await response.json();
+      let cleanedText = data.choices[0].message.content.trim();
+      if (cleanedText.startsWith("```json")) cleanedText = cleanedText.slice(7);
+      if (cleanedText.endsWith("```")) cleanedText = cleanedText.slice(0, -3);
+      const parsed = JSON.parse(cleanedText.trim());
+      if (parsed.steps) {
+        setEditTitle(parsed.title || editTitle);
+        const generated = parsed.steps.map((s, idx) => ({
+          id: `step-${idx}-${Date.now()}`,
+          title: s,
+          completed: false
+        }));
+        setEditSteps(generated);
+        setEditAiEditActive(false);
+        setEditAiEditPrompt('');
+        playSuccess();
+      }
+    } catch (e) {
+      alert("Не удалось отредактировать через ИИ: " + e.message);
     } finally {
       setEditDeconstructLoading(false);
     }
@@ -2557,7 +2604,50 @@ ${qaText}
                   >
                     🔮 С СОПРОВОЖДЕНИЕМ
                   </button>
+                  <button 
+                    className={`rpg-btn ${editAiEditActive ? 'active' : ''}`}
+                    style={{ 
+                      flex: 1, 
+                      fontSize: '0.8rem', 
+                      padding: '6px 0',
+                      border: editAiEditActive ? '1px solid var(--color-relic-glow)' : '1px solid var(--color-iron-light)'
+                    }} 
+                    onClick={() => {
+                      playClick();
+                      setEditAiEditActive(!editAiEditActive);
+                    }}
+                    disabled={editDeconstructLoading}
+                  >
+                    🪄 КОРРЕКТИРОВАТЬ ИИ
+                  </button>
                 </div>
+
+                {editAiEditActive && (
+                  <div style={{ marginTop: '0.8rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-bone-dim)' }}>
+                      УКАЖИТЕ ИНСТРУКЦИИ ДЛЯ ИЗМЕНЕНИЯ ШАГОВ / НАЗВАНИЯ:
+                    </label>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <input 
+                        type="text" 
+                        className="rpg-input" 
+                        style={{ flex: 1, fontSize: '0.85rem' }} 
+                        placeholder="Например: перепиши шаги на английском / добавь тестирование..."
+                        value={editAiEditPrompt}
+                        onChange={(e) => setEditAiEditPrompt(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleEditAiEditSubmit()}
+                        disabled={editDeconstructLoading}
+                      />
+                      <button 
+                        className="rpg-btn rpg-btn-mana" 
+                        onClick={handleEditAiEditSubmit}
+                        disabled={!editAiEditPrompt.trim() || editDeconstructLoading}
+                      >
+                        🔮 ИЗМЕНИТЬ
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* 4. Manual steps manipulation */}
