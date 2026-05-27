@@ -4552,15 +4552,12 @@ if (setupStage === 'resolution') {
                     }}
                   >
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', textTransform: 'uppercase', letterSpacing: '1px' }}>Охота</span>
-                      <span style={{ fontSize: '2rem', fontFamily: 'var(--font-rpg)', color: '#fff', fontWeight: 'bold' }}>
-                        {formattedTime(huntTimeSpent)}
+                      <span style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                        {huntMode === 'pomodoro' ? 'Поиск добычи' : 'Охота'}
                       </span>
-                      {huntMode === 'pomodoro' && (
-                        <span style={{ fontSize: '0.85rem', color: '#ffb813', fontWeight: 'bold', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '2px' }}>
-                          Поиск добычи: {Math.floor(huntTimerValue / 60)}:{(huntTimerValue % 60).toString().padStart(2, '0')}
-                        </span>
-                      )}
+                      <span style={{ fontSize: '2rem', fontFamily: 'var(--font-rpg)', color: '#fff', fontWeight: 'bold' }}>
+                        {huntMode === 'pomodoro' ? formattedTime(huntTimerValue) : formattedTime(huntTimeSpent)}
+                      </span>
                     </div>
                   </div>
 
