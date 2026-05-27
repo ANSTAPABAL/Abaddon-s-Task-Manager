@@ -1207,9 +1207,11 @@ ${legacyPromptContext}
     setHuntIsBreak(false);
     setHuntBreakEvent(null);
     setHuntPayoutActive(false);
+    setHuntTimeSpent(0);
+    setHuntLastBreakCheckpoint(0);
     
     if (huntMode === 'pomodoro') {
-      setHuntTimerValue(huntBreakInterval * 60);
+      setHuntTimerValue(Math.min(30, huntBreakInterval) * 60);
     }
   };
 
@@ -1249,7 +1251,8 @@ ${legacyPromptContext}
     setHuntIsBreak(false);
     setHuntBreakEvent(null);
     if (huntMode === 'pomodoro') {
-      setHuntTimerValue(huntBreakInterval * 60);
+      const remainingWorkSecs = (huntBreakInterval * 60) - huntTimeSpent;
+      setHuntTimerValue(Math.min(30 * 60, Math.max(0, remainingWorkSecs)));
     }
   };
 
@@ -1347,24 +1350,41 @@ ${legacyPromptContext}
         }
       } else {
         timerId = setInterval(() => {
-          setHuntTimeSpent(prev => prev + 1);
+          let nextSpent = 0;
+          setHuntTimeSpent(prev => {
+            nextSpent = prev + 1;
+            
+            // Check if total selected duration is reached
+            if (nextSpent >= huntBreakInterval * 60) {
+              setTimeout(() => {
+                setHuntIsRunning(false);
+                setHuntPayoutActive(true);
+              }, 0);
+            }
+            
+            // Check for break in stopwatch mode
+            if (huntMode === 'stopwatch') {
+              const diff = nextSpent - huntLastBreakCheckpoint;
+              if (diff >= 30 * 60) {
+                setTimeout(() => triggerHuntBreak(), 0);
+              }
+            }
+            
+            return nextSpent;
+          });
+          
           setHuntTimeTotal(prev => prev + 1);
 
           if (huntMode === 'pomodoro') {
             setHuntTimerValue(prev => {
               if (prev <= 1) {
-                setTimeout(() => triggerHuntBreak(), 0);
+                // Trigger break only if we haven't reached the end of the total session yet
+                if (nextSpent < huntBreakInterval * 60) {
+                  setTimeout(() => triggerHuntBreak(), 0);
+                }
                 return 0;
               }
               return prev - 1;
-            });
-          } else {
-            setHuntTimeSpent(currentSpent => {
-              const diff = currentSpent - huntLastBreakCheckpoint;
-              if (diff >= huntBreakInterval * 60) {
-                setTimeout(() => triggerHuntBreak(), 0);
-              }
-              return currentSpent;
             });
           }
         }, 1000);
