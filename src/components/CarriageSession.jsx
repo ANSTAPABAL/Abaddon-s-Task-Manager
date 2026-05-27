@@ -4363,7 +4363,7 @@ if (setupStage === 'resolution') {
           {!huntIsRunning && !huntPayoutActive && (
             <div className="animate-fade-in">
               <p style={{ fontSize: '0.95rem', color: 'var(--color-bone-dim)', lineHeight: '1.5', marginBottom: '1.5rem', fontFamily: 'Georgia, serif' }}>
-                Охота на узы времени совмещает Pomodoro и Stopwatch со случайными Абсолютно Gritty приключениями в стиле Джо Аберкромби. Заработайте золото, мораль и тонны опыта!
+                Заработайте золото, мораль и тонны опыта за ваши приключения!
               </p>
 
               <div style={{ background: 'rgba(0,0,0,0.4)', padding: '1.5rem', border: '1px solid rgba(255, 204, 0, 0.15)', borderRadius: '4px', marginBottom: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
