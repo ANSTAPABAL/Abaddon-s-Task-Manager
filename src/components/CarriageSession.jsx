@@ -4443,81 +4443,93 @@ if (setupStage === 'resolution') {
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.9rem', color: 'var(--color-bone-dim)' }}>
-                      {huntMode === 'pomodoro' ? 'ДЛИТЕЛЬНОСТЬ ДО ПРИВАЛА:' : 'ИНТЕРВАЛ ПРИВАЛА:'}
-                    </span>
-                    
-                    {/* Hours and Minutes Inputs */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <input 
-                        type="number" 
-                        min="0" 
-                        max="5"
-                        value={Math.floor(huntBreakInterval / 60)}
-                        onChange={(e) => {
-                          const hrs = Math.max(0, Math.min(5, Number(e.target.value)));
-                          const mins = huntBreakInterval % 60;
-                          const total = hrs * 60 + mins;
-                          setHuntBreakInterval(Math.max(5, Math.min(300, total)));
-                        }}
-                        className="rpg-input" 
-                        style={{ width: '55px', textAlign: 'center', fontSize: '0.9rem', padding: '4px', background: '#000', color: '#fff', border: '1px solid rgba(255,204,0,0.3)' }}
-                      />
-                      <span style={{ fontSize: '0.85rem', color: 'var(--color-bone-dim)' }}>ч</span>
+                {huntMode === 'pomodoro' ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.9rem', color: 'var(--color-bone-dim)' }}>
+                        ДЛИТЕЛЬНОСТЬ ДО ПРИВАЛА:
+                      </span>
                       
-                      <input 
-                        type="number" 
-                        min="0" 
-                        max="59"
-                        value={huntBreakInterval % 60}
-                        onChange={(e) => {
-                          const hrs = Math.floor(huntBreakInterval / 60);
-                          const mins = Math.max(0, Math.min(59, Number(e.target.value)));
-                          const total = hrs * 60 + mins;
-                          setHuntBreakInterval(Math.max(5, Math.min(300, total)));
-                        }}
-                        className="rpg-input" 
-                        style={{ width: '55px', textAlign: 'center', fontSize: '0.9rem', padding: '4px', background: '#000', color: '#fff', border: '1px solid rgba(255,204,0,0.3)' }}
-                      />
-                      <span style={{ fontSize: '0.85rem', color: 'var(--color-bone-dim)' }}>мин</span>
+                      {/* Hours and Minutes Inputs */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <input 
+                          type="number" 
+                          min="0" 
+                          max="5"
+                          value={Math.floor(huntBreakInterval / 60)}
+                          onChange={(e) => {
+                            const hrs = Math.max(0, Math.min(5, Number(e.target.value)));
+                            const mins = huntBreakInterval % 60;
+                            const total = hrs * 60 + mins;
+                            setHuntBreakInterval(Math.max(5, Math.min(300, total)));
+                          }}
+                          className="rpg-input" 
+                          style={{ width: '55px', textAlign: 'center', fontSize: '0.9rem', padding: '4px', background: '#000', color: '#fff', border: '1px solid rgba(255,204,0,0.3)' }}
+                        />
+                        <span style={{ fontSize: '0.85rem', color: 'var(--color-bone-dim)' }}>ч</span>
+                        
+                        <input 
+                          type="number" 
+                          min="0" 
+                          max="59"
+                          value={huntBreakInterval % 60}
+                          onChange={(e) => {
+                            const hrs = Math.floor(huntBreakInterval / 60);
+                            const mins = Math.max(0, Math.min(59, Number(e.target.value)));
+                            const total = hrs * 60 + mins;
+                            setHuntBreakInterval(Math.max(5, Math.min(300, total)));
+                          }}
+                          className="rpg-input" 
+                          style={{ width: '55px', textAlign: 'center', fontSize: '0.9rem', padding: '4px', background: '#000', color: '#fff', border: '1px solid rgba(255,204,0,0.3)' }}
+                        />
+                        <span style={{ fontSize: '0.85rem', color: 'var(--color-bone-dim)' }}>мин</span>
+                      </div>
+                    </div>
+
+                    {/* Range Slider from 5 to 300 minutes */}
+                    <input 
+                      type="range"
+                      min="5"
+                      max="300"
+                      step="5"
+                      value={huntBreakInterval}
+                      onChange={(e) => setHuntBreakInterval(Number(e.target.value))}
+                      style={{ width: '100%', accentColor: 'var(--color-blood-glow, #8b1a1a)', cursor: 'pointer' }}
+                    />
+                    
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--color-bone-dim)' }}>
+                      <span>Мин: 5 мин</span>
+                      <span style={{ color: '#ffcc00', fontWeight: 'bold' }}>
+                        Выбрано: {Math.floor(huntBreakInterval / 60) > 0 ? `${Math.floor(huntBreakInterval / 60)} ч ` : ''}{huntBreakInterval % 60} мин ({huntBreakInterval} мин)
+                      </span>
+                      <span>Макс: 5 ч (300 мин)</span>
+                    </div>
+
+                    <div style={{ 
+                      marginTop: '0.6rem', 
+                      fontSize: '0.85rem', 
+                      color: '#ffb813', 
+                      fontWeight: 'bold',
+                      textAlign: 'center'
+                    }}>
+                      📈 Расчет похода: {(huntBreakInterval / 30).toFixed(1)} перевалов
                     </div>
                   </div>
-
-                  {/* Range Slider from 5 to 300 minutes */}
-                  <input 
-                    type="range"
-                    min="5"
-                    max="300"
-                    step="5"
-                    value={huntBreakInterval}
-                    onChange={(e) => setHuntBreakInterval(Number(e.target.value))}
-                    style={{ width: '100%', accentColor: 'var(--color-blood-glow, #8b1a1a)', cursor: 'pointer' }}
-                  />
-                  
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--color-bone-dim)' }}>
-                    <span>Мин: 5 мин</span>
-                    <span style={{ color: '#ffcc00', fontWeight: 'bold' }}>
-                      Выбрано: {Math.floor(huntBreakInterval / 60) > 0 ? `${Math.floor(huntBreakInterval / 60)} ч ` : ''}{huntBreakInterval % 60} мин ({huntBreakInterval} мин)
-                    </span>
-                    <span>Макс: 5 ч (300 мин)</span>
-                  </div>
-
+                ) : (
                   <div style={{ 
-                    marginTop: '0.6rem', 
-                    fontSize: '0.85rem', 
-                    color: '#ffb813', 
-                    fontWeight: 'bold',
-                    textAlign: 'center'
+                    fontSize: '0.9rem', 
+                    color: 'var(--color-bone-dim)', 
+                    lineHeight: '1.5', 
+                    fontStyle: 'italic', 
+                    textAlign: 'left',
+                    background: 'rgba(255, 204, 0, 0.03)',
+                    border: '1px dashed rgba(255, 204, 0, 0.15)',
+                    padding: '12px',
+                    borderRadius: '4px'
                   }}>
-                    {huntMode === 'pomodoro' ? (
-                      `📈 Расчет похода: ${(huntBreakInterval / 30).toFixed(1)} перевалов`
-                    ) : (
-                      `📈 Расчет похода: ${(huntBreakInterval / 30).toFixed(1)} перевалов за привал`
-                    )}
+                    ⏱️ <b>Режим Секундомера:</b> таймер будет вести непрерывный отсчет времени работы вверх. Вы можете прерваться на 10-минутный привал с Аберкромби-событиями в любой момент вручную по кнопке «Стартовать привал пораньше». Награды начисляются пропорционально общему времени.
                   </div>
-                </div>
+                )}
               </div>
 
               <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
