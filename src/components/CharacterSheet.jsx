@@ -4,10 +4,10 @@ import { useAudio } from '../hooks/useAudio';
 
 const getRacePortraitUrl = (race) => {
   const r = race ? race.toLowerCase() : '';
-  if (r.includes('человек')) return 'http://localhost:3001/races/human.jpg';
-  if (r.includes('эльф')) return 'http://localhost:3001/races/elf.jpg';
-  if (r.includes('тролль')) return 'http://localhost:3001/races/troll.jpg';
-  if (r.includes('каргахаул')) return 'http://localhost:3001/races/kargahaul.jpg';
+  if (r.includes('человек')) return 'http://127.0.0.1:3001/races/human.jpg';
+  if (r.includes('эльф')) return 'http://127.0.0.1:3001/races/elf.jpg';
+  if (r.includes('тролль')) return 'http://127.0.0.1:3001/races/troll.jpg';
+  if (r.includes('каргахаул')) return 'http://127.0.0.1:3001/races/kargahaul.jpg';
   return null;
 };
 

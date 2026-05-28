@@ -137,8 +137,8 @@ class AudioSynthesizer {
   setupLocalDoublePlayer() {
     this.stopLocalDoublePlayer();
     
-    const track1Url = 'http://localhost:3001/tracks/fear_and_hunger.mp3';
-    const track2Url = 'http://localhost:3001/tracks/brown_noise.mp3';
+    const track1Url = 'http://127.0.0.1:3001/tracks/fear_and_hunger.mp3';
+    const track2Url = 'http://127.0.0.1:3001/tracks/brown_noise.mp3';
     
     this.localDoublePlayer1 = new Audio(track1Url);
     this.localDoublePlayer1.loop = true;

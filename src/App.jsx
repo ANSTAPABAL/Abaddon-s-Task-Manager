@@ -260,7 +260,7 @@ export default function App() {
 Задачи в бэклоге (спящие квесты): ${JSON.stringify(backlogTasks.map(t => ({ id: t.id, title: t.title, type: t.type, toxicity: t.toxicity, estimatedTime: t.estimatedTime, stepsCount: t.steps ? t.steps.length : 0, curseLevel: t.curseLevel })))}
 `;
 
-      const response = await fetch('http://localhost:3001/api/ai/complete', {
+      const response = await fetch('http://127.0.0.1:3001/api/ai/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -273,7 +273,9 @@ export default function App() {
 
       if (!response.ok) throw new Error("Связь с духами прервалась");
       const data = await response.json();
-      setSpiritsCounselText(data.choices[0].message.content);
+      const content = data?.choices?.[0]?.message?.content;
+      if (typeof content !== 'string') throw new Error("AI returned empty content");
+      setSpiritsCounselText(content);
     } catch (e) {
       setSpiritsCounselText(`💀 Духи молчат. Шепот Бездны доносит лишь эхо: "${e.message}". Попробуйте воззвать позже...`);
     } finally {
@@ -306,7 +308,7 @@ export default function App() {
 Проведено медитаций: ${char.meditationsCount}
 `;
 
-      const response = await fetch('http://localhost:3001/api/ai/complete', {
+      const response = await fetch('http://127.0.0.1:3001/api/ai/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -317,9 +319,20 @@ export default function App() {
         })
       });
 
-      if (!response.ok) throw new Error("Connection failed");
+      if (!response.ok) {
+        let errMsg = "Connection failed";
+        try {
+          const errData = await response.json();
+          if (errData && errData.error) errMsg += `: ${errData.error}`;
+        } catch (_) {}
+        throw new Error(errMsg);
+      }
       const data = await response.json();
-      return data.choices[0].message.content.trim();
+      const content = data?.choices?.[0]?.message?.content;
+      if (typeof content !== 'string') {
+        throw new Error(data?.error?.message || `AI returned empty or invalid response: ${JSON.stringify(data)}`);
+      }
+      return content.trim();
     } catch (e) {
       return `«Его воля сокрушила прокрастинацию и навеки разогнала Скверну Абаддона...»\n\n(Не удалось соединиться с сервером AI для составления индивидуальной летописи, но духи помнят твой подвиг!)`;
     }
@@ -394,7 +407,7 @@ export default function App() {
 
   // --- SETTINGS, ENV CONFIGURATION, AUDIO CONTROLS & REROLL ---
   const fetchEnvConfig = () => {
-    fetch('http://localhost:3001/api/env-config')
+    fetch('http://127.0.0.1:3001/api/env-config')
       .then(res => res.json())
       .then(data => {
         setEnvConfig(data);
@@ -413,7 +426,7 @@ export default function App() {
 
   const handleSaveEnvConfig = () => {
     playClick();
-    fetch('http://localhost:3001/api/env-config', {
+    fetch('http://127.0.0.1:3001/api/env-config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ apiKey: inputApiKey, port: inputPort })
@@ -583,7 +596,7 @@ export default function App() {
   
   useEffect(() => {
     // 1. Load tasks from local server
-    fetch('http://localhost:3001/api/tasks')
+    fetch('http://127.0.0.1:3001/api/tasks')
       .then(res => {
         if (!res.ok) throw new Error("Backend offline");
         return res.json();
@@ -613,7 +626,7 @@ export default function App() {
       });
 
     // 2. Load character stats
-    fetch('http://localhost:3001/api/character')
+    fetch('http://127.0.0.1:3001/api/character')
       .then(res => {
         if (!res.ok) throw new Error("Backend offline");
         return res.json();
@@ -630,7 +643,7 @@ export default function App() {
       });
 
     // 3. Load pedestals hall
-    fetch('http://localhost:3001/api/pedestals')
+    fetch('http://127.0.0.1:3001/api/pedestals')
       .then(res => {
         if (!res.ok) throw new Error("Backend offline");
         return res.json();
@@ -642,7 +655,7 @@ export default function App() {
   // Save tasks on edit
   useEffect(() => {
     if (tasks.length === 0) return;
-    fetch('http://localhost:3001/api/tasks', {
+    fetch('http://127.0.0.1:3001/api/tasks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(tasks)
@@ -652,7 +665,7 @@ export default function App() {
   // Save character on stat change
   useEffect(() => {
     if (!characterLoaded || !character || !character.race) return;
-    fetch('http://localhost:3001/api/character', {
+    fetch('http://127.0.0.1:3001/api/character', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(character)
@@ -662,7 +675,7 @@ export default function App() {
   // Save pedestals when modified
   const savePedestals = (updatedPedestals) => {
     setPedestals(updatedPedestals);
-    fetch('http://localhost:3001/api/pedestals', {
+    fetch('http://127.0.0.1:3001/api/pedestals', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updatedPedestals)
@@ -726,7 +739,7 @@ ${failuresLessons.length > 0 ? failuresLessons.map(l => `  * "${l}"`).join('\n')
   }
 ]`;
 
-    const response = await fetch('http://localhost:3001/api/ai/complete', {
+    const response = await fetch('http://127.0.0.1:3001/api/ai/complete', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -737,11 +750,22 @@ ${failuresLessons.length > 0 ? failuresLessons.map(l => `  * "${l}"`).join('\n')
       })
     });
 
-    if (!response.ok) throw new Error("AI Tunnel compilation failed");
+    if (!response.ok) {
+      let errMsg = "AI Tunnel compilation failed";
+      try {
+        const errData = await response.json();
+        if (errData && errData.error) errMsg += `: ${errData.error}`;
+      } catch (_) {}
+      throw new Error(errMsg);
+    }
     const data = await response.json();
     
     // Parse response content cleanly, stripping markdown JSON markers if any
-    let cleanedText = data.choices[0].message.content.trim();
+    const content = data?.choices?.[0]?.message?.content;
+    if (typeof content !== 'string') {
+      throw new Error(data?.error?.message || `AI returned empty or invalid response: ${JSON.stringify(data)}`);
+    }
+    let cleanedText = content.trim();
     if (cleanedText.startsWith("```json")) cleanedText = cleanedText.slice(7);
     if (cleanedText.endsWith("```")) cleanedText = cleanedText.slice(0, -3);
     
@@ -801,7 +825,7 @@ ${contextPrompt}`;
       userPrompt = `Задача: "${task.title}". Вопросы: ${JSON.stringify(extraData.questions)}. Ответы пользователя: ${JSON.stringify(extraData.answers)}`;
     }
 
-    const response = await fetch('http://localhost:3001/api/ai/complete', {
+    const response = await fetch('http://127.0.0.1:3001/api/ai/complete', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -812,10 +836,21 @@ ${contextPrompt}`;
       })
     });
 
-    if (!response.ok) throw new Error("AI Tunnel compilation failed");
+    if (!response.ok) {
+      let errMsg = "AI Tunnel request failed";
+      try {
+        const errData = await response.json();
+        if (errData && errData.error) errMsg += `: ${errData.error}`;
+      } catch (_) {}
+      throw new Error(errMsg);
+    }
     const data = await response.json();
-    
-    let cleanedText = data.choices[0].message.content.trim();
+
+    const content = data?.choices?.[0]?.message?.content;
+    if (typeof content !== 'string') {
+      throw new Error(data?.error?.message || `AI returned empty or invalid response: ${JSON.stringify(data)}`);
+    }
+    let cleanedText = content.trim();
     if (cleanedText.startsWith("```json")) cleanedText = cleanedText.slice(7);
     if (cleanedText.endsWith("```")) cleanedText = cleanedText.slice(0, -3);
 

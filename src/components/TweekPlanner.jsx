@@ -258,7 +258,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
 {"type": "hunt" | "siege" | "relic" | "corpse"}`;
 
     try {
-      const response = await fetch('http://localhost:3001/api/ai/complete', {
+      const response = await fetch('http://127.0.0.1:3001/api/ai/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -270,7 +270,9 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
       });
       if (!response.ok) throw new Error();
       const data = await response.json();
-      let text = data.choices[0].message.content.trim();
+      const content = data?.choices?.[0]?.message?.content;
+      if (typeof content !== 'string') throw new Error();
+      let text = content.trim();
       if (text.startsWith("```json")) text = text.slice(7);
       if (text.endsWith("```")) text = text.slice(0, -3);
       const parsed = JSON.parse(text.trim());

@@ -3,6 +3,14 @@ import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import dns from 'dns';
+
+dns.setDefaultResultOrder('ipv4first');
+try {
+  dns.setServers(['8.8.8.8', '1.1.1.1']);
+} catch (e) {
+  console.warn("Failed to set custom DNS servers:", e.message);
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -13,6 +21,10 @@ const PORT = process.env.PORT || 3001;
 // Middlewares
 app.use(cors());
 app.use(express.json());
+app.use((req, res, next) => {
+  console.log(`[Server Log] ${req.method} ${req.url}`);
+  next();
+});
 
 // Ensure the local data directory and files exist
 const DATA_DIR = path.join(__dirname, 'data');
@@ -63,7 +75,7 @@ const DEFAULT_SESSION = {
     huntTimerValue: 1800,
     huntTimeSpent: 0,
     huntTimeTotal: 0,
-    huntBreakTimeLeft: 600,
+    huntBreakTimeLeft: 1800,
     huntLastBreakCheckpoint: 0,
     huntBreakEvent: null,
     huntPayoutActive: false
@@ -616,7 +628,7 @@ setInterval(() => {
             if (activeSession.hunt.huntTimerValue <= 0 && activeSession.hunt.huntTimeSpent < activeSession.hunt.huntBreakInterval * 60) {
               // Trigger Break
               activeSession.hunt.huntIsBreak = true;
-              activeSession.hunt.huntBreakTimeLeft = 600;
+              activeSession.hunt.huntBreakTimeLeft = 1800;
               activeSession.hunt.huntLastBreakCheckpoint = activeSession.hunt.huntTimeSpent;
 
               const xpReward = Math.random() < 0.5 ? 5 : 10;
@@ -643,7 +655,7 @@ setInterval(() => {
           if (diff >= 30 * 60) {
             // Trigger Break
             activeSession.hunt.huntIsBreak = true;
-            activeSession.hunt.huntBreakTimeLeft = 600;
+            activeSession.hunt.huntBreakTimeLeft = 1800;
             activeSession.hunt.huntLastBreakCheckpoint = activeSession.hunt.huntTimeSpent;
 
             const xpReward = Math.random() < 0.5 ? 5 : 10;

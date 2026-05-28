@@ -131,14 +131,16 @@ ${backlogTasks.length > 0 ? backlogTasks.map(t => `- [${t.type}] "${t.title}" (�
     const initialMessages = [{ role: 'user', content: initialPrompt }];
 
     try {
-      const response = await fetch('http://localhost:3001/api/ai/complete', {
+      const response = await fetch('http://127.0.0.1:3001/api/ai/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: initialMessages })
       });
       if (!response.ok) throw new Error("Бездна перегружена");
       const data = await response.json();
-      const text = data.choices[0].message.content;
+      const content = data?.choices?.[0]?.message?.content;
+      if (typeof content !== 'string') throw new Error("AI returned empty content");
+      const text = content;
       
       setChatLog([{ role: 'oracle', content: text }]);
       setApiMessages([
@@ -174,14 +176,16 @@ ${backlogTasks.length > 0 ? backlogTasks.map(t => `- [${t.type}] "${t.title}" (�
     setChatLoading(true);
 
     try {
-      const response = await fetch('http://localhost:3001/api/ai/complete', {
+      const response = await fetch('http://127.0.0.1:3001/api/ai/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: updatedApiMessages })
       });
       if (!response.ok) throw new Error("Бездна перегружена");
       const data = await response.json();
-      const text = data.choices[0].message.content;
+      const content = data?.choices?.[0]?.message?.content;
+      if (typeof content !== 'string') throw new Error("AI returned empty content");
+      const text = content;
 
       setChatLog([...updatedChatLog, { role: 'oracle', content: text }]);
       setApiMessages([...updatedApiMessages, { role: 'assistant', content: text }]);

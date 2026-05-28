@@ -296,6 +296,12 @@ export default function CarriageSession({
   onStateSync
 }) {
   const { playClick, playBoneCrack, playSuccess, startHeartbeat, stopHeartbeat, setAtmosphereMood } = useAudio();
+  const toggleFullscreenFocus = () => {
+    playClick();
+    const nextVal = !isFullscreenFocus;
+    setIsFullscreenFocus(nextVal);
+    localStorage.setItem('immersive_fullscreen_focus', nextVal ? 'true' : 'false');
+  };
   const [messyText, setMessyText] = useState('');
   const [loadingAI, setLoadingAI] = useState(false);
 
@@ -369,7 +375,7 @@ export default function CarriageSession({
   const [huntTimeTotal, setHuntTimeTotal] = useState(0); // total session seconds
   const [huntIsRunning, setHuntIsRunning] = useState(false);
   const [huntIsBreak, setHuntIsBreak] = useState(false);
-  const [huntBreakTimeLeft, setHuntBreakTimeLeft] = useState(600); // 10 minutes break in seconds
+  const [huntBreakTimeLeft, setHuntBreakTimeLeft] = useState(1800); // 30 minutes break in seconds
   const [huntLastBreakCheckpoint, setHuntLastBreakCheckpoint] = useState(0);
   const [huntBreakEvent, setHuntBreakEvent] = useState(null);
   const [huntPayoutActive, setHuntPayoutActive] = useState(false);
@@ -384,6 +390,15 @@ export default function CarriageSession({
   const [adaptationTask, setAdaptationTask] = useState(null);
   const [adaptationTaskIndex, setAdaptationTaskIndex] = useState(-1);
   const [adaptationDeadline, setAdaptationDeadline] = useState('');
+
+  // Immersive Fullscreen Focus, Combat Break, and Inline Step Edit States
+  const [isFullscreenFocus, setIsFullscreenFocus] = useState(() => localStorage.getItem('immersive_fullscreen_focus') === 'true');
+  const [activeCombatBreak, setActiveCombatBreak] = useState(null); // null, or { index: 1, tasks: [...] }
+  const [accumulatedBreakRewards, setAccumulatedBreakRewards] = useState({ xp: 0, gold: 0 });
+  const [newCombatStepText, setNewCombatStepText] = useState('');
+  const [editingStepId, setEditingStepId] = useState(null);
+  const [editingStepText, setEditingStepText] = useState('');
+  const triggeredBreaksRef = useRef(new Set());
 
   const editTitleRef = useRef(null);
 
@@ -519,27 +534,52 @@ export default function CarriageSession({
     const isLargeQuest = task?.pomodoroTime >= 50 || task?.type === 'siege';
     const hpContext = character.hp <= 30 ? `Герой истощен, едва держится на ногах (критический уровень здоровья HP: ${character.hp})` : `Герой крепок и полон сил (здоровье HP: ${character.hp})`;
     
+    const moralVal = character.moralCompass !== undefined ? character.moralCompass : 50;
+    let spiritContext = "";
+    if (moralVal >= 80) {
+      spiritContext = `\nСИЛА ДУХА И МЕНТАЛЬНОЕ СОСТОЯНИЕ: Искупленный (${moralVal}/100). Изгнанник милосерден, смирен, глубок духом, покорен предначертанию Времени, его диалоги с NPC добрые, он выражает искреннюю благодарность и скромен. В летописи его победы будут выглядеть благородно, милосердно, величественно, он стремится сберечь жизни невиновных.`;
+    } else if (moralVal >= 60) {
+      spiritContext = `\nСИЛА ДУХА И МЕНТАЛЬНОЕ СОСТОЯНИЕ: Стойкий Путник (${moralVal}/100). Изгнанник вежлив, покоен, скромен, сосредоточен на искуплении долга, уважает союзников.`;
+    } else if (moralVal >= 40) {
+      spiritContext = `\nСИЛА ДУХА И МЕНТАЛЬНОЕ СОСТОЯНИЕ: Черствый Скиталец (${moralVal}/100). Изгнанник безразличен, холоден, отвечает односложно, его заботит только выживание, к встречным он абсолютно равнодушен.`;
+    } else if (moralVal >= 20) {
+      spiritContext = `\nСИЛА ДУХА И МЕНТАЛЬНОЕ СОСТОЯНИЕ: Падший Изгой (${moralVal}/100). Изгнанник озлоблен, раздражителен, полон злобы и затаенной боли, говорит сквозь зубы, совершает неоправданно жестокие поступки. Встреченные им люди боятся его или презирают.`;
+    } else {
+      spiritContext = `\nСИЛА ДУХА И МЕНТАЛЬНОЕ СОСТОЯНИЕ: Мясник Бездны (${moralVal}/100). Полное падение духа. Изгнанник абсолютно жесток, кровожаден, безумен от боли и ярости, совершает страшную дикую жестокость, может без повода убить хорошего человека, встреченные им люди нападают на него из самообороны или страха, а диалоги полны угрожающей тьмы и ненависти.`;
+    }
+
     const lastLegend = pedestals && pedestals.length > 0 ? pedestals[pedestals.length - 1] : null;
     let legacyPromptContext = "";
     if (lastLegend) {
       if (lastLegend.legacyStatus === 'stained') {
-        legacyPromptContext = `\n⚠️ НАСЛЕДИЕ РОДОСЛОВНОЙ: Предыдущий герой пользователя (${lastLegend.name}, класс ${lastLegend.class}) трагически пал/потерпел позорное поражение, и его имя ЗАПЯТНАНО. Текущий герой (${character.name}) с прозвищем "${character.nickname}" несет груз стыда предка ${lastLegend.name} и отчаянно пытается искупить этот позор. Вплети это кратко в текст летописи.`;
+        legacyPromptContext = `\n⚠️ НАСЛЕДИЕ РОДОСЛОВНОЙ: Предыдущий герой пользователя (${lastLegend.name}, класс ${lastLegend.class}) трагически пал/потерпел позорное поражение, и его имя ЗАПЯТНАНО. Текущий герой несет груз стыда предка ${lastLegend.name} и отчаянно пытается искупить этот позор. Вплети это кратко в текст летописи.`;
       } else if (lastLegend.legacyStatus === 'sanctified') {
-        legacyPromptContext = `\n⚠️ НАСЛЕДИЕ РОДОСЛОВНОЙ: Предыдущий герой пользователя (${lastLegend.name}, класс ${lastLegend.class}) совершил великий триумф, одолев Скверну Абаддона, и его имя ОСВЯЩЕНО. Текущий герой (${character.name}) с прозвищем "${character.nickname}" овеян славой предка ${lastLegend.name} и стремится соответствовать его величию. Вплети это кратко в текст летописи.`;
+        legacyPromptContext = `\n⚠️ НАСЛЕДИЕ РОДОСЛОВНОЙ: Предыдущий герой пользователя (${lastLegend.name}, класс ${lastLegend.class}) совершил великий триумф, одолев Скверну Абаддона, и его имя ОСВЯЩЕНО. Текущий герой овеян славой предка ${lastLegend.name} и стремится соответствовать его величию. Вплети это кратко в текст летописи.`;
       }
     }
 
     let prompt = '';
+    const loreGuidelines = `
+ПРАВИЛА ИМЕНОВАНИЯ И ЛОРА:
+1. НИКОГДА не выдумывай и не используй конкретные имена (никаких "Дункан" и т.д.). Протагонист — БЕЗЛИКОЕ НИЧТО, у которого не осталось прошлого.
+2. ВСЕГДА называй его только «Изгнанник» или по его классу/расе (например, «Изгнанник-Маг меток», «Изгнанный эльф» с учетом его переданных класса и расы).
+3. Его былая личность выжжена дотла. В его памяти лишь шрамы, ожоги, фантомная боль от бесконечных прошлых избиений, пыток, удушений и ментального насилия в застенках Бездны, откуда его израненным вышвырнули в повозку смерти сражаться из последних сил. Отрази этот тяжелый лорный контекст преодоления боли и триумфа увядающей воли.
+
+ЗАПРЕТ НА ВУЛЬГАРНОСТЬ:
+Строго ЗАПРЕЩЕН любой туалетный юмор, физиологические отвратительные подробности (мочеиспускание, испражнения и т.д.). Держи суровый, реалистичный, трагический и пафосный тон темного фэнтези Джо Аберкромби без дешевой пошлости.
+${spiritContext}
+`;
+
     if (isAmbush) {
       prompt = `Ты — Летописец Бездны во вселенной Абаддона. Опиши короткую, суровую и грязную летопись-эпитафию в стиле Джо Аберкромби.
-Герой завершил контракт «${task?.title || ''}», одолев врага «${enemy}», но его промедление и нерешительность привлекли разбойников. Он пришел на место встречи, но обнаружил лишь растерзанное тело «${npcName}». Герой в ярости перебил бандитов Бездны, осквернивших привал. Опиши эту суровую схватку и запах крови. До 90 слов, 2 абзаца.`;
+Изгнанник завершил контракт «${task?.title || ''}», одолев врага «${enemy}», но его промедление и нерешительность привлекли разбойников. Он пришел на место встречи, но обнаружил лишь растерзанное тело «${npcName}». Герой в ярости перебил бандитов Бездны, осквернивших привал. Опиши эту суровую схватку и запах крови. До 90 слов, 2 абзаца.
+${loreGuidelines}`;
     } else if (type === 'victory') {
       prompt = `Ты — Летописец Бездны во вселенной Абаддона. Опиши короткую, суровую и грязную летопись-эпитафию в стиле Джо Аберкромби (темное фэнтези, реализм, цинизм, кровь, пот и грязь).
-Герой одержал победу в фокус-сессии над когнитивной тварью: «${enemy}» (задача: "${task?.title || ''}").
+Изгнанник одержал победу в фокус-сессии над когнитивной тварью: «${enemy}» (задача: "${task?.title || ''}").
 ${legacyPromptContext}
 
 ТЕХНИЧЕСКИЙ КОНТЕКСТ ГЕРОЯ:
-- Имя и Прозвище: ${character.name} (${character.nickname})
 - Раса: ${character.race}
 - Класс: ${character.class}
 - Текущее состояние здоровья: ${hpContext}
@@ -553,12 +593,13 @@ ${legacyPromptContext}
 2. Опиши финальный безжалостный удар с использованием классовых фишек героя (если класс — Химомансер/Маг крови, упомяни использование алой крови, шипов, вен; если класс — Пси-Телекинетик/Psi-Telekinetic/Mental Sovereign, упомяни использование ментального взрыва/Kopfplatzen; если класс — Плазмамансер, упомяни клинки эфира или искривление пространства; если другой класс — обыграй его особенности).
 3. Обыграй состояние здоровья (если HP мало — покажи, что герой победил на грани сил, сплевывая кровь; если HP много — что он двигался уверенно).
 4. Обыграй размер задачи и статус просрочки:
-   - Если это КРУПНЫЙ квест или ПРОСРОЧЕННЫЙ долг, покажи, что этот триумф возвращает герою веру в себя после кучи провалов и прокрастинации ("ты вновь чертовски веришь в себя, ублюдок, после всего этого дерьма").
+   - Если это КРУПНЫЙ квест или ПРОСРОЧЕННЫЙ долг, покажи, что этот триумф возвращает Изгнаннику веру в свои силы после кучи провалов и прокрастинации.
    - Если это мелкий квест — покажи, что это быстрая и уверенная победа, приближающая нас к цели.
-5. Текст должен быть коротким (до 90 слов), разделенным ровно на 2-3 коротких абзаца. Разрешены уместные крепкие словечки (маты вроде "сука", "ублюдок", "дерьмо") для придания грязи и атмосферы.`;
+5. Текст должен быть коротким (до 90 слов), разделенным ровно на 2-3 коротких абзаца. Разрешены уместные крепкие словечки (вроде "ублюдок", "дерьмо") для придания грязи и атмосферы.
+${loreGuidelines}`;
     } else if (type === 'flee') {
       prompt = `Ты — Летописец Бездны во вселенной Абаддона. Опиши короткую, суровую и грязную летопись-эпитафию в стиле Джо Аберкромби (темное фэнтези, реализм, цинизм, грязь, холодный дождь).
-Герой отступил и сбежал с поля боя от когнитивной тварью: «${enemy}» (задача: "${task?.title || ''}").
+Изгнанник отступил и сбежал с поля боя от когнитивной твари: «${enemy}» (задача: "${task?.title || ''}").
 
 ТЕХНИЧЕСКИЙ КОНТЕКСТ ГЕРОЯ:
 - Раса: ${character.race}
@@ -572,15 +613,15 @@ ${legacyPromptContext}
 1. Используй циничный писательский стиль Джо Аберкромби (грязь, дождь, разочарование, хмурое утро).
 2. Обыграй бегство с учетом класса героя (например, Химомансер убегает, оставляя алый след, или укрываясь барьером).
 3. Обыграй HP (если HP мало — он едва уполз в жиже; если много — отступил расчетливо).
-4. Покажи, что бегство — это чертовски обидно, но это не конец. Нужно вернуться в лагерь, зализать раны, сплюнуть кровь и подготовить реванш.
-5. Текст должен быть коротким (до 80 слов), разделенным ровно на 2 коротких абзаца. Разрешены крепкие выражения к месту.`;
+4. Покажи, что бегство — это обидно, но это не конец. Нужно вернуться к костру, зализать раны, сплюнуть кровь и подготовить реванш.
+5. Текст должен быть коротким (до 80 слов), разделенным ровно на 2 коротких абзаца. Разрешены крепкие выражения к месту.
+${loreGuidelines}`;
     } else if (type === 'death') {
       prompt = `Ты — Летописец Бездны во вселенной Абаддона. Опиши короткую, суровую летопись в стиле Джо Аберкромби (запах сырой земли, хруст костей, темнота, горькая ирония).
-Герой пал в бою с тварью: «${enemy}» (задача: "${task?.title || ''}"). Его здоровье на критическом минимуме (10 HP), разум сломлен.
+Изгнанник пал в бою с тварью: «${enemy}» (задача: "${task?.title || ''}"). Его здоровье на критическом минимуме (10 HP), разум сломлен.
 ${legacyPromptContext}
 
 ТЕХНИЧЕСКИЙ КОНТЕКСТ ГЕРОЯ:
-- Имя и Прозвище: ${character.name} (${character.nickname})
 - Раса: ${character.race}
 - Класс: ${character.class}
 - Время контракта: ${task?.pomodoroTime || 25} минут
@@ -591,18 +632,21 @@ ${legacyPromptContext}
 1. Стиль Джо Аберкромби (реалистичное падение лицом в жижу, хруст, тяжелые раны, циничная надежда).
 2. Обыграй падение с использованием класса.
 3. Покажи, что костлявая сегодня осталась голодной. Герой очнется у теплого костра в лагере, чтобы подняться из этого дерьма и отомстить.
-4. Текст должен быть коротким (до 80 слов), разделенным на 2 коротких абзаца. Разрешены уместные маты.`;
+4. Текст должен быть коротким (до 80 слов), разделенным на 2 коротких абзаца. Разрешены уместные маты.
+${loreGuidelines}`;
     }
 
     try {
-      const response = await fetch('http://localhost:3001/api/ai/complete', {
+      const response = await fetch('http://127.0.0.1:3001/api/ai/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: [{ role: 'user', content: prompt }] })
       });
       if (!response.ok) throw new Error('AI offline');
       const data = await response.json();
-      const generatedText = data.choices[0].message.content.trim();
+      const content = data?.choices?.[0]?.message?.content;
+      if (typeof content !== 'string') throw new Error("AI returned empty content");
+      const generatedText = content.trim();
       setResolutionText(generatedText);
       
       // Sync chronicle back to the defeated enemy
@@ -764,7 +808,7 @@ ${legacyPromptContext}
 
       const userPrompt = `Задача: "${task.title}". Текущий тип: ${task.type || 'hunt'}. Требуется шагов (needsSteps): ${needsSteps}.`;
 
-      const response = await fetch('http://localhost:3001/api/ai/complete', {
+      const response = await fetch('http://127.0.0.1:3001/api/ai/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -777,7 +821,9 @@ ${legacyPromptContext}
 
       if (response.ok) {
         const data = await response.json();
-        let text = data.choices[0].message.content.trim();
+        const content = data?.choices?.[0]?.message?.content;
+        if (typeof content !== 'string') throw new Error("AI returned empty content");
+        let text = content.trim();
         if (text.startsWith("```json")) text = text.slice(7);
         if (text.endsWith("```")) text = text.slice(0, -3);
         const parsed = JSON.parse(text.trim());
@@ -1016,14 +1062,23 @@ ${legacyPromptContext}
   "title": "Новое название задачи",
   "steps": ["шаг 1", "шаг 2", ...]
 }`;
-      const response = await fetch('http://localhost:3001/api/ai/complete', {
+      const response = await fetch('http://127.0.0.1:3001/api/ai/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: [{ role: 'user', content: prompt }] })
       });
-      if (!response.ok) throw new Error('AI Tunnel offline');
+      if (!response.ok) {
+        let errMsg = 'AI Tunnel offline';
+        try {
+          const errData = await response.json();
+          if (errData && errData.error) errMsg += `: ${errData.error}`;
+        } catch (_) {}
+        throw new Error(errMsg);
+      }
       const data = await response.json();
-      let cleanedText = data.choices[0].message.content.trim();
+      const content = data?.choices?.[0]?.message?.content;
+      if (typeof content !== 'string') throw new Error("AI returned empty content");
+      let cleanedText = content.trim();
       if (cleanedText.startsWith("```json")) cleanedText = cleanedText.slice(7);
       if (cleanedText.endsWith("```")) cleanedText = cleanedText.slice(0, -3);
       const parsed = JSON.parse(cleanedText.trim());
@@ -1121,7 +1176,7 @@ ${legacyPromptContext}
 
 Сделай благословение пафосным, в стиле мрачного фэнтези (Fear & Hunger, Darkest Dungeon), упомянув его победы над конкретными врагами (если они есть) или его расовые/классовые черты. Благослови его на новые свершения и похвали его верность Времени! Пиши на русском языке.`;
 
-      const response = await fetch('http://localhost:3001/api/ai/complete', {
+      const response = await fetch('http://127.0.0.1:3001/api/ai/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1134,7 +1189,9 @@ ${legacyPromptContext}
 
       if (!response.ok) throw new Error();
       const data = await response.json();
-      let text = data.choices[0].message.content.trim();
+      const content = data?.choices?.[0]?.message?.content;
+      if (typeof content !== 'string') throw new Error("AI returned empty content");
+      let text = content.trim();
       if (text.startsWith("```json")) text = text.slice(7);
       if (text.endsWith("```")) text = text.slice(0, -3);
       setRitualBlessingText(text);
@@ -1220,7 +1277,7 @@ ${legacyPromptContext}
   const triggerHuntBreak = () => {
     playBoneCrack();
     setHuntIsBreak(true);
-    setHuntBreakTimeLeft(600); // 10 minutes break
+    setHuntBreakTimeLeft(1800); // 30 minutes break
     setHuntLastBreakCheckpoint(huntTimeSpent);
 
     const xpReward = Math.random() < 0.5 ? 5 : 10;
@@ -1587,8 +1644,10 @@ const handleWinActiveSession = (task) => {
     const isSiege = task?.type === 'siege';
     const isSurvival = task?.isSurvival || false;
     const rewardMultiplier = isSurvival ? 2 : 1;
-    const expReward = (isAmbush ? 10 : (isSiege ? 60 : 25)) * rewardMultiplier;
-    const goldReward = (isAmbush ? 5 : (isSiege ? 15 : 5)) * rewardMultiplier;
+    const baseExpReward = (isAmbush ? 10 : (isSiege ? 60 : 25)) * rewardMultiplier;
+    const baseGoldReward = (isAmbush ? 5 : (isSiege ? 15 : 5)) * rewardMultiplier;
+    const expReward = baseExpReward + (accumulatedBreakRewards.xp || 0);
+    const goldReward = baseGoldReward + (accumulatedBreakRewards.gold || 0);
 
     // Create Defeated Enemy Object
     const hashStrForIcon = (enemyName || "") + (task?.id || '');
@@ -1639,7 +1698,10 @@ const handleWinActiveSession = (task) => {
         updatedBio.push(`На месте встречи Изгнанник обнаружил лишь растерзанное тело ${randNpc.name}. Ему пришлось вступить в бой с устроившими засаду бандитами Бездны. Разбойники перебиты, с их тел снято +${expReward} XP и +${earnedGold} Золота.`);
       } else {
         const modeText = isSurvival ? " [Жизнь и Смерть]" : "";
-        updatedBio.push(`Выполнен контракт${modeText}: "${task?.title || ''}". Встречен ${randNpc.name}. Получено +${expReward} XP и +${earnedGold} Золота.`);
+        const breakText = (accumulatedBreakRewards.xp > 0 || accumulatedBreakRewards.gold > 0)
+          ? ` За время привалов в бою зачищены дополнительные цели: +${accumulatedBreakRewards.xp} XP и +${accumulatedBreakRewards.gold} Золота.`
+          : "";
+        updatedBio.push(`Выполнен контракт${modeText}: "${task?.title || ''}". Встречен ${randNpc.name}. Получено +${expReward} XP и +${earnedGold} Золота.${breakText}`);
       }
 
       const existingDefeated = prev.defeatedEnemies || [];
@@ -1665,6 +1727,9 @@ const handleWinActiveSession = (task) => {
     
     localStorage.removeItem('active_task_id');
     localStorage.removeItem('combat_time_left');
+
+    setAccumulatedBreakRewards({ xp: 0, gold: 0 });
+    triggeredBreaksRef.current.clear();
     
     setSetupStage('resolution');
     setResolutionType('victory');
@@ -1932,7 +1997,7 @@ const handleWinActiveSession = (task) => {
     let active = true;
     
     // Fetch active session from local backend
-    fetch('http://localhost:3001/api/active-session')
+    fetch('http://127.0.0.1:3001/api/active-session')
       .then(res => res.json())
       .then(data => {
         if (!active) return;
@@ -1991,7 +2056,7 @@ const handleWinActiveSession = (task) => {
             setHuntTimerValue(data.hunt.huntTimerValue || 1800);
             setHuntTimeSpent(data.hunt.huntTimeSpent || 0);
             setHuntTimeTotal(data.hunt.huntTimeTotal || 0);
-            setHuntBreakTimeLeft(data.hunt.huntBreakTimeLeft || 600);
+            setHuntBreakTimeLeft(data.hunt.huntBreakTimeLeft || 1800);
             setHuntLastBreakCheckpoint(data.hunt.huntLastBreakCheckpoint || 0);
             setHuntBreakEvent(data.hunt.huntBreakEvent || null);
             setHuntPayoutActive(data.hunt.huntPayoutActive || false);
@@ -2071,7 +2136,7 @@ const handleWinActiveSession = (task) => {
       }
     };
     
-    fetch('http://localhost:3001/api/active-session', {
+    fetch('http://127.0.0.1:3001/api/active-session', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(currentSession)
@@ -2235,14 +2300,23 @@ const handleWinActiveSession = (task) => {
 {
   "questions": ["Вопрос 1", "Вопрос 2", "Вопрос 3"]
 }`;
-      const response = await fetch('http://localhost:3001/api/ai/complete', {
+      const response = await fetch('http://127.0.0.1:3001/api/ai/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: [{ role: 'user', content: prompt }] })
       });
-      if (!response.ok) throw new Error('AI Tunnel offline');
+      if (!response.ok) {
+        let errMsg = 'AI Tunnel offline';
+        try {
+          const errData = await response.json();
+          if (errData && errData.error) errMsg += `: ${errData.error}`;
+        } catch (_) {}
+        throw new Error(errMsg);
+      }
       const data = await response.json();
-      let cleanedText = data.choices[0].message.content.trim();
+      const content = data?.choices?.[0]?.message?.content;
+      if (typeof content !== 'string') throw new Error("AI returned empty content");
+      let cleanedText = content.trim();
       if (cleanedText.startsWith("```json")) cleanedText = cleanedText.slice(7);
       if (cleanedText.endsWith("```")) cleanedText = cleanedText.slice(0, -3);
       const parsed = JSON.parse(cleanedText.trim());
@@ -2274,14 +2348,23 @@ ${qaText}
   "title": "Уточненное название задачи",
   "steps": ["микро-шаг 1", "микро-шаг 2", ...]
 }`;
-      const response = await fetch('http://localhost:3001/api/ai/complete', {
+      const response = await fetch('http://127.0.0.1:3001/api/ai/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: [{ role: 'user', content: prompt }] })
       });
-      if (!response.ok) throw new Error('AI Tunnel offline');
+      if (!response.ok) {
+        let errMsg = 'AI Tunnel offline';
+        try {
+          const errData = await response.json();
+          if (errData && errData.error) errMsg += `: ${errData.error}`;
+        } catch (_) {}
+        throw new Error(errMsg);
+      }
       const data = await response.json();
-      let cleanedText = data.choices[0].message.content.trim();
+      const content = data?.choices?.[0]?.message?.content;
+      if (typeof content !== 'string') throw new Error("AI returned empty content");
+      let cleanedText = content.trim();
       if (cleanedText.startsWith("```json")) cleanedText = cleanedText.slice(7);
       if (cleanedText.endsWith("```")) cleanedText = cleanedText.slice(0, -3);
       const parsed = JSON.parse(cleanedText.trim());
@@ -2316,14 +2399,23 @@ ${qaText}
   "title": "Новое название задачи",
   "steps": ["шаг 1", "шаг 2", ...]
 }`;
-      const response = await fetch('http://localhost:3001/api/ai/complete', {
+      const response = await fetch('http://127.0.0.1:3001/api/ai/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: [{ role: 'user', content: prompt }] })
       });
-      if (!response.ok) throw new Error('AI Tunnel offline');
+      if (!response.ok) {
+        let errMsg = 'AI Tunnel offline';
+        try {
+          const errData = await response.json();
+          if (errData && errData.error) errMsg += `: ${errData.error}`;
+        } catch (_) {}
+        throw new Error(errMsg);
+      }
       const data = await response.json();
-      let cleanedText = data.choices[0].message.content.trim();
+      const content = data?.choices?.[0]?.message?.content;
+      if (typeof content !== 'string') throw new Error("AI returned empty content");
+      let cleanedText = content.trim();
       if (cleanedText.startsWith("```json")) cleanedText = cleanedText.slice(7);
       if (cleanedText.endsWith("```")) cleanedText = cleanedText.slice(0, -3);
       const parsed = JSON.parse(cleanedText.trim());
@@ -2352,14 +2444,23 @@ ${qaText}
     try {
       const prompt = `Ты — Бездна во вселенной Абаддона. Разложи задачу «${currentCard.title}» на 5-8 максимально мелких, понятных физических микро-шагов, чтобы человек с СДВГ мог приступить к ней без паники и ступора. Текущие шаги: ${currentCard.steps ? currentCard.steps.join(', ') : 'нет'}. Выведи ответ строго в формате JSON: { "steps": ["микро-шаг 1", "микро-шаг 2", ...] }`;
       
-      const response = await fetch('http://localhost:3001/api/ai/complete', {
+      const response = await fetch('http://127.0.0.1:3001/api/ai/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: [{ role: 'user', content: prompt }] })
       });
-      if (!response.ok) throw new Error('AI Tunnel offline');
+      if (!response.ok) {
+        let errMsg = 'AI Tunnel offline';
+        try {
+          const errData = await response.json();
+          if (errData && errData.error) errMsg += `: ${errData.error}`;
+        } catch (_) {}
+        throw new Error(errMsg);
+      }
       const data = await response.json();
-      let cleanedText = data.choices[0].message.content.trim();
+      const content = data?.choices?.[0]?.message?.content;
+      if (typeof content !== 'string') throw new Error("AI returned empty content");
+      let cleanedText = content.trim();
       if (cleanedText.startsWith("```json")) cleanedText = cleanedText.slice(7);
       if (cleanedText.endsWith("```")) cleanedText = cleanedText.slice(0, -3);
       const parsed = JSON.parse(cleanedText.trim());
@@ -2576,6 +2677,40 @@ ${qaText}
         setTimeLeft(nextTime);
         localStorage.setItem('combat_time_left', nextTime);
 
+        // Check and trigger combat break every 30 minutes (1800 seconds)
+        if (activeTask && activeTask.executionMode !== 'day') {
+          const totalSessionTime = activeTask.pomodoroTime * 60;
+          const elapsedSecs = totalSessionTime - nextTime;
+          const breakInterval = 1800; // 30 minutes
+          const breakIndex = Math.floor(elapsedSecs / breakInterval);
+          
+          if (breakIndex > 0 && !triggeredBreaksRef.current.has(breakIndex) && nextTime > 0) {
+            triggeredBreaksRef.current.add(breakIndex);
+            setIsRunning(false);
+            localStorage.setItem('combat_is_running', 'false');
+            
+            const proceduralBreakTasks = [
+              { id: `break-task-1-${Date.now()}`, title: "💆 Когнитивная передышка (Сделать разминку шеи и плеч - 1 мин)", completed: false, xp: 5, gold: 2 },
+              { id: `break-task-2-${Date.now()}`, title: "💧 Эликсир Жизни (Выпить стакан чистой воды)", completed: false, xp: 5, gold: 2 },
+              { id: `break-task-3-${Date.now()}`, title: "💨 Дыхание Бездны (Сделать 5 глубоких вдохов по квадрату)", completed: false, xp: 5, gold: 2 }
+            ];
+            
+            setActiveCombatBreak({
+              index: breakIndex,
+              tasks: proceduralBreakTasks
+            });
+            
+            playBoneCrack();
+            playSuccess();
+            
+            setCombatLog(log => [
+              `⛺ [ПРИВАЛ БОЯ] Достигнута отметка в 30 минут сражения! Таймер приостановлен. Время передохнуть и набраться сил!`,
+              ...log.slice(0, 5)
+            ]);
+            return;
+          }
+        }
+
         // 1. Fatigue accumulator (caps work daily limits) using accurate delta
         const now = Date.now();
         const deltaSec = Math.max(0, (now - lastTickTimeRef.current) / 1000);
@@ -2745,19 +2880,49 @@ ${qaText}
     const activity = activities.find(a => a.id === breakActivityChoice) || activities[0];
     const npc = breakEvent.npc;
 
+    const moralVal = character.moralCompass !== undefined ? character.moralCompass : 50;
+    let spiritContext = "";
+    if (moralVal >= 80) {
+      spiritContext = `\nСИЛА ДУХА И МЕНТАЛЬНОЕ СОСТОЯНИЕ: Искупленный (${moralVal}/100). Изгнанник милосерден, смирен, глубок духом, покорен предначертанию Времени, его диалоги с NPC добрые, он выражает искреннюю благодарность и скромен. NPC говорят с ним тепло и уважительно.`;
+    } else if (moralVal >= 60) {
+      spiritContext = `\nСИЛА ДУХА И МЕНТАЛЬНОЕ СОСТОЯНИЕ: Стойкий Путник (${moralVal}/100). Изгнанник вежлив, покоен, скромен, сосредоточен на искуплении долга, уважает тех, кто делит с ним костер.`;
+    } else if (moralVal >= 40) {
+      spiritContext = `\nСИЛА ДУХА И МЕНТАЛЬНОЕ СОСТОЯНИЕ: Черствый Скиталец (${moralVal}/100). Изгнанник безразличен, холоден, отвечает односложно и безразлично, его заботит только выживание. NPC реагируют так же сухо.`;
+    } else if (moralVal >= 20) {
+      spiritContext = `\nСИЛА ДУХА И МЕНТАЛЬНОЕ СОСТОЯНИЕ: Падший Изгой (${moralVal}/100). Изгнанник озлоблен, раздражителен, говорит сквозь зубы, полон злобы и затаенной боли, грубит NPC. NPC отвечают ему с опаской, презрением или скрытой враждебностью.`;
+    } else {
+      spiritContext = `\nСИЛА ДУХА И МЕНТАЛЬНОЕ СОСТОЯНИЕ: Мясник Бездны (${moralVal}/100). Полное падение духа. Изгнанник безумен от боли, жесток, кровожаден, диалоги полны угрожающей тьмы и ненависти. Встреченные NPC боятся его или нападают первыми в самообороне. Опиши атмосферу дикой жестокости, где он едва сдерживает себя, чтобы не совершить убийство хорошего человека у костра.`;
+    }
+
+    const loreGuidelines = `
+ПРАВИЛА ИМЕНОВАНИЯ И ЛОРА:
+1. НИКОГДА не выдумывай и не используй конкретные имена. Протагонист — БЕЗЛИКОЕ НИЧТО, у которого не осталось прошлого.
+2. ВСЕГДА называй его только «Изгнанник» или по его классу/расе (например, «Изгнанник-Маг меток», «Изгнанный эльф» с учетом переданных класса и расы).
+3. Его былая личность выжжена дотла. В его памяти лишь шрамы, ожоги, фантомная боль от бесконечных прошлых избиений, пыток, удушений и ментального насилия в застенках Бездны, откуда его израненным вышвырнули в повозку смерти сражаться из последних сил.
+
+ЗАПРЕТ НА ВУЛЬГАРНОСТЬ И ТУАЛЕТНЫЙ ЮМОР:
+Строго ЗАПРЕЩЕН любой туалетный юмор, физиологические отвратительные подробности (мочеиспускание, испражнения и т.д.). Держи суровый, реалистичный, трагический и пафосный тон темного фэнтези Джо Аберкромби без дешевой пошлости.
+${spiritContext}
+`;
+
     let prompt = '';
     if (breakEvent.isAmbush) {
-      prompt = `Ты — Летописец Бездны во вселенной Абаддона. Опиши короткую, суровую летопись в стиле Джо Аберкромби.
-Герой (класс: ${character.class}, раса: ${character.race}) собирался сделать перерыв, но обнаружил лишь растерзанный труп «${npc.name}» и засаду разбойников Бездны. Герою пришлось драться за свою жизнь. Опиши эту внезапную схватку в темноте и то, как он перебил бандитов Бездны. 4-5 предложений.`;
+      prompt = `Ты — Летописец Бездны во вселенной Абаддона. Опиши короткую летопись в стиле Джо Аберкромби.
+Изгнанник (класс: ${character.class}, раса: ${character.race}) собирался сделать перерыв, но обнаружил лишь растерзанный труп «${npc.name}» и засаду разбойников Бездны. Ему пришлось драться за свою жизнь. Опиши эту внезапную схватку в темноте и то, как он перебил бандитов Бездны. 4-5 предложений.
+${loreGuidelines}`;
     } else {
       if (npc.type === 'mirror') {
-        prompt = `Ты — ${npc.name}, ${npc.prompt}. Герой (класс: ${character.class}, раса: ${character.race}, ур.${character.level}) выбрал перерыв: «${activity.label}» (в лоре: ${activity.lore}). Порицай его прокрастинацию как грех изгнанника, напомни что он мог бы избежать Бездны будь он внимательнее к себе, но дай шанс искупиться через эту активность. Жёстко но справедливо, тёмное фэнтези. 4-5 предложений.`;
+        prompt = `Ты — ${npc.name}, ${npc.prompt}. Изгнанник (класс: ${character.class}, раса: ${character.race}, ур.${character.level}) выбрал перерыв: «${activity.label}» (в лоре: ${activity.lore}). Порицай его прокрастинацию как грех изгнанника, напомни что он мог бы избежать Бездны будь он внимательнее к себе, но дай шанс искупиться через эту активность. Жёстко но справедливо, тёмное фэнтези. 4-5 предложений.
+${loreGuidelines}`;
       } else if (npc.type === 'provoking') {
-        prompt = `Ты — ${npc.name}, ${npc.prompt}. Герой (класс: ${character.class}, ур.${character.level}) делает перерыв: «${activity.label}» (${activity.lore}). Подначь его, спровоцируй вернуться в бой после перерыва ещё сильнее. Дерзко но с уважением. Тёмное фэнтези. 3-4 предложения.`;
+        prompt = `Ты — ${npc.name}, ${npc.prompt}. Изгнанник (класс: ${character.class}, ур.${character.level}) делает перерыв: «${activity.label}» (${activity.lore}). Подначь его, спровоцируй вернуться в бой после перерыва ещё сильнее. Дерзко но с уважением. Тёмное фэнтези. 3-4 предложения.
+${loreGuidelines}`;
       } else if (npc.type === 'helping') {
-        prompt = `Ты — ${npc.name}, ${npc.prompt}. Герой (класс: ${character.class}, раса: ${character.race}) делает перерыв: «${activity.label}» (${activity.lore}). Помоги практическим советом в стиле своего персонажа. Объясни пользу через метафору мира Абаддона. 3-4 предложения.`;
+        prompt = `Ты — ${npc.name}, ${npc.prompt}. Изгнанник (класс: ${character.class}, раса: ${character.race}) делает перерыв: «${activity.label}» (${activity.lore}). Помоги практическим советом в стиле своего персонажа. Объясни пользу через метафору мира Абаддона. 3-4 предложения.
+${loreGuidelines}`;
       } else {
-        prompt = `Ты — ${npc.name}, ${npc.prompt}. Герой (класс: ${character.class}, раса: ${character.race}, ур.${character.level}) делает перерыв: «${activity.label}» (${activity.lore}). Мотивируй его, скажи мудрое и ободряющее в стиле тёмного фэнтези мира Абаддона. 3-4 предложения.`;
+        prompt = `Ты — ${npc.name}, ${npc.prompt}. Изгнанник (класс: ${character.class}, раса: ${character.race}, ур.${character.level}) делает перерыв: «${activity.label}» (${activity.lore}). Мотивируй его, скажи мудрое и ободряющее в стиле тёмного фэнтези мира Абаддона. 3-4 предложения.
+${loreGuidelines}`;
       }
       if (breakEvent.type === 'big') {
         prompt += ' Это БОЛЬШОЙ привал (1.5 часа работы). Опиши восстановление ран, маны, еду у костра. Подчеркни важность полноценного отдыха для когнитивного здоровья.';
@@ -2765,14 +2930,16 @@ ${qaText}
     }
 
     try {
-      const response = await fetch('http://localhost:3001/api/ai/complete', {
+      const response = await fetch('http://127.0.0.1:3001/api/ai/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: [{ role: 'user', content: prompt }] })
       });
       if (!response.ok) throw new Error('AI недоступен');
       const data = await response.json();
-      setBreakAiText(data.choices[0].message.content);
+      const content = data?.choices?.[0]?.message?.content;
+      if (typeof content !== 'string') throw new Error("AI returned empty content");
+      setBreakAiText(content);
       playSuccess();
     } catch (e) {
       if (breakEvent.isAmbush) {
@@ -2880,23 +3047,37 @@ ${qaText}
     return `${isNegative ? '-' : ''}${m}:${s}`;
   };
 
+  const recalculateEnemyHp = (steps) => {
+    if (!steps || steps.length === 0) return 100;
+    const total = steps.length;
+    const completed = steps.filter(s => s.completed).length;
+    if (completed === total) return 0;
+    const dmgPerStep = 100 / total;
+    return Math.max(1, Math.round(100 - completed * dmgPerStep));
+  };
+
   const handleToggleStep = (stepId) => {
     playClick();
     
     // Complete active step -> Hero strikes the enemy!
     const step = sessionSteps.find(s => s.id === stepId);
-    if (step && !step.completed) {
+    if (!step) return;
+    const wasCompleted = step.completed;
+
+    const updatedSteps = sessionSteps.map(s => s.id === stepId ? { ...s, completed: !s.completed } : s);
+    setSessionSteps(updatedSteps);
+    if (activeTask) {
+      setTasks(prev => prev.map(t => t.id === activeTask.id ? { ...t, steps: updatedSteps } : t));
+    }
+
+    if (!wasCompleted) {
       playSuccess();
       
       // Calculate damage dealt based on step size
-      const dmg = Math.ceil(100 / sessionSteps.length);
-      setEnemyHp(prev => {
-        const nextHp = Math.max(0, prev - dmg);
-        if (nextHp <= 0) {
-          setTimeout(() => handleWinActiveSession(activeTask), 100);
-        }
-        return nextHp;
-      });
+      const dmg = Math.ceil(100 / updatedSteps.length);
+      const nextHp = recalculateEnemyHp(updatedSteps);
+      setEnemyHp(nextHp);
+      
       triggerFlash('fire');
       spawnFloater(`-${dmg} HP!`, 'hero-damage');
       
@@ -2908,13 +3089,102 @@ ${qaText}
       
       // Reset enemy tick threat
       setTicksWithoutStep(0);
-    }
 
-    const updatedSteps = sessionSteps.map(s => s.id === stepId ? { ...s, completed: !s.completed } : s);
+      if (nextHp <= 0) {
+        setTimeout(() => handleWinActiveSession(activeTask), 100);
+      }
+    } else {
+      const nextHp = recalculateEnemyHp(updatedSteps);
+      setEnemyHp(nextHp);
+    }
+  };
+
+  const handleAddStepInCombat = (title) => {
+    if (!title.trim()) return;
+    playClick();
+    const newStep = {
+      id: `step-${Date.now()}`,
+      title: title.trim(),
+      completed: false
+    };
+    const updatedSteps = [...sessionSteps, newStep];
     setSessionSteps(updatedSteps);
     if (activeTask) {
       setTasks(prev => prev.map(t => t.id === activeTask.id ? { ...t, steps: updatedSteps } : t));
     }
+    const nextHp = recalculateEnemyHp(updatedSteps);
+    setEnemyHp(nextHp);
+    
+    setCombatLog(log => [
+      `➕ Добавлена новая фаза прорыва: «${title.trim()}». Здоровье врага пересчитано!`,
+      ...log.slice(0, 5)
+    ]);
+  };
+
+  const handleDeleteStepInCombat = (stepId) => {
+    playClick();
+    const step = sessionSteps.find(s => s.id === stepId);
+    if (!step) return;
+    const updatedSteps = sessionSteps.filter(s => s.id !== stepId);
+    setSessionSteps(updatedSteps);
+    if (activeTask) {
+      setTasks(prev => prev.map(t => t.id === activeTask.id ? { ...t, steps: updatedSteps } : t));
+    }
+    const nextHp = recalculateEnemyHp(updatedSteps);
+    setEnemyHp(nextHp);
+
+    setCombatLog(log => [
+      `🗑️ Удалена фаза прорыва: «${step.title.trim()}». Здоровье врага пересчитано!`,
+      ...log.slice(0, 5)
+    ]);
+    
+    if (updatedSteps.length > 0 && updatedSteps.every(s => s.completed) && nextHp === 0) {
+      setTimeout(() => handleWinActiveSession(activeTask), 100);
+    }
+  };
+
+  const handleEditStepInCombat = (stepId, newTitle) => {
+    if (!newTitle.trim()) return;
+    playClick();
+    const updatedSteps = sessionSteps.map(s => s.id === stepId ? { ...s, title: newTitle.trim() } : s);
+    setSessionSteps(updatedSteps);
+    if (activeTask) {
+      setTasks(prev => prev.map(t => t.id === activeTask.id ? { ...t, steps: updatedSteps } : t));
+    }
+  };
+
+  const handleCompleteCombatBreak = () => {
+    playClick();
+    playSuccess();
+    
+    let earnedXp = 0;
+    let earnedGold = 0;
+    if (activeCombatBreak) {
+      activeCombatBreak.tasks.forEach(t => {
+        if (t.completed) {
+          earnedXp += t.xp;
+          earnedGold += t.gold;
+        }
+      });
+    }
+    
+    setAccumulatedBreakRewards(prev => ({
+      xp: prev.xp + earnedXp,
+      gold: prev.gold + earnedGold
+    }));
+    
+    setActiveCombatBreak(null);
+    
+    // Resume combat
+    setIsRunning(true);
+    localStorage.setItem('combat_timer_start_time', Date.now());
+    localStorage.setItem('combat_timer_start_value', timeLeft);
+    localStorage.setItem('combat_is_running', 'true');
+    
+    setCombatLog(log => [
+      `⛺ Привал завершен! Вы свернули лагерь и бросились обратно в бой! Накоплено на привале: +${earnedXp} XP, +${earnedGold} Золота.`,
+      ...log.slice(0, 5)
+    ]);
   };
 
   const handleFlee = () => {
@@ -4174,13 +4444,13 @@ if (setupStage === 'resolution') {
       <div 
         className="gothic-modal-overlay" 
         style={{ 
-          position: 'absolute',
+          position: isFullscreenFocus ? 'fixed' : 'absolute',
           top: 0,
           left: 0,
-          width: '100%',
-          minHeight: 'calc(100vh - 120px)',
-          height: 'auto',
-          zIndex: 50,
+          width: isFullscreenFocus ? '100vw' : '100%',
+          height: isFullscreenFocus ? '100vh' : 'auto',
+          minHeight: isFullscreenFocus ? '100vh' : 'calc(100vh - 120px)',
+          zIndex: 9999,
           background: 'radial-gradient(circle, rgba(26, 8, 10, 0.75) 0%, rgba(3, 0, 1, 0.9) 100%)',
           backdropFilter: 'blur(6px)',
           WebkitBackdropFilter: 'blur(6px)',
@@ -4196,9 +4466,27 @@ if (setupStage === 'resolution') {
             boxShadow: isSurvival ? '0 0 45px rgba(255, 77, 77, 0.8)' : '0 0 30px rgba(139, 26, 26, 0.5)',
             background: '#090506',
             textAlign: 'center',
-            padding: '2.5rem'
+            padding: '2.5rem',
+            position: 'relative'
           }}
         >
+          <button 
+            className="rpg-btn" 
+            style={{
+              position: 'absolute',
+              top: '12px',
+              right: '12px',
+              zIndex: 10005,
+              padding: '6px 12px',
+              fontSize: '0.75rem',
+              borderColor: 'var(--color-blood-glow)',
+              background: 'rgba(0,0,0,0.6)',
+              color: '#fff',
+            }} 
+            onClick={toggleFullscreenFocus}
+          >
+            {isFullscreenFocus ? '🌌 СВЕРНУТЬ В ОКНО' : '🌌 ПОЛНОЭКРАННЫЙ РЕЖИМ'}
+          </button>
           <h2 className="gothic-title" style={{ fontSize: '1.8rem', color: '#ff4d4d', marginBottom: '1.2rem', textShadow: '0 0 10px rgba(255, 77, 77, 0.5)' }}>
             🚨 ПОДГОТОВИТЬСЯ К БОЮ! 🚨
           </h2>
@@ -4319,13 +4607,13 @@ if (setupStage === 'resolution') {
       <div 
         className="gothic-modal-overlay" 
         style={{ 
-          position: 'absolute',
+          position: isFullscreenFocus ? 'fixed' : 'absolute',
           top: 0,
           left: 0,
-          width: '100%',
-          minHeight: 'calc(100vh - 120px)',
-          height: 'auto',
-          zIndex: 50,
+          width: isFullscreenFocus ? '100vw' : '100%',
+          height: isFullscreenFocus ? '100vh' : 'auto',
+          minHeight: isFullscreenFocus ? '100vh' : 'calc(100vh - 120px)',
+          zIndex: 9999,
           background: 'radial-gradient(circle, rgba(14, 5, 20, 0.75) 0%, rgba(2, 0, 3, 0.9) 100%)',
           backdropFilter: 'blur(6px)',
           WebkitBackdropFilter: 'blur(6px)',
@@ -4350,9 +4638,27 @@ if (setupStage === 'resolution') {
             boxShadow: '0 0 35px rgba(155, 93, 229, 0.4), inset 0 0 15px rgba(0,0,0,0.6)',
             background: '#09050e',
             textAlign: 'center',
-            padding: '2.5rem'
+            padding: '2.5rem',
+            position: 'relative'
           }}
         >
+          <button 
+            className="rpg-btn" 
+            style={{
+              position: 'absolute',
+              top: '12px',
+              right: '12px',
+              zIndex: 10005,
+              padding: '6px 12px',
+              fontSize: '0.75rem',
+              borderColor: '#9b5de5',
+              background: 'rgba(0,0,0,0.6)',
+              color: '#fff',
+            }} 
+            onClick={toggleFullscreenFocus}
+          >
+            {isFullscreenFocus ? '🌌 СВЕРНУТЬ В ОКНО' : '🌌 ПОЛНОЭКРАННЫЙ РЕЖИМ'}
+          </button>
           <h2 className="gothic-title" style={{ fontSize: '1.6rem', color: '#9b5de5', marginBottom: '1.5rem', textShadow: '0 0 10px rgba(155, 93, 229, 0.4)' }}>
             🔮 РИТУАЛ 🔮
           </h2>
@@ -4546,13 +4852,13 @@ if (setupStage === 'resolution') {
       <div 
         className="gothic-modal-overlay" 
         style={{ 
-          position: 'absolute',
+          position: isFullscreenFocus ? 'fixed' : 'absolute',
           top: 0,
           left: 0,
-          width: '100%',
-          minHeight: 'calc(100vh - 120px)',
-          height: 'auto',
-          zIndex: 50,
+          width: isFullscreenFocus ? '100vw' : '100%',
+          height: isFullscreenFocus ? '100vh' : 'auto',
+          minHeight: isFullscreenFocus ? '100vh' : 'calc(100vh - 120px)',
+          zIndex: 9999,
           background: 'radial-gradient(circle, rgba(14, 10, 5, 0.75) 0%, rgba(2, 1, 0, 0.9) 100%)',
           backdropFilter: 'blur(6px)',
           WebkitBackdropFilter: 'blur(6px)'
@@ -4567,9 +4873,27 @@ if (setupStage === 'resolution') {
             boxShadow: '0 0 35px rgba(139, 26, 26, 0.4), inset 0 0 15px rgba(0,0,0,0.6)',
             background: '#0a0605',
             textAlign: 'center',
-            padding: '2.5rem'
+            padding: '2.5rem',
+            position: 'relative'
           }}
         >
+          <button 
+            className="rpg-btn" 
+            style={{
+              position: 'absolute',
+              top: '12px',
+              right: '12px',
+              zIndex: 10005,
+              padding: '6px 12px',
+              fontSize: '0.75rem',
+              borderColor: 'var(--color-blood-glow)',
+              background: 'rgba(0,0,0,0.6)',
+              color: '#fff',
+            }} 
+            onClick={toggleFullscreenFocus}
+          >
+            {isFullscreenFocus ? '🌌 СВЕРНУТЬ В ОКНО' : '🌌 ПОЛНОЭКРАННЫЙ РЕЖИМ'}
+          </button>
           <h2 className="gothic-title" style={{ fontSize: '1.5rem', color: '#ffcc00', marginBottom: '1.5rem', textShadow: '0 0 10px rgba(255, 204, 0, 0.3)' }}>
             ОХОТА
           </h2>
@@ -5296,18 +5620,63 @@ if (setupStage === 'resolution') {
               </div>
             </div>
 
-            {/* Steps Section */}
-            <h4 style={{ fontSize: '0.85rem', color: 'var(--color-bone)', marginBottom: '6px', fontFamily: 'var(--font-rpg)' }}>Шаги прорыва:</h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '1.2rem', paddingLeft: '0.5rem', borderLeft: '1px dashed var(--color-iron-light)' }}>
-              {currentCard.steps && currentCard.steps.map((s, sIdx) => (
-                <div key={sIdx} style={{ fontSize: '0.85rem', color: 'var(--color-bone-dim)' }}>
-                  • {s}
+            {/* Steps Section or Guided Questions Panel */}
+            {reviewGuidedActive ? (
+              <div style={{ background: 'rgba(25, 20, 35, 0.65)', border: '1px dashed var(--color-relic-glow)', padding: '1rem', marginBottom: '1.2rem', borderRadius: '4px' }}>
+                <h4 style={{ fontSize: '0.88rem', color: 'var(--color-relic-glow)', marginBottom: '10px', fontFamily: 'var(--font-rpg)', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <span>💬 Бездна задает вопросы о деталях:</span>
+                </h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+                  {reviewGuidedQuestions.map((q, idx) => (
+                    <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '4px', textAlign: 'left' }}>
+                      <label style={{ fontSize: '0.82rem', color: 'var(--color-bone-dim)', lineHeight: '1.3' }}>{q}</label>
+                      <input 
+                        type="text" 
+                        className="rpg-input" 
+                        style={{ fontSize: '0.85rem', padding: '6px 10px', width: '100%' }} 
+                        placeholder="Ваш ответ..."
+                        value={reviewGuidedAnswers[idx] || ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setReviewGuidedAnswers(prev => ({ ...prev, [idx]: val }));
+                        }}
+                      />
+                    </div>
+                  ))}
                 </div>
-              ))}
-              {(!currentCard.steps || currentCard.steps.length === 0) && (
-                <div style={{ fontStyle: 'italic', color: 'var(--color-iron-light)', fontSize: '0.8rem' }}>Нет шагов. Нажмите кнопку ниже для авто-расширения.</div>
-              )}
-            </div>
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1.2rem' }}>
+                  <button 
+                    className="rpg-btn rpg-btn-mana" 
+                    style={{ fontSize: '0.78rem', padding: '5px 12px' }}
+                    onClick={handleReviewAnswerSubmit}
+                    disabled={loadingAI}
+                  >
+                    🔮 Уточнить шаги Бездной
+                  </button>
+                  <button 
+                    className="rpg-btn" 
+                    style={{ fontSize: '0.78rem', padding: '5px 12px' }}
+                    onClick={() => setReviewGuidedActive(false)}
+                  >
+                    ОТМЕНА
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <h4 style={{ fontSize: '0.85rem', color: 'var(--color-bone)', marginBottom: '6px', fontFamily: 'var(--font-rpg)' }}>Шаги прорыва:</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '1.2rem', paddingLeft: '0.5rem', borderLeft: '1px dashed var(--color-iron-light)' }}>
+                  {currentCard.steps && currentCard.steps.map((s, sIdx) => (
+                    <div key={sIdx} style={{ fontSize: '0.85rem', color: 'var(--color-bone-dim)' }}>
+                      • {s}
+                    </div>
+                  ))}
+                  {(!currentCard.steps || currentCard.steps.length === 0) && (
+                    <div style={{ fontStyle: 'italic', color: 'var(--color-iron-light)', fontSize: '0.8rem' }}>Нет шагов. Нажмите кнопку ниже для авто-расширения.</div>
+                  )}
+                </div>
+              </>
+            )}
 
             {/* AI Warning & Actions for Late Hour / Long Journey */}
             {(currentCard.isLongJourney || isLateHour) && (
@@ -5401,14 +5770,24 @@ if (setupStage === 'resolution') {
                 </label>
               </div>
 
-              <button 
-                className="rpg-btn" 
-                style={{ fontSize: '0.75rem', padding: '3px 8px', borderColor: 'var(--color-mana-glow)' }}
-                onClick={handleDetailedDeconstruction}
-                disabled={loadingAI}
-              >
-                🔮 Нужны более подробные шаги
-              </button>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button 
+                  className="rpg-btn" 
+                  style={{ fontSize: '0.75rem', padding: '3px 8px', borderColor: 'var(--color-mana-glow)' }}
+                  onClick={handleDetailedDeconstruction}
+                  disabled={loadingAI}
+                >
+                  🔮 Нужны более подробные шаги
+                </button>
+                <button 
+                  className="rpg-btn" 
+                  style={{ fontSize: '0.75rem', padding: '3px 8px', borderColor: 'var(--color-relic-glow)' }}
+                  onClick={handleRequestReviewQuestions}
+                  disabled={loadingAI || reviewGuidedActive}
+                >
+                  💬 Расспросить Бездну (Диалог)
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -5559,6 +5938,144 @@ if (setupStage === 'resolution') {
 
   // --- ACTIVE SESSION STAGE (RPG COMBAT ARENA WITH DYNAMIC WOW CLASS SKILLS) ---
   if (setupStage === 'active' && activeTask) {
+    if (activeCombatBreak) {
+      return (
+        <div 
+          className="rpg-panel rest-camp-overlay animate-fade-in" 
+          style={isFullscreenFocus ? {
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            zIndex: 9999,
+            overflowY: 'auto',
+            background: 'radial-gradient(circle, #24140b 0%, #080301 100%)',
+            padding: '2.5rem',
+            border: '3px solid #ff9f43',
+            boxShadow: '0 0 35px rgba(255, 159, 67, 0.4), inset 0 0 20px rgba(0,0,0,0.8)',
+            boxSizing: 'border-box',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center'
+          } : {
+            maxWidth: '950px',
+            margin: '0 auto',
+            padding: '2.5rem',
+            border: '3px solid #ff9f43',
+            boxShadow: '0 0 35px rgba(255, 159, 67, 0.4), inset 0 0 20px rgba(0,0,0,0.8)',
+            background: 'radial-gradient(circle, #24140b 0%, #080301 100%)',
+            textAlign: 'center',
+            position: 'relative'
+          }}
+        >
+          <button 
+            className="rpg-btn" 
+            style={{
+              position: 'absolute',
+              top: '12px',
+              right: '12px',
+              zIndex: 10005,
+              padding: '6px 12px',
+              fontSize: '0.75rem',
+              borderColor: '#ff9f43',
+              background: 'rgba(0,0,0,0.6)',
+              color: '#ff9f43',
+            }} 
+            onClick={toggleFullscreenFocus}
+          >
+            {isFullscreenFocus ? '🌌 СВЕРНУТЬ В ОКНО' : '🌌 ПОЛНОЭКРАННЫЙ РЕЖИМ'}
+          </button>
+
+          <span style={{ fontSize: '4rem', filter: 'drop-shadow(0 0 15px rgba(255, 159, 67, 0.4))' }}>⛺</span>
+          
+          <h1 className="gothic-title" style={{ color: '#ff9f43', fontSize: '2rem', marginBottom: '0.5rem', letterSpacing: '2px', textShadow: '0 0 10px rgba(255, 159, 67, 0.3)' }}>
+            ⛺ БОЕВОЙ ПРИВАЛ: Дыхание Бездны
+          </h1>
+          <p style={{ color: 'var(--color-bone-dim)', fontSize: '0.95rem', maxWidth: '600px', margin: '0 auto 1.5rem auto', lineHeight: '1.5', fontStyle: 'italic', fontFamily: 'Georgia, serif' }}>
+            «Вы бьетесь в чертогах Абаддона уже 30 минут. Разум требует краткой передышки, костер трещит во мгле. Духи шепчут вам выполнить простые дела, дабы укрепить боевую волю!»
+          </p>
+
+          <div style={{ 
+            background: 'rgba(0,0,0,0.5)', 
+            border: '1px solid rgba(255, 159, 67, 0.2)', 
+            borderRadius: '4px',
+            padding: '1.5rem', 
+            maxWidth: '650px',
+            width: '100%',
+            boxShadow: 'inset 0 0 20px rgba(0,0,0,0.8)',
+            marginBottom: '2rem',
+            textAlign: 'left'
+          }}>
+            <h3 style={{ fontSize: '0.9rem', color: '#ff9f43', textTransform: 'uppercase', marginBottom: '1rem', borderBottom: '1px dashed rgba(255,159,67,0.2)', paddingBottom: '5px', fontFamily: 'var(--font-rpg)' }}>
+              🎯 Испытания привала (Дополнительные награды в конце боя):
+            </h3>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+              {activeCombatBreak.tasks.map(t => (
+                <div 
+                  key={t.id}
+                  onClick={() => {
+                    playClick();
+                    if (!t.completed) playSuccess();
+                    setActiveCombatBreak(prev => {
+                      const updatedTasks = prev.tasks.map(task => task.id === t.id ? { ...task, completed: !task.completed } : task);
+                      return { ...prev, tasks: updatedTasks };
+                    });
+                    if (!t.completed) {
+                      spawnFloater(`+${t.xp} XP!`, 'hero-damage');
+                    }
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.8rem',
+                    padding: '0.75rem 1rem',
+                    background: t.completed ? 'rgba(46, 213, 115, 0.05)' : 'rgba(0,0,0,0.3)',
+                    border: `1px solid ${t.completed ? '#2ed573' : 'rgba(255, 159, 67, 0.15)'}`,
+                    cursor: 'pointer',
+                    textDecoration: t.completed ? 'line-through' : 'none',
+                    opacity: t.completed ? 0.6 : 1,
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <input 
+                    type="checkbox"
+                    checked={t.completed}
+                    onChange={() => {}}
+                    style={{ accentColor: '#2ed573', pointerEvents: 'none' }}
+                  />
+                  <div style={{ flex: 1 }}>
+                    <span style={{ fontSize: '0.9rem', color: '#fff' }}>{t.title}</span>
+                  </div>
+                  <div style={{ fontSize: '0.75rem', fontFamily: 'var(--font-rpg)', color: '#2ed573', display: 'flex', gap: '8px' }}>
+                    <span>🎁 +{t.xp} XP</span>
+                    <span style={{ color: '#ffd700' }}>🪙 +{t.gold} Золота</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <button 
+            className="rpg-btn"
+            style={{ 
+              padding: '0.8rem 2.5rem', 
+              fontSize: '1.05rem', 
+              borderColor: '#ff9f43', 
+              color: '#ff9f43',
+              boxShadow: '0 0 15px rgba(255, 159, 67, 0.2)',
+              fontWeight: 'bold'
+            }}
+            onClick={handleCompleteCombatBreak}
+          >
+            ⛺ СВЕРНУТЬ ЛАГЕРЬ И ПРОДОЛЖИТЬ БОЙ
+          </button>
+        </div>
+      );
+    }
+
     const isBoss = activeTask.type === 'siege';
     const potionCount = character.inventory?.filter(i => i.id === 'item_potion').length || 0;
 
@@ -5578,7 +6095,50 @@ if (setupStage === 'resolution') {
        "Враг неповоротлив: начните с самого простого физического шага.");
 
     return (
-      <div className="rpg-panel" style={{ maxWidth: '950px', margin: '0 auto', border: `2px solid ${isBoss ? 'var(--color-blood-glow)' : 'var(--color-iron-light)'}` }}>
+      <div 
+        className={`rpg-panel ${isFullscreenFocus ? 'immersive-fullscreen-arena' : ''}`}
+        style={isFullscreenFocus ? {
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          zIndex: 9999,
+          overflowY: 'auto',
+          background: 'radial-gradient(circle, #0e0813 0%, #030106 100%)',
+          padding: '2rem',
+          maxWidth: '100vw',
+          margin: 0,
+          border: `3px solid ${isBoss ? 'var(--color-blood-glow)' : 'var(--color-relic-glow)'}`,
+          boxSizing: 'border-box'
+        } : {
+          maxWidth: '950px',
+          margin: '0 auto',
+          border: `2px solid ${isBoss ? 'var(--color-blood-glow)' : 'var(--color-iron-light)'}`,
+          position: 'relative'
+        }}
+      >
+        <button 
+          className="rpg-btn" 
+          style={{
+            position: 'absolute',
+            top: '12px',
+            right: '12px',
+            zIndex: 10005,
+            padding: '6px 12px',
+            fontSize: '0.75rem',
+            borderColor: isBoss ? 'var(--color-blood-glow)' : 'var(--color-relic-glow)',
+            background: 'rgba(0,0,0,0.6)',
+            color: '#fff',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px'
+          }} 
+          onClick={toggleFullscreenFocus}
+        >
+          {isFullscreenFocus ? '🌌 СВЕРНУТЬ В ОКНО' : '🌌 ПОЛНОЭКРАННЫЙ РЕЖИМ'}
+        </button>
+
         {/* Screen Flash overlays */}
         {screenFlash && <div className={`screen-flash flash-${screenFlash}`} />}
 
@@ -5667,33 +6227,97 @@ if (setupStage === 'resolution') {
               🎯 Фазы прорыва к победе:
             </h3>
             
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '1.5rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '1rem' }}>
               {sessionSteps.length > 0 ? (
                 sessionSteps.map((step) => (
                   <div 
                     key={step.id} 
-                    onClick={() => handleToggleStep(step.id)}
+                    onClick={() => {
+                      if (editingStepId !== step.id) {
+                        handleToggleStep(step.id);
+                      }
+                    }}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '0.8rem',
+                      justifyContent: 'space-between',
                       padding: '0.75rem',
                       background: step.completed ? 'rgba(0,0,0,0.25)' : 'var(--color-iron)',
                       border: '1px solid var(--color-iron-light)',
-                      textDecoration: step.completed ? 'line-through' : 'none',
                       opacity: step.completed ? 0.45 : 1,
                       cursor: 'pointer'
                     }}
                   >
-                    <input 
-                      type="checkbox" 
-                      checked={step.completed} 
-                      onChange={() => {}} 
-                      style={{ pointerEvents: 'none' }}
-                    />
-                    <span style={{ fontSize: '0.9rem', color: step.completed ? 'var(--color-bone-dim)' : '#fff' }}>
-                      {step.title}
-                    </span>
+                    {editingStepId === step.id ? (
+                      <div style={{ display: 'flex', gap: '8px', width: '100%', alignItems: 'center' }} onClick={(e) => e.stopPropagation()}>
+                        <input 
+                          type="text" 
+                          className="rpg-input" 
+                          style={{ flex: 1, fontSize: '0.85rem', padding: '4px 8px', background: '#000', color: '#fff', border: '1px solid var(--color-relic)' }} 
+                          value={editingStepText}
+                          onChange={(e) => setEditingStepText(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && editingStepText.trim()) {
+                              handleEditStepInCombat(step.id, editingStepText);
+                              setEditingStepId(null);
+                            }
+                          }}
+                        />
+                        <button 
+                          className="rpg-btn" 
+                          style={{ padding: '4px 10px', fontSize: '0.75rem', borderColor: '#2ed573', color: '#2ed573' }}
+                          onClick={() => {
+                            handleEditStepInCombat(step.id, editingStepText);
+                            setEditingStepId(null);
+                          }}
+                        >
+                          ✓
+                        </button>
+                        <button 
+                          className="rpg-btn" 
+                          style={{ padding: '4px 10px', fontSize: '0.75rem' }}
+                          onClick={() => setEditingStepId(null)}
+                        >
+                          ✗
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', textDecoration: step.completed ? 'line-through' : 'none' }}>
+                          <input 
+                            type="checkbox" 
+                            checked={step.completed} 
+                            onChange={() => {}} 
+                            style={{ pointerEvents: 'none' }}
+                          />
+                          <span style={{ fontSize: '0.9rem', color: step.completed ? 'var(--color-bone-dim)' : '#fff' }}>
+                            {step.title}
+                          </span>
+                        </div>
+                        
+                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }} onClick={(e) => e.stopPropagation()}>
+                          <button
+                            className="rpg-btn"
+                            style={{ padding: '2px 6px', fontSize: '0.75rem', border: 'none', background: 'none', cursor: 'pointer' }}
+                            title="Редактировать фазу"
+                            onClick={() => {
+                              setEditingStepId(step.id);
+                              setEditingStepText(step.title);
+                            }}
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            className="rpg-btn"
+                            style={{ padding: '2px 6px', fontSize: '0.75rem', border: 'none', background: 'none', cursor: 'pointer' }}
+                            title="Удалить фазу"
+                            onClick={() => handleDeleteStepInCombat(step.id)}
+                          >
+                            ❌
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 ))
               ) : (
@@ -5708,6 +6332,36 @@ if (setupStage === 'resolution') {
                   🔮 Бездна расшифровывает фазы прорыва квеста...
                 </div>
               )}
+            </div>
+
+            {/* Input to add step manually in combat */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '1.5rem' }}>
+              <input 
+                type="text" 
+                className="rpg-input"
+                style={{ flex: 1, fontSize: '0.85rem', padding: '6px 10px', background: '#000', color: '#fff', border: '1px solid var(--color-iron-light)' }}
+                placeholder="Призвать новую фазу прорыва..."
+                value={newCombatStepText}
+                onChange={(e) => setNewCombatStepText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && newCombatStepText.trim()) {
+                    handleAddStepInCombat(newCombatStepText);
+                    setNewCombatStepText('');
+                  }
+                }}
+              />
+              <button 
+                className="rpg-btn"
+                style={{ fontSize: '0.8rem', padding: '6px 12px', borderColor: 'var(--color-relic-glow)', color: 'var(--color-relic-glow)' }}
+                onClick={() => {
+                  if (newCombatStepText.trim()) {
+                    handleAddStepInCombat(newCombatStepText);
+                    setNewCombatStepText('');
+                  }
+                }}
+              >
+                + ФАЗА
+              </button>
             </div>
 
             {/* Controls */}
