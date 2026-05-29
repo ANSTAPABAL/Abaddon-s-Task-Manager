@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Skull, Pin, Trash2, Shield, Calendar, Sparkles, CheckSquare, Plus, ArrowRight, UserCheck, Flame, RefreshCw } from 'lucide-react';
 import { useAudio } from '../hooks/useAudio';
+import { getVirtualTodayStr, getVirtualTomorrowStr, parseDeadlineTextToDate } from '../utils/dateUtils';
 
 const generateLocalSteps = (title, type) => {
   const t = title.toLowerCase();
@@ -185,7 +186,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
     try {
       const result = await parseMessyTasks(chaosText);
       if (result && Array.isArray(result)) {
-        const todayDateStr = new Date().toISOString().split('T')[0];
+        const todayDateStr = getVirtualTodayStr();
         const newTasks = result.map((t, idx) => {
           const initialType = t.type || classifyLocally(t.title);
           return {
@@ -193,7 +194,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
             title: t.title,
             type: initialType,
             status: 'active',
-            date: t.deadline ? todayDateStr : null, // if they have a deadline, add to today, else backlog
+            date: t.scheduledDate || parseDeadlineTextToDate(t.deadline, todayDateStr) || (t.deadline ? todayDateStr : null), // parse deadline correctly or put in today/backlog
             pomodoroTime: t.estimatedTime || (initialType === 'siege' ? 50 : 25),
             pomodoroSpent: 0,
             isSurvival: isChaosSurvivalMode,
@@ -421,10 +422,8 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
   const [pushDestination, setPushDestination] = useState('backlog'); // backlog, tomorrow
 
   const handlePostponeAllToday = () => {
-    const todayDateStr = new Date().toISOString().split('T')[0];
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowDateStr = tomorrow.toISOString().split('T')[0];
+    const todayDateStr = getVirtualTodayStr();
+    const tomorrowDateStr = getVirtualTomorrowStr();
 
     const todayActiveTasks = tasks.filter(t => t.date === todayDateStr && t.status === 'active');
     if (todayActiveTasks.length === 0) {
@@ -488,7 +487,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
 
     playSuccess();
 
-    const todayDateStr = new Date().toISOString().split('T')[0];
+    const todayDateStr = getVirtualTodayStr();
     setTasks(prev => prev.map(t => {
       if (t.id === taskId) {
         return {
@@ -524,11 +523,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
     const performPush = (runeData) => {
       playBoneCrack();
 
-      const targetDate = destination === 'tomorrow' ? (() => {
-        const d = new Date();
-        d.setDate(d.getDate() + 1);
-        return d.toISOString().split('T')[0];
-      })() : null; // backlog is null
+      const targetDate = destination === 'tomorrow' ? getVirtualTomorrowStr() : null; // backlog is null
 
       const updatedTasks = tasks.map(t => {
         if (t.id === taskId) {
@@ -662,18 +657,26 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
 
   const handleSaveEdits = () => {
     playSuccess();
-    setTasks(prev => prev.map(t => t.id === editingTask.id ? {
-      ...t,
-      title: editTitle,
-      type: editType,
-      pomodoroTime: Number(editTime),
-      intent: editIntent,
-      steps: editSteps,
-      nature: editNature,
-      executionMode: editExecutionMode,
-      deadline: editDeadline,
-      isSurvival: editIsSurvival
-    } : t));
+    const todayStr = getVirtualTodayStr();
+    setTasks(prev => prev.map(t => {
+      if (t.id === editingTask.id) {
+        const parsedDate = editDeadline ? parseDeadlineTextToDate(editDeadline, todayStr) : null;
+        return {
+          ...t,
+          title: editTitle,
+          type: editType,
+          pomodoroTime: Number(editTime),
+          intent: editIntent,
+          steps: editSteps,
+          nature: editNature,
+          executionMode: editExecutionMode,
+          deadline: editDeadline,
+          date: parsedDate || t.date || (editDeadline ? todayStr : null),
+          isSurvival: editIsSurvival
+        };
+      }
+      return t;
+    }));
     setEditingTask(null);
   };
 

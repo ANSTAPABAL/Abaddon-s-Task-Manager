@@ -39,7 +39,19 @@ export default function App() {
   
   // App States
   const [activeTab, setActiveTab] = useState('escape'); // escape, character, planner, recovery
-  const [tasks, setTasks] = useState([]);
+  const [tasks, setTasksState] = useState([]);
+
+  const setTasks = (newTasksVal) => {
+    setTasksState(prev => {
+      const next = typeof newTasksVal === 'function' ? newTasksVal(prev) : newTasksVal;
+      fetch('http://127.0.0.1:3001/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(next)
+      }).catch(err => console.warn("Failed to auto-save tasks:", err));
+      return next;
+    });
+  };
   const [character, setCharacter] = useState(rollStartingCharacter);
   
   // Reminders states
@@ -207,6 +219,92 @@ export default function App() {
   const [judgmentTasks, setJudgmentTasks] = useState([]);
   const [judgmentIndex, setJudgmentIndex] = useState(0);
   const [judgmentShowReschedule, setJudgmentShowReschedule] = useState(false);
+  const [judgmentResolution, setJudgmentResolution] = useState(null); // { task, text, loading }
+
+  const handleGenerateJudgmentChronicle = async (task) => {
+    setJudgmentResolution(prev => ({ ...prev, loading: true }));
+    try {
+      const isPastDebt = task?.type === 'corpse' || (task?.curseLevel && task.curseLevel > 0);
+      const isLargeQuest = task?.pomodoroTime >= 50 || task?.type === 'siege';
+      const hpContext = character.hp <= 30 ? `Герой истощен, едва держится на ногах (критический уровень здоровья HP: ${character.hp})` : `Герой крепок и полон сил (здоровье HP: ${character.hp})`;
+      
+      const moralVal = character.moralCompass !== undefined ? character.moralCompass : 50;
+      let spiritContext = "";
+      if (moralVal >= 80) {
+        spiritContext = `\nСИЛА ДУХА И МЕНТАЛЬНОЕ СОСТОЯНИЕ: Искупленный (${moralVal}/100). Изгнанник милосерден, смирен, глубок духом, покорен предначертанию Времени, его диалоги с NPC добрые, он выражает искреннюю благодарность и скромен. В летописи его победы будут выглядеть благородно, милосердно, величественно, он стремится сберечь жизни невиновных.`;
+      } else if (moralVal >= 60) {
+        spiritContext = `\nСИЛА ДУХА И МЕНТАЛЬНОЕ СОСТОЯНИЕ: Стойкий Путник (${moralVal}/100). Изгнанник вежлив, покоен, скромен, сосредоточен на искуплении долга, уважает союзников.`;
+      } else if (moralVal >= 40) {
+        spiritContext = `\nСИЛА ДУХА И МЕНТАЛЬНОЕ СОСТОЯНИЕ: Черствый Скиталец (${moralVal}/100). Изгнанник безразличен, холоден, отвечает односложно, его заботит только выживание, к встречным он абсолютно равнодушен.`;
+      } else if (moralVal >= 20) {
+        spiritContext = `\nСИЛА ДУХА И МЕНТАЛЬНОЕ СОСТОЯНИЕ: Падший Изгой (${moralVal}/100). Изгнанник озлоблен, раздражителен, полон злобы и затаенной боли, говорит сквозь зубы, совершает неоправданно жестокие поступки. Встреченные им люди боятся его или презирают.`;
+      } else {
+        spiritContext = `\nСИЛА ДУХА И МЕНТАЛЬНОЕ СОСТОЯНИЕ: Мясник Бездны (${moralVal}/100). Полное падение духа. Изгнанник абсолютно жесток, кровожаден, безумен от боли и ярости, совершает страшную дикую жестокость, может без повода убить хорошего человека, встреченные им люди нападают на него из самообороны или страха, а диалоги полны угрожающей тьмы и ненависти.`;
+      }
+
+      const lastLegend = pedestals && pedestals.length > 0 ? pedestals[pedestals.length - 1] : null;
+      let legacyPromptContext = "";
+      if (lastLegend) {
+        if (lastLegend.legacyStatus === 'stained') {
+          legacyPromptContext = `\n⚠️ НАСЛЕДИЕ РОДОСЛОВНОЙ: Предыдущий герой пользователя (${lastLegend.name}, класс ${lastLegend.class}) трагически пал/потерпел позорное поражение, и его имя ЗАПЯТНАНО. Текущий герой несет груз стыда предка ${lastLegend.name} и отчаянно пытается искупить этот позор. Вплети это кратко в текст летописи.`;
+        } else if (lastLegend.legacyStatus === 'sanctified') {
+          legacyPromptContext = `\n⚠️ НАСЛЕДИЕ РОДОСЛОВНОЙ: Предыдущий герой пользователя (${lastLegend.name}, класс ${lastLegend.class}) совершил великий триумф, одолев Скверну Абаддона, и его имя ОСВЯЩЕНО. Текущий герой овеян славой предка ${lastLegend.name} и стремится соответствовать его величию. Вплети это кратко в текст летописи.`;
+        }
+      }
+
+      const loreGuidelines = `
+ПРАВИЛА ИМЕНОВАНИЯ И ЛОРА:
+1. НИКОГДА не выдумывай и не используй конкретные имена (никаких "Дункан" и т.д.). Протагонист — БЕЗЛИКОЕ НИЧТО, у которого не осталось прошлого.
+2. ВСЕГДА называй его только «Изгнанник» или по его классу/расе (например, «Изгнанник-Маг меток», «Изгнанный эльф» с учетом его переданных класса и расы).
+3. Его былая личность выжжена дотла. В его памяти лишь шрамы, ожоги, фантомная боль от бесконечных прошлых избиений, пыток, удушений и ментального насилия в застенках Бездны, откуда его израненным вышвырнули в повозку смерти сражаться из последних сил. Отрази этот тяжелый лорный контекст преодоления боли и триумфа увядающей воли.
+
+ЗАПРЕТ НА ВУЛЬГАРНОСТЬ:
+Строго ЗАПРЕЩЕН любой туалетный юмор, физиологические отвратительные подробности (мочеиспускание, испражнения и т.д.). Держи суровый, реалистичный, трагический и пафосный тон темного фэнтези Джо Аберкромби без дешевой пошлости.
+${spiritContext}
+`;
+
+      const prompt = `Ты — Летописец Бездны во вселенной Абаддона. Опиши короткую, суровую и грязную летопись-эпитафию в стиле Джо Аберкромби (темное фэнтези, реализм, цинизм, кровь, пот и грязь).
+Изгнанник одержал победу в фокус-сессии над когнитивной тварью (задача: "${task?.title || ''}").
+${legacyPromptContext}
+
+ТЕХНИЧЕСКИЙ КОНТЕКСТ ГЕРОЯ:
+- Раса: ${character.race}
+- Класс: ${character.class}
+- Текущее состояние здоровья: ${hpContext}
+- Время контракта: ${task?.pomodoroTime || 25} минут
+- Срок (дедлайн): ${task?.deadline || 'без жесткого дедлайна'}
+- Характер задачи: ${isLargeQuest ? 'КРУПНОЕ СРАЖЕНИЕ (Осада/Большой квест)' : 'НЕБОЛЬШАЯ СХВАТКА'}
+- Статус просрочки: ${isPastDebt ? 'ПРОСРОЧЕННЫЙ ДОЛГ / ПРОКЛЯТАЯ ЗАДАЧА (труп прошлого / высокий уровень скверны)' : 'Свежий своевременный контракт'}
+
+ТРЕБОВАНИЯ К ОПИСАНИЮ:
+1. Используй неподражаемый циничный писательский стиль Джо Аберкромби (темное фэнтези, кровь в грязи, тяжелое дыхание, грубые фразы, суровый реализм).
+2. Опиши финальный безжалостный удар с использованием классовых фишек героя (если класс — Химомансер/Маг крови, упомяни использование алой крови, шипов, вен; если класс — Пси-Телекинетик/Psi-Telekinetic/Mental Sovereign, упомяни использование ментального взрыва/Kopfplatzen; если класс — Плазмамансер, упомяни клинки эфира или искривление пространства; если другой класс — обыграй его особенности).
+3. Обыграй состояние здоровья (если HP мало — покажи, что герой победил на грани сил, сплевывая кровь; если HP много — что он двигался уверенно).
+4. Обыграй размер задачи и статус просрочки:
+   - Если это КРУПНЫЙ квест или ПРОСРОЧЕННЫЙ долг, покажи, что этот триумф возвращает Изгнаннику веру в свои силы после кучи провалов и прокрастинации.
+   - Если это мелкий квест — покажи, что это быстрая и уверенная победа, приближающая нас к цели.
+5. Текст должен быть коротким (до 90 слов), разделенным ровно на 2-3 коротких абзаца. Разрешены уместные крепкие словечки (вроде "ублюдок", "дерьмо") для придания грязи и атмосферы.
+${loreGuidelines}`;
+
+      const response = await fetch('http://127.0.0.1:3001/api/ai/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: [{ role: 'user', content: prompt }] })
+      });
+      if (!response.ok) throw new Error('AI Tunnel offline');
+      const data = await response.json();
+      const content = data?.choices?.[0]?.message?.content;
+      if (typeof content !== 'string') throw new Error("AI returned empty content");
+      setJudgmentResolution(prev => ({ ...prev, text: content.trim(), loading: false }));
+    } catch (e) {
+      console.error(e);
+      setJudgmentResolution(prev => ({ 
+        ...prev, 
+        text: `«Его воля сокрушила прокрастинацию и навеки разогнала Скверну Абаддона...»\n\n(Не удалось соединиться с сервером AI для составления индивидуальной летописи, но духи помнят твой подвиг!)`, 
+        loading: false 
+      }));
+    }
+  };
 
   const handleCommuneWithSpirits = async (overrideTasks) => {
     playClick();
@@ -607,7 +705,7 @@ export default function App() {
           executionMode: t.executionMode || 'ask_later',
           nature: t.nature || 'external'
         }));
-        setTasks(migrated);
+        setTasksState(migrated);
 
         // Trigger Daily Judgment Ceremony for overdue active contracts
         const todayStr = getVirtualTodayStr();
@@ -652,15 +750,7 @@ export default function App() {
       .catch(err => console.warn("Using in-memory pedestals hall"));
   }, []);
 
-  // Save tasks on edit
-  useEffect(() => {
-    if (tasks.length === 0) return;
-    fetch('http://127.0.0.1:3001/api/tasks', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(tasks)
-    }).catch(err => console.warn("Could not save tasks to backend"));
-  }, [tasks]);
+  // Tasks auto-saving is handled directly by the setTasks wrapper to ensure immediate persistence and avoid race conditions/lost updates.
 
   // Save character on stat change
   useEffect(() => {
@@ -686,6 +776,10 @@ export default function App() {
   const parseMessyTasks = async (textBlob) => {
     const currentHour = new Date().getHours();
     const failuresLessons = tasks ? tasks.filter(t => t.runeOfReturn && t.runeOfReturn.futureAdvice).map(t => t.runeOfReturn.futureAdvice) : [];
+    const virtualTodayStr = getVirtualTodayStr();
+    const weekdaysLongRU = ["воскресенье", "понедельник", "вторник", "среда", "четверг", "пятница", "суббота"];
+    const virtualMs = Date.now() - 2 * 60 * 60 * 1000;
+    const virtualDayOfWeek = weekdaysLongRU[new Date(virtualMs).getDay()];
 
     const systemPrompt = `Ты — Бездна во вселенной Абаддона. Твоя задача — взять хаотичные мысли СДВГ-пользователя и превратить их в структурированный JSON-массив задач, геймифицированных как квесты из мрачной фэнтези RPG.
 
@@ -710,7 +804,16 @@ export default function App() {
 4. "weakPoints": массив из 2 инсайтов о психологических и поведенческих слабостях этого врага/задачи (например: ["Монстр боится правила 5 минут...", "Враг слеп к вашей активности..."]).
 5. "randomEvent": жуткое или допаминовое случайное событие-модификатор боя (например: "Густой туман Бездны скрывает шкалу здоровья", "Допаминовая вспышка: удвоенный опыт за этот бой!", "Скрежет цепей ускоряет таймер страха").
 6. "deadline": найди в тексте пользователя срок выполнения, дедлайн, время или день (например: "до среды", "до 18:00", "завтра утром", "до конца дня"), извлеки его и кратко запиши (например: "Среда", "18:00", "Завтра"). Если срок в тексте не упомянут или не ясен, запиши null.
-7. "estimatedTime": ОБЯЗАТЕЛЬНО проанализируй текст на наличие времени (например, "займет полчаса", "буду делать 45 минут", "делать 2 часа"). Если пользователь указал реальное время, переведи его в минуты (например, 30, 45, 120) и запиши. Если пользователь написал что-то примерное ("примерно часок", "полдня", "минут сорок") или написал "не знаю", или вообще не указал время, ты ДОЛЖЕН рассчитать и подставить реалистичное среднее время (например, 25-30 минут для простых задач "hunt", 45-60 минут для интеллектуальных "relic", 90-120 минут для сложных "siege" и Осад). Поле "estimatedTime" всегда должно быть числом (минуты) и никогда не null или undefined!
+7. "scheduledDate": рассчитай точную дату запланированного выполнения в формате "YYYY-MM-DD" на основе дедлайна, используя сегодняшнюю дату в качестве точки отсчета.
+   Сегодняшняя виртуальная дата отсчета: ${virtualTodayStr} (день недели: ${virtualDayOfWeek}).
+   Примеры расчетов:
+   - "завтра" -> дата завтрашнего дня (${getVirtualTomorrowStr()})
+   - "через 2 дня" -> сегодняшняя дата + 2 дня
+   - "до среды" / "в среду" -> дата ближайшей среды в будущем
+   - "до пятницы" / "в пятницу" -> дата ближайшей пятницы в будущем
+   - "до конца дня" / "сегодня" / (если дедлайн не указан, но задача должна быть сделана сегодня) -> сегодняшняя дата (${virtualTodayStr})
+   Если задача не имеет временных рамок и предназначена для бэклога, запиши null.
+8. "estimatedTime": ОБЯЗАТЕЛЬНО проанализируй текст на наличие времени (например, "займет полчаса", "буду делать 45 минут", "делать 2 часа"). Если пользователь указал реальное время, переведи его в минуты (например, 30, 45, 120) и запиши. Если пользователь написал что-то примерное ("примерно часок", "полдня", "минут сорок") или написал "не знаю", или вообще не указал время, ты ДОЛЖЕН рассчитать и подставить реалистичное среднее время (например, 25-30 минут для простых задач "hunt", 45-60 минут для интеллектуальных "relic", 90-120 минут для сложных "siege" и Осад). Поле "estimatedTime" всегда должно быть числом (минуты) и никогда не null или undefined!
 
 ТЕКУЩИЙ КОНТЕКСТ ВРЕМЕНИ И ОШИБОК (АНАЛИЗ И ОБУЧЕНИЕ):
 - Текущее время постановки задач: ${new Date().toLocaleTimeString()} (Час: ${currentHour}).
@@ -735,6 +838,7 @@ ${failuresLessons.length > 0 ? failuresLessons.map(l => `  * "${l}"`).join('\n')
     "weakPoints": ["Монстр боится правила 5 минут...", "Начните с глупого действия..."],
     "randomEvent": "Густой туман Бездны скрывает здоровье...",
     "deadline": "до среды",
+    "scheduledDate": "2026-06-03",
     "isLongJourney": false
   }
 ]`;
@@ -1578,7 +1682,79 @@ ${contextPrompt}`;
               </p>
             </div>
 
-            {!judgmentShowReschedule ? (
+            {judgmentResolution ? (
+              <div>
+                {judgmentResolution.loading ? (
+                  <div style={{ padding: '2rem' }}>
+                    <div className="heartbeat-pulse fast" style={{ fontSize: '1.2rem', color: '#8b0000', fontWeight: 'bold' }}>
+                      🔮 ЛЕТОПИСЕЦ БЕЗДНЫ СОСТАВЛЯЕТ СВИТОК...
+                    </div>
+                  </div>
+                ) : judgmentResolution.text ? (
+                  <div style={{ textAlign: 'left', fontFamily: 'Georgia, serif', lineHeight: '1.6' }}>
+                    <h4 style={{ color: '#8b0000', fontSize: '1.15rem', borderBottom: '1px solid #5c4033', paddingBottom: '0.4rem', marginBottom: '0.8rem', fontWeight: 'bold' }}>
+                      📜 Итоги боя: {judgmentResolution.task.title}
+                    </h4>
+                    <p style={{ whiteSpace: 'pre-line', color: '#2a1a08', fontSize: '0.92rem' }}>
+                      {judgmentResolution.text}
+                    </p>
+                    <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1.5rem' }}>
+                      <button 
+                        className="rpg-btn"
+                        style={{ background: '#8b0000', color: '#fff', borderColor: '#5c4033', padding: '8px 25px' }}
+                        onClick={() => {
+                          playClick();
+                          setJudgmentResolution(null);
+                          // Move to next task
+                          if (judgmentIndex + 1 < judgmentTasks.length) {
+                            setJudgmentIndex(prev => prev + 1);
+                          } else {
+                            setJudgmentOpen(false);
+                          }
+                        }}
+                      >
+                        Да будет так (Продолжить)
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <p style={{ fontSize: '1.05rem', marginBottom: '1.5rem', fontWeight: 'bold', color: '#2a1a08' }}>
+                      Контракт успешно запечатан! Награды зачислены в ваш когнитивный сосуд.
+                    </p>
+                    <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+                      <button 
+                        className="rpg-btn"
+                        style={{ background: '#d4af37', color: '#000', borderColor: '#aa7c11', padding: '8px 20px', fontWeight: 'bold' }}
+                        onClick={() => {
+                          playClick();
+                          handleGenerateJudgmentChronicle(judgmentResolution.task);
+                        }}
+                      >
+                        🔮 ПОСМОТРЕТЬ ИТОГИ
+                      </button>
+                      
+                      <button 
+                        className="rpg-btn"
+                        style={{ background: '#5c4033', color: '#eeddbb', borderColor: '#2a1a08', padding: '8px 20px' }}
+                        onClick={() => {
+                          playClick();
+                          setJudgmentResolution(null);
+                          // Move to next task
+                          if (judgmentIndex + 1 < judgmentTasks.length) {
+                            setJudgmentIndex(prev => prev + 1);
+                          } else {
+                            setJudgmentOpen(false);
+                          }
+                        }}
+                      >
+                        👣 ПРОДОЛЖИТЬ
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : !judgmentShowReschedule ? (
               <div>
                 <p style={{ fontSize: '0.95rem', marginBottom: '1.5rem', fontWeight: 'bold' }}>
                   Вы смогли завершить этот контракт вовремя?
@@ -1597,8 +1773,14 @@ ${contextPrompt}`;
                       const exp = baseExp * (isSurvival ? 2 : 1);
                       const gold = baseGold * (isSurvival ? 2 : 1);
 
-                       // Complete task
-                      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: 'completed' } : t));
+                       // Complete task and save immediately
+                      const updatedTasks = tasks.map(t => t.id === task.id ? { ...t, status: 'completed' } : t);
+                      setTasks(updatedTasks);
+                      fetch('http://127.0.0.1:3001/api/tasks', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(updatedTasks)
+                      }).catch(err => console.warn("Immediate save failed"));
                       
                       // Rewards
                       setCharacter(c => {
@@ -1622,12 +1804,12 @@ ${contextPrompt}`;
                         };
                       });
 
-                      // Next
-                      if (judgmentIndex + 1 < judgmentTasks.length) {
-                        setJudgmentIndex(prev => prev + 1);
-                      } else {
-                        setJudgmentOpen(false);
-                      }
+                      // Ask to see chronicle/continue
+                      setJudgmentResolution({
+                        task: task,
+                        text: '',
+                        loading: false
+                      });
                     }}
                   >
                     🏹 ДА, ВЫПОЛНЕНО
@@ -1670,7 +1852,13 @@ ${contextPrompt}`;
                       const task = judgmentTasks[judgmentIndex];
                       triggerRuneOfReturn(task, (runeData) => {
                         const todayStr = getVirtualTodayStr();
-                        setTasks(prev => prev.map(t => t.id === task.id ? { ...t, date: todayStr, curseLevel: Math.min(5, (t.curseLevel || 0) + 1), runeOfReturn: runeData } : t));
+                        const updated = tasks.map(t => t.id === task.id ? { ...t, date: todayStr, curseLevel: Math.min(5, (t.curseLevel || 0) + 1), runeOfReturn: runeData } : t);
+                        setTasks(updated);
+                        fetch('http://127.0.0.1:3001/api/tasks', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify(updated)
+                        }).catch(err => console.warn("Immediate save failed"));
                         
                         // Move next
                         setJudgmentShowReschedule(false);
@@ -1692,7 +1880,13 @@ ${contextPrompt}`;
                       const task = judgmentTasks[judgmentIndex];
                       triggerRuneOfReturn(task, (runeData) => {
                         const tomorrowStr = getVirtualTomorrowStr();
-                        setTasks(prev => prev.map(t => t.id === task.id ? { ...t, date: tomorrowStr, curseLevel: Math.min(5, (t.curseLevel || 0) + 1), runeOfReturn: runeData } : t));
+                        const updated = tasks.map(t => t.id === task.id ? { ...t, date: tomorrowStr, curseLevel: Math.min(5, (t.curseLevel || 0) + 1), runeOfReturn: runeData } : t);
+                        setTasks(updated);
+                        fetch('http://127.0.0.1:3001/api/tasks', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify(updated)
+                        }).catch(err => console.warn("Immediate save failed"));
 
                         // Move next
                         setJudgmentShowReschedule(false);
@@ -1713,7 +1907,13 @@ ${contextPrompt}`;
                       playClick();
                       const task = judgmentTasks[judgmentIndex];
                       triggerRuneOfReturn(task, (runeData) => {
-                        setTasks(prev => prev.map(t => t.id === task.id ? { ...t, date: null, curseLevel: Math.min(5, (t.curseLevel || 0) + 1), runeOfReturn: runeData } : t));
+                        const updated = tasks.map(t => t.id === task.id ? { ...t, date: null, curseLevel: Math.min(5, (t.curseLevel || 0) + 1), runeOfReturn: runeData } : t);
+                        setTasks(updated);
+                        fetch('http://127.0.0.1:3001/api/tasks', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify(updated)
+                        }).catch(err => console.warn("Immediate save failed"));
 
                         // Move next
                         setJudgmentShowReschedule(false);

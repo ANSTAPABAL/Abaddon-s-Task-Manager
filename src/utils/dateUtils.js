@@ -22,3 +22,76 @@ export const getVirtualTomorrowStr = () => {
   const dd = String(d.getUTCDate()).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}`;
 };
+
+export const parseDeadlineTextToDate = (deadlineText, baseDateStr) => {
+  if (!deadlineText) return null;
+  const text = deadlineText.toLowerCase().trim();
+  
+  const baseDate = baseDateStr ? new Date(baseDateStr) : new Date(Date.now() - 2 * 60 * 60 * 1000);
+  
+  const addDays = (date, days) => {
+    const result = new Date(date);
+    result.setDate(result.getDate() + days);
+    return result;
+  };
+  
+  const formatDate = (date) => {
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  // 1. Tomorrow / Завтра
+  if (text.includes('завтра')) {
+    return formatDate(addDays(baseDate, 1));
+  }
+  
+  // 2. Day after tomorrow / Послезавтра
+  if (text.includes('послезавтра')) {
+    return formatDate(addDays(baseDate, 2));
+  }
+  
+  // 3. In X days / Через X дней / Через X дня
+  const m = text.match(/через\s+(\d+)\s+(день|дня|дней)/);
+  if (m) {
+    const days = parseInt(m[1], 10);
+    return formatDate(addDays(baseDate, days));
+  }
+  
+  // Try matching just a number of days like "2 дня"
+  const m2 = text.match(/(\d+)\s+(день|дня|дней)/);
+  if (m2) {
+    const days = parseInt(m2[1], 10);
+    return formatDate(addDays(baseDate, days));
+  }
+
+  // 4. Weekdays: понедельник, вторник, среда, четверг, пятница, суббота, воскресенье
+  const weekdays = [
+    { names: ['понедельник', 'пн'], dayNum: 1 },
+    { names: ['вторник', 'вт'], dayNum: 2 },
+    { names: ['сред', 'ср'], dayNum: 3 },
+    { names: ['четверг', 'чт'], dayNum: 4 },
+    { names: ['пятниц', 'пт'], dayNum: 5 },
+    { names: ['суббот', 'сб'], dayNum: 6 },
+    { names: ['воскресень', 'вс'], dayNum: 0 }
+  ];
+  
+  for (const day of weekdays) {
+    if (day.names.some(name => text.includes(name))) {
+      const currentDay = baseDate.getDay(); // 0-6 (0 is Sunday)
+      let daysToAdd = day.dayNum - currentDay;
+      if (daysToAdd <= 0) {
+        daysToAdd += 7; // Next week's occurrence
+      }
+      return formatDate(addDays(baseDate, daysToAdd));
+    }
+  }
+
+  // 5. In a week / Через неделю
+  if (text.includes('неделю') || text.includes('через неделю')) {
+    return formatDate(addDays(baseDate, 7));
+  }
+
+  return null;
+};

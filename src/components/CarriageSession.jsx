@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { useAudio } from '../hooks/useAudio';
 import { rollStartingCharacter } from '../utils/characterUtils';
-import { getVirtualTodayStr, getVirtualTomorrowStr } from '../utils/dateUtils';
+import { getVirtualTodayStr, getVirtualTomorrowStr, parseDeadlineTextToDate } from '../utils/dateUtils';
 
 // Список 50 уникальных вариаций когнитивной борьбы Бездны (ADHD-аспекты)
 const COMBAT_VARIATIONS = [
@@ -911,8 +911,10 @@ ${legacyPromptContext}
   const handleSaveEdit = () => {
     playClick();
     if (!editTitle.trim()) return;
+    const todayStr = getVirtualTodayStr();
     setTasks(prev => prev.map(t => {
       if (t.id === editingTask.id) {
+        const parsedDate = editDeadline ? parseDeadlineTextToDate(editDeadline, todayStr) : null;
         return {
           ...t,
           title: editTitle,
@@ -921,6 +923,7 @@ ${legacyPromptContext}
           intent: editIntent,
           steps: editSteps,
           deadline: editDeadline,
+          date: parsedDate || t.date || (editDeadline ? todayStr : null),
           nature: editNature,
           executionMode: editExecutionMode,
           isSurvival: editIsSurvival
@@ -1872,7 +1875,7 @@ const handleWinActiveSession = (task) => {
     }
   };
 
-  const handleEscapeFate = (task) => {
+  const executeEscapeFate = (task) => {
     playBoneCrack();
     setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: 'buried' } : t));
     
@@ -1886,6 +1889,60 @@ const handleWinActiveSession = (task) => {
     triggerFlash('blood');
     spawnFloater(`-${penaltyDmg} HP!`, "enemy-strike");
     spawnFloater("-10 Мораль", "enemy-strike");
+  };
+
+  const handleEscapeFate = (task) => {
+    playClick();
+    setEscapeFatePendingTask(task);
+  };
+
+  const renderEscapeFateConfirmationModal = () => {
+    if (!escapeFatePendingTask) return null;
+    const penaltyDmg = escapeFatePendingTask.isSurvival ? 30 : 15;
+    return (
+      <div className="gothic-modal-overlay animate-fade-in" style={{ zIndex: 100000 }}>
+        <div className="gothic-modal-content" style={{ 
+          maxWidth: '500px', 
+          border: '2px solid var(--color-blood-glow)',
+          boxShadow: '0 0 30px rgba(139, 26, 26, 0.8)',
+          background: 'radial-gradient(circle, #1a080a 0%, #050102 100%)',
+          textAlign: 'center',
+          padding: '2rem'
+        }}>
+          <h2 className="gothic-title" style={{ fontSize: '1.6rem', color: '#ff4d4d', marginBottom: '1rem', textShadow: '0 0 10px rgba(255, 77, 77, 0.5)' }}>
+            Твой ли это выбор?
+          </h2>
+          
+          <p style={{ fontSize: '0.95rem', color: 'var(--color-bone)', lineHeight: '1.5', marginBottom: '1.5rem', fontFamily: 'Georgia, serif' }}>
+            Побег от предначертанного контракта <strong style={{ color: '#fff' }}>«{escapeFatePendingTask.title}»</strong> нанесет вашему телу <strong style={{ color: '#ff4d4d' }}>-{penaltyDmg} HP</strong> урона и осквернит моральный компас на <strong style={{ color: '#ff4d4d' }}>-10 Морали</strong>.
+          </p>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+            <button
+              className="rpg-btn rpg-btn-blood"
+              style={{ fontWeight: 'bold', fontSize: '0.95rem', padding: '10px' }}
+              onClick={() => {
+                const t = escapeFatePendingTask;
+                setEscapeFatePendingTask(null);
+                executeEscapeFate(t);
+              }}
+            >
+              Да, я бегу от своей судьбы
+            </button>
+            <button
+              className="rpg-btn"
+              style={{ fontSize: '0.95rem', padding: '10px', borderColor: 'var(--color-iron-light)', color: 'var(--color-bone-dim)' }}
+              onClick={() => {
+                playClick();
+                setEscapeFatePendingTask(null);
+              }}
+            >
+              Нет, поток времени решил всё за меня
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const handleTriggerRedemptionCeremony = async () => {
@@ -2552,7 +2609,7 @@ ${qaText}
         title: t.title,
         type: t.type || 'hunt',
         status: 'active',
-        date: todayStr, 
+        date: t.scheduledDate || parseDeadlineTextToDate(t.deadline, todayStr) || todayStr, 
         pomodoroTime: t.estimatedTime || 25,
         pomodoroSpent: 0,
         toxicity: t.toxicity || 'standard',
@@ -3304,18 +3361,18 @@ ${loreGuidelines}`;
     if (!meditationSelectOpen) return null;
     return (
       <div className="break-event-overlay animate-fade-in" style={{ zIndex: 9999 }}>
-        <div className="break-event-card" style={{ borderColor: 'var(--color-relic-glow)', maxWidth: '550px', padding: '2rem' }}>
-          <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-            <span style={{ fontSize: '3rem' }}>🎪</span>
-            <h1 className="gothic-title" style={{ fontSize: '1.8rem', color: 'var(--color-relic-glow)', marginTop: '0.5rem' }}>
+        <div className="break-event-card rpg-scrollbar" style={{ borderColor: 'var(--color-relic-glow)', maxWidth: '500px', padding: '1rem 1.25rem', maxHeight: '85vh', overflowY: 'auto' }}>
+          <div style={{ textAlign: 'center', marginBottom: '0.8rem' }}>
+            <span style={{ fontSize: '1.8rem' }}>🎪</span>
+            <h1 className="gothic-title" style={{ fontSize: '1.25rem', color: 'var(--color-relic-glow)', marginTop: '0.2rem', marginBottom: '0.1rem' }}>
               Разбить Лагерь Восстановления
             </h1>
-            <p style={{ fontSize: '0.85rem', color: 'var(--color-bone-dim)', fontStyle: 'italic', marginTop: '0.3rem' }}>
+            <p style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', fontStyle: 'italic', margin: 0 }}>
               Выберите когнитивную или физическую активность для отдыха
             </p>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', marginBottom: '1.5rem' }}>
+          <div className="rpg-scrollbar" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '0.8rem', maxHeight: '32vh', overflowY: 'auto', paddingRight: '6px' }}>
             {[
               { id: 'stretch', label: '🤸 Разминка суставов', desc: 'Снятие оков застоя и потягивания. Повращайте плечами, наклоните голову, потянитесь.' },
               { id: 'walk', label: '🚶 Походить по комнате', desc: 'Вылазка из-за стола, смена обстановки. Сделайте круг по комнате, переключите внимание.' },
@@ -3332,30 +3389,30 @@ ${loreGuidelines}`;
                 style={{
                   background: selectedMeditationType === act.id ? 'rgba(212, 175, 55, 0.1)' : 'rgba(0,0,0,0.3)',
                   border: `1px solid ${selectedMeditationType === act.id ? 'var(--color-relic-glow)' : 'var(--color-iron-light)'}`,
-                  padding: '0.8rem',
+                  padding: '0.45rem 0.6rem',
                   cursor: 'pointer',
                   borderRadius: '4px',
                   transition: 'all 0.2s ease'
                 }}
               >
-                <h4 style={{ color: selectedMeditationType === act.id ? '#ffb813' : '#fff', fontSize: '0.95rem', margin: 0 }}>
+                <h4 style={{ color: selectedMeditationType === act.id ? '#ffb813' : '#fff', fontSize: '0.85rem', margin: 0 }}>
                   {act.label}
                 </h4>
-                <p style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)', margin: '4px 0 0 0', lineHeight: '1.3' }}>
+                <p style={{ fontSize: '0.68rem', color: 'var(--color-bone-dim)', margin: '2px 0 0 0', lineHeight: '1.25' }}>
                   {act.desc}
                 </p>
               </div>
             ))}
           </div>
 
-          <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)' }}>Время привала:</span>
+          <div style={{ marginBottom: '0.8rem', display: 'flex', gap: '0.8rem', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)' }}>Время привала:</span>
             <div style={{ display: 'flex', gap: '0.4rem', flex: 1 }}>
               {[60, 180, 300].map(dur => (
                 <button 
                   key={dur} 
                   className="rpg-btn" 
-                  style={{ flex: 1, padding: '4px 8px', fontSize: '0.8rem', background: meditationDuration === dur ? 'rgba(212, 175, 55, 0.1)' : 'rgba(0,0,0,0.2)', borderColor: meditationDuration === dur ? 'var(--color-relic-glow)' : 'var(--color-iron-light)' }}
+                  style={{ flex: 1, padding: '3px 6px', fontSize: '0.75rem', background: meditationDuration === dur ? 'rgba(212, 175, 55, 0.1)' : 'rgba(0,0,0,0.2)', borderColor: meditationDuration === dur ? 'var(--color-relic-glow)' : 'var(--color-iron-light)' }}
                   onClick={() => { playClick(); setMeditationDuration(dur); }}
                 >
                   {dur === 60 ? '1 мин' : dur === 180 ? '3 мин' : '5 мин'}
@@ -3364,17 +3421,17 @@ ${loreGuidelines}`;
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.8rem' }}>
+          <div style={{ display: 'flex', gap: '0.6rem' }}>
             <button 
               className="rpg-btn" 
-              style={{ flex: 1, padding: '0.6rem' }}
+              style={{ flex: 1, padding: '0.5rem', fontSize: '0.8rem' }}
               onClick={() => { playClick(); setMeditationSelectOpen(false); }}
             >
               Отмена
             </button>
             <button 
               className="rpg-btn rpg-btn-mana" 
-              style={{ flex: 1, padding: '0.6rem', borderColor: 'var(--color-relic-glow)', color: '#ffb813' }}
+              style={{ flex: 1, padding: '0.5rem', fontSize: '0.8rem', borderColor: 'var(--color-relic-glow)', color: '#ffb813' }}
               onClick={() => {
                 setMeditationSelectOpen(false);
                 startTimedMeditation(meditationDuration, selectedMeditationType);
@@ -4451,9 +4508,9 @@ if (setupStage === 'resolution') {
           height: isFullscreenFocus ? '100vh' : 'auto',
           minHeight: isFullscreenFocus ? '100vh' : 'calc(100vh - 120px)',
           zIndex: 9999,
-          background: 'radial-gradient(circle, rgba(26, 8, 10, 0.75) 0%, rgba(3, 0, 1, 0.9) 100%)',
-          backdropFilter: 'blur(6px)',
-          WebkitBackdropFilter: 'blur(6px)',
+          background: 'radial-gradient(circle, rgba(26, 8, 10, 0.5) 0%, rgba(5, 3, 6, 0.65) 100%)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
           animation: prepTimerActive ? 'pulse-red 1.5s infinite alternate' : 'none'
         }}
       >
@@ -4614,9 +4671,9 @@ if (setupStage === 'resolution') {
           height: isFullscreenFocus ? '100vh' : 'auto',
           minHeight: isFullscreenFocus ? '100vh' : 'calc(100vh - 120px)',
           zIndex: 9999,
-          background: 'radial-gradient(circle, rgba(14, 5, 20, 0.75) 0%, rgba(2, 0, 3, 0.9) 100%)',
-          backdropFilter: 'blur(6px)',
-          WebkitBackdropFilter: 'blur(6px)',
+          background: 'radial-gradient(circle, rgba(14, 5, 20, 0.5) 0%, rgba(5, 3, 6, 0.65) 100%)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
           animation: ritualTimerActive ? `pulse-red ${pulseSpeed} infinite alternate` : 'none'
         }}
       >
@@ -4859,9 +4916,9 @@ if (setupStage === 'resolution') {
           height: isFullscreenFocus ? '100vh' : 'auto',
           minHeight: isFullscreenFocus ? '100vh' : 'calc(100vh - 120px)',
           zIndex: 9999,
-          background: 'radial-gradient(circle, rgba(14, 10, 5, 0.75) 0%, rgba(2, 1, 0, 0.9) 100%)',
-          backdropFilter: 'blur(6px)',
-          WebkitBackdropFilter: 'blur(6px)'
+          background: 'radial-gradient(circle, rgba(14, 10, 5, 0.5) 0%, rgba(5, 3, 6, 0.65) 100%)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)'
         }}
       >
         <div 
