@@ -349,6 +349,7 @@ export default function CarriageSession({
   // Preparation (Prepare for Battle) overlay states
   const [prepTask, setPrepTask] = useState(null);
   const [autoAskedForIndex, setAutoAskedForIndex] = useState(-1);
+  const [selectedDialogueChoice, setSelectedDialogueChoice] = useState(null);
   const [prepExecutionMode, setPrepExecutionMode] = useState(null);
   const [prepActionInput, setPrepActionInput] = useState('');
   const [prepTimerActive, setPrepTimerActive] = useState(false);
@@ -525,6 +526,77 @@ export default function CarriageSession({
   const [resolutionText, setResolutionText] = useState('');
   const [resolutionLoading, setResolutionLoading] = useState(false);
   const [resolutionIsAmbush, setResolutionIsAmbush] = useState(false);
+
+  const getDialogueOptions = (npc, moral, completedCount) => {
+    if (!npc) return [];
+    return [
+      {
+        type: 'mercy',
+        title: '☀️ Путь Милосердия (Искупление)',
+        text: `Вступиться за жителей деревни, поделиться с «${npc.name}» пищей и помолиться о его пути у костра.`,
+        resolutionText: `Вы проявили истинное благородство духа. Поделившись крохами пищи с «${npc.name}», вы тихо молились у костра. В вашей душе зажегся огонь искупления, согревающий разум во мгле.`,
+        statChangeText: '❤️ +8 HP, 🔮 Моральный компас +5, 🪙 -2 Золота',
+        apply: (char) => ({
+          ...char,
+          hp: Math.min(char.maxHp || 100, (char.hp || 80) + 8),
+          moralCompass: Math.min(100, (char.moralCompass !== undefined ? char.moralCompass : 50) + 5),
+          gold: Math.max(0, (char.gold || 0) - 2)
+        })
+      },
+      {
+        type: 'cynic',
+        title: '💀 Путь Цинизма (Изгой / Наемник)',
+        text: `Хладнокровно потребовать плату за избавление от монстра или обыскать останки у костра в поисках монет.`,
+        resolutionText: `Мир Абаддона не прощает слабости. Вы без лишних слов затребовали плату с «${npc.name}» и обыскали грязную землю у костра. Золото приятно греет карман, но совесть покрылась коркой льда.`,
+        statChangeText: '🪙 +12 Золота, 🔮 Моральный компас -5',
+        apply: (char) => ({
+          ...char,
+          gold: (char.gold || 0) + 12,
+          moralCompass: Math.max(0, (char.moralCompass !== undefined ? char.moralCompass : 50) - 5)
+        })
+      },
+      {
+        type: 'focus',
+        title: '👁️ Путь Воли (Нейтралитет)',
+        text: `Молча вытереть кровь с клинка, расспросить о следующих рубежах и продолжить поход.`,
+        resolutionText: `Вы не тратите драгоценную волю на пустые разговоры. Очистив сталь от черной крови, вы расспросили «${npc.name}» о следующей угрозе. Ваша воля непоколебима, а разум сфокусирован.`,
+        statChangeText: '🔮 +8 MP Маны, 🌟 +8 XP Опыта',
+        apply: (char) => ({
+          ...char,
+          mana: Math.min(char.maxMana || 100, (char.mana || 80) + 8),
+          xp: (char.xp || 0) + 8
+        })
+      }
+    ];
+  };
+
+  const handleExecuteDialogueChoice = (choice) => {
+    playSuccess();
+    setSelectedDialogueChoice(choice);
+    
+    // Apply changes to the character state!
+    setCharacter(prev => {
+      const nextChar = choice.apply(prev);
+      
+      // Handle level up if XP exceeds threshold
+      let nextXp = nextChar.xp || 0;
+      let nextLvl = nextChar.level || 1;
+      const xpNeeded = nextLvl * 100;
+      if (nextXp >= xpNeeded) {
+        nextXp -= xpNeeded;
+        nextLvl += 1;
+        spawnFloater("LEVEL UP!", "hero-heal");
+      }
+      return {
+        ...nextChar,
+        xp: nextXp,
+        level: nextLvl
+      };
+    });
+
+    // Log the event in combat log!
+    setCombatLog(prev => [`💬 Вы выбрали: «${choice.title}». Влияние: ${choice.statChangeText}`, ...prev.slice(0, 5)]);
+  };
 
   const handleGenerateResolutionChronicle = async (type, task, enemy, isAmbush = false, npcName = '') => {
     if (resolutionLoading) return;
@@ -768,6 +840,53 @@ ${loreGuidelines}`;
 
     try {
       const needsSteps = !task.steps || task.steps.length === 0;
+      const level = character.level || 1;
+      const completedCount = character.completedTasksCount || 0;
+      const moral = character.moralCompass !== undefined ? character.moralCompass : 50;
+
+      // 1. Determine Location by level/progress
+      let locationName = "Пограничные Рубежи Абаддона";
+      let locationContext = "Окраинные холодные пустоши на границе Каргахаула, где бродят проголодавшиеся волки, дикие твари и мелкие бродяги.";
+      if (level === 2) {
+        locationName = "Болотные Топи Смерти";
+        locationContext = "Гнилые трясины, кишащие болотными химо-слизнями, гнойными людоедами и обезумевшими мародерами.";
+      } else if (level === 3) {
+        locationName = "Пепельные Чертоги Инквизиции";
+        locationContext = "Обугленные руины старых замков, где рыщут слепые инквизиторы Света, иссохшая нежить и бродячие дезертиры.";
+      } else if (level >= 4) {
+        locationName = "Цитадель Владыки Света";
+        locationContext = "Величественный замок из белого мрамора, оскверненный некро-паразитами, охраняемый элитными паладинами.";
+      }
+
+      // 2. Determine Scale Context based on level & task type
+      let scaleContext = "";
+      if (task.type === 'siege') {
+        if (level === 1) {
+          scaleContext = "Герой находится на 1-м уровне. Штурмовать огромные замки ему не по зубам. Вместо этого Осада должна быть локальной и приземленной: отбивать покосившийся аванпост бродяг от волков, защищать хлипкий забор от гнилых людоедов в трущобах или прорываться из окружения мелких разбойников.";
+        } else if (level <= 3) {
+          scaleContext = "Герой набрался опыта. Осада представляет собой штурм разбойничьего лагеря, зачистку склепа костей или защиту каравана от орд иссохшей нежити.";
+        } else {
+          scaleContext = "Герой — могучий воин (уровень 4+). Осада величественна: например, штурм форта Империи Света плечом к плечу с выжившим Принцем маленького человеческого княжества, либо битва за Цитадель Владыки.";
+        }
+      } else {
+        scaleContext = "Это быстрая сессия фокуса. Масштаб приземленный, сосредоточенный на быстрой схватке, побеге или поиске реликвии.";
+      }
+
+      // 3. Determine Faction Alignment based on Moral/Spirit ("дух")
+      let moraleContext = "";
+      if (moral < 45) {
+        moraleContext = "У героя низкий, темный дух (плохой дух, Изгой). Он циничен, одинок и готов на все ради денег и выживания (порой 'подъедает' трупы, крадет у слабых или выступает хладнокровным наемником). Его враги и окружение — выжившие изгнанники, подозрительные путешественники, бродячие солдаты, дезертиры империи или крестьяне-людоеды.";
+      } else if (moral >= 65) {
+        moraleContext = "У героя высокий, благородный дух (Искупленный). Он стремится к искуплению, защищает слабых и готов вступиться за местных жителей в городке или деревушке, куда притопал. Его враги — порождения тьмы, гнилая нежить и бесчестные чудовища.";
+      } else {
+        moraleContext = "Герой — прагматичный выживающий. Его цели диктуются выживанием во мгле.";
+      }
+
+      // 4. Matrix for 300+ enemies keywords to supply the AI
+      const prefixOptions = ["Иссохший", "Гнойный", "Чумной", "Бледный", "Одержимый", "Кровавый", "Мертвоглазый", "Костяной", "Каргахаульский", "Ослепший", "Свирепый", "Дикий"];
+      const entityOptions = ["Людоед", "Дезертир", "Вор реликвий", "Костяной Жнец", "Болотный химо-слизень", "Мародер империи", "Инквизитор Света", "Элитный паладин", "Бродяга Бездны", "Пепельный Скелет", "Одичавший волк"];
+      const randomPrefix = prefixOptions[Math.floor(Math.random() * prefixOptions.length)];
+      const randomEntity = entityOptions[Math.floor(Math.random() * entityOptions.length)];
       
       const lastLegend = pedestals && pedestals.length > 0 ? pedestals[pedestals.length - 1] : null;
       let legacyPromptContext = "";
@@ -783,19 +902,34 @@ ${loreGuidelines}`;
 Твоя задача — проанализировать задачу пользователя и вернуть JSON с геймификацией и деконструкцией.
 ${legacyPromptContext}
 
+ЛОКАЦИЯ И МИР:
+Текущая локация героя: ${locationName}.
+Контекст окружения: ${locationContext}.
+
+МАСШТАБ СРАЖЕНИЯ И ПРОГРЕСС:
+${scaleContext}
+
+ДУХ И ПОВЕДЕНИЕ ГЕРОЯ:
+${moraleContext}
+
+ТРЕБОВАНИЯ К УНИКАЛЬНОСТИ ВРАГА (БОЛЕЕ 300 ВАРИАЦИЙ):
+1. Сгенерируй полностью уникального врага, идеально подходящего под локацию, силу духа героя и масштаб приключения.
+2. Враг должен быть преимущественно ГУМАНОИДНЫМ или МИФОЛОГИЧЕСКИМ существом из жанра grim-dark (например: ослепший паладин, бродячий дезертир, крестьянин-людоед, выживший изгой, элитный солдат).
+3. Дай ему жуткое, уникальное имя ("enemyName") и подробное описание его появления из грота ("loreDescription", 3-4 предложения).
+   - Для уникального вдохновения используй концепцию: "${randomPrefix} ${randomEntity}".
+   - Описание должно сочно и детализированно рисовать гуманоидный или мифологический grim-dark силуэт (его пронзительный взгляд, очертания лат или масок, трещины на оружии, мрачные повадки).
+   - СТРОГО ЗАПРЕЩЕНЫ любые бесформенные летающие сгустки плоти и аморфные черви.
+4. Сгенерируй 2 слабости ("weakPoints") на основе его повадок (например: "он медлителен из-за тяжелых лат...", "боится резких шагов...").
+5. Сгенерируй 1 случайное событие поля боя ("randomEvent").
+
+ПРИРОДА ЗАДАЧИ:
 1. Классифицируй задачу по типу ("type"):
    - "siege" (осада): крупные проекты, сложные отчеты, курсовые, дипломные, написание большого объема кода/текста.
    - "relic" (реликвия): изучение нового, чтение документации, рисование, исследование, анализ.
    - "corpse" (тлен/труп): разбор старых хвостов, долгов, уборка, очистка файлов, рутина.
    - "hunt" (охота): стандартные дела, звонки, отправка писем, быстрые задачи.
 
-2. Сгенерируй атмосферного уникального врага:
-   - Враг должен быть преимущественно ГУМАНОИДНЫМ или МИФОЛОГИЧЕСКИМ существом из жанра grim-dark (например: ослепший паладин, плачущая сирена, костяной ткач, безумный жрец Бездны, пожиратель кожи, повелитель цепей, безголовый командор).
-   - Дай ему жуткое, уникальное имя ("enemyName") и подробное описание его появления из грота ("loreDescription", 3-4 предложения) с его повадками, оружием и внешним видом. Описание должно сочно и детализированно рисовать гуманоидный или мифологический grim-dark силуэт (его пронзительный взгляд, очертания лат или масок, трещины на оружии, мрачные повадки). СТРОГО ЗАПРЕЩЕНЫ любые бесформенные летающие сгустки плоти, аморфные черные черви, склизкие паразиты и клубки конечностей (избегай этого клише полностью).
-   - Сгенерируй 2 слабости ("weakPoints") на основе его повадок (например: "он медлителен из-за тяжелых лат...", "боится резких шагов...").
-   - Сгенерируй 1 случайное событие поля боя ("randomEvent").
-
-3. Если needsSteps равен true, разложи задачу на 4-6 элементарных физических микро-шагов ("steps"). Шаги должны быть геймифицированы (RPG действие + в скобках простое реальное действие, например: "Прочесть первую страницу древнего фолианта (Открыть документацию)"). Также дай краткое намерение квеста ("intent").
+2. Если needsSteps равен true, разложи задачу на 4-6 элементарных физических микро-шагов ("steps"). Шаги должны быть геймифицированы (RPG действие + в скобках простое реальное действие, например: "Прочесть первую страницу древнего фолианта (Открыть документацию)"). Также дай краткое намерение квеста ("intent").
 
 Выведи ТОЛЬКО валидный JSON-объект в формате:
 {
@@ -4240,6 +4374,61 @@ if (setupStage === 'resolution') {
                     </>
                   )}
 
+                  {/* Dynamic Post-Combat Dialogue Choices */}
+                  {!resolutionIsAmbush && (
+                    <div style={{ marginTop: '0.8rem', borderTop: '1px dashed rgba(255,255,255,0.1)', paddingTop: '0.8rem' }}>
+                      <div style={{ fontSize: '0.78rem', color: '#ffb813', textTransform: 'uppercase', marginBottom: '8px', fontFamily: 'var(--font-rpg)', fontWeight: 'bold' }}>
+                        💬 Выбор Изгнанника (Диалог с NPC):
+                      </div>
+                      
+                      {selectedDialogueChoice ? (
+                        <div style={{ 
+                          background: 'rgba(255, 184, 19, 0.05)', 
+                          border: '1px solid rgba(255, 184, 19, 0.2)', 
+                          padding: '0.8rem', 
+                          fontSize: '0.82rem', 
+                          color: '#e6dfd3',
+                          lineHeight: '1.4',
+                          fontStyle: 'italic',
+                          borderRadius: '4px'
+                        }}>
+                          {selectedDialogueChoice.resolutionText}
+                          <div style={{ color: '#2ed573', marginTop: '5px', fontSize: '0.75rem', fontWeight: 'bold' }}>
+                            Результат: {selectedDialogueChoice.statChangeText}
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          {getDialogueOptions(resolutionNpc, moralVal, completedCount).map((choice, cIdx) => (
+                            <button
+                              key={cIdx}
+                              className="rpg-btn"
+                              style={{ 
+                                display: 'block',
+                                width: '100%',
+                                textAlign: 'left', 
+                                padding: '8px 10px', 
+                                fontSize: '0.78rem', 
+                                lineHeight: '1.3',
+                                borderColor: choice.type === 'mercy' ? '#2ecc71' : choice.type === 'cynic' ? '#e74c3c' : 'rgba(255,255,255,0.15)',
+                                background: 'rgba(10,8,12,0.6)',
+                                transition: 'all 0.15s'
+                              }}
+                              onClick={() => handleExecuteDialogueChoice(choice)}
+                            >
+                              <div style={{ fontWeight: 'bold', color: '#ffb813', marginBottom: '2px' }}>
+                                {choice.title}
+                              </div>
+                              <div style={{ fontSize: '0.7rem', color: 'var(--color-bone-dim)' }}>
+                                {choice.text}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* Offer existing contracts */}
                   {activeTasksToOffer.length > 0 && (
                     <div>
@@ -6052,7 +6241,7 @@ if (setupStage === 'resolution') {
       }}>
         <div style={{ maxWidth: '650px', textAlign: 'center' }}>
           <h1 className="gothic-title" style={{ fontSize: '2.5rem', color: 'var(--color-blood-glow)', marginBottom: '1rem', letterSpacing: '0.15em' }}>
-            НАПИШИ, ЧТОБЫ ВЫЖИТЬ
+            {(character.completedTasksCount || 0) === 0 ? "НАПИШИ, ЧТОБЫ ВЫЖИТЬ" : "ПОДГОТОВИТЬСЯ К БОЮ"}
           </h1>
           <p style={{ fontSize: '1rem', color: 'var(--color-bone-dim)', marginBottom: '2rem', lineHeight: '1.4' }}>
             {(() => {
