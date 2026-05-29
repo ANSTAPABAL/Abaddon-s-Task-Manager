@@ -296,12 +296,7 @@ export default function CarriageSession({
   onStateSync
 }) {
   const { playClick, playBoneCrack, playSuccess, startHeartbeat, stopHeartbeat, setAtmosphereMood } = useAudio();
-  const toggleFullscreenFocus = () => {
-    playClick();
-    const nextVal = !isFullscreenFocus;
-    setIsFullscreenFocus(nextVal);
-    localStorage.setItem('immersive_fullscreen_focus', nextVal ? 'true' : 'false');
-  };
+
   const [messyText, setMessyText] = useState('');
   const [loadingAI, setLoadingAI] = useState(false);
 
@@ -394,7 +389,7 @@ export default function CarriageSession({
   const [adaptationDeadline, setAdaptationDeadline] = useState('');
 
   // Immersive Fullscreen Focus, Combat Break, and Inline Step Edit States
-  const [isFullscreenFocus, setIsFullscreenFocus] = useState(() => localStorage.getItem('immersive_fullscreen_focus') === 'true');
+
   const [activeCombatBreak, setActiveCombatBreak] = useState(null); // null, or { index: 1, tasks: [...] }
   const [accumulatedBreakRewards, setAccumulatedBreakRewards] = useState({ xp: 0, gold: 0 });
   const [newCombatStepText, setNewCombatStepText] = useState('');
@@ -929,7 +924,7 @@ ${moraleContext}
    - "corpse" (тлен/труп): разбор старых хвостов, долгов, уборка, очистка файлов, рутина.
    - "hunt" (охота): стандартные дела, звонки, отправка писем, быстрые задачи.
 
-2. Если needsSteps равен true, разложи задачу на 4-6 элементарных физических микро-шагов ("steps"). Шаги должны быть геймифицированы (RPG действие + в скобках простое реальное действие, например: "Прочесть первую страницу древнего фолианта (Открыть документацию)"). Также дай краткое намерение квеста ("intent").
+2. Если needsSteps равен true, разложи задачу на 4-6 элементарных физических микро-шагов ("steps"). Шаги должны быть геймифицированы (RPG действие + в скобках простое реальное действие, например: "Прочесть первую страницу древнего фолианта (Открыть документацию)"). Также дай краткое намерение квеста ("intent"). СТРОГОЕ ТРЕБОВАНИЕ: НИ В КОЕМ СЛУЧАЕ не выдумывай конкретный стек технологий, базы данных, языки программирования, библиотеки или требования, если они явно не указаны в названии задачи! Шаги в скобках должны быть общими и приземленными физическими действиями (например, «открыть файл», «написать черновик», «вытереть пыль»), соответствующими реальному тексту. Не делай ложных допущений за пользователя!
 
 Выведи ТОЛЬКО валидный JSON-объект в формате:
 {
@@ -1595,6 +1590,7 @@ ${moraleContext}
 
 
   const actuallyStartCombat = (task, mode) => {
+    setSelectedDialogueChoice(null);
     setActiveTask(task);
     const initialTime = task.timeLeft !== undefined ? task.timeLeft : task.pomodoroTime * 60;
     setTimeLeft(initialTime);
@@ -4321,6 +4317,7 @@ if (setupStage === 'resolution') {
                     style={{ padding: '0.8rem 2.5rem', fontSize: '1rem', borderColor, width: '100%' }}
                     onClick={() => {
                       playClick();
+                      setSelectedDialogueChoice(null);
                       const willQualify = (character.completedTasksCount || 0) >= 15 && 
                                           (character.completedSiegesCount || 0) >= 3;
                       if (isVictory && willQualify) {
@@ -4677,18 +4674,9 @@ if (setupStage === 'resolution') {
 
     return (
       <div 
-        className="gothic-modal-overlay" 
+        className="gothic-modal-overlay animate-fade-in" 
         style={{ 
-          position: isFullscreenFocus ? 'fixed' : 'absolute',
-          top: 0,
-          left: 0,
-          width: isFullscreenFocus ? '100vw' : '100%',
-          height: isFullscreenFocus ? '100vh' : 'auto',
-          minHeight: isFullscreenFocus ? '100vh' : 'calc(100vh - 120px)',
-          zIndex: 9999,
           background: 'radial-gradient(circle, rgba(26, 8, 10, 0.5) 0%, rgba(5, 3, 6, 0.65) 100%)',
-          backdropFilter: 'blur(8px)',
-          WebkitBackdropFilter: 'blur(8px)',
           animation: prepTimerActive ? 'pulse-red 1.5s infinite alternate' : 'none'
         }}
       >
@@ -4705,23 +4693,6 @@ if (setupStage === 'resolution') {
             position: 'relative'
           }}
         >
-          <button 
-            className="rpg-btn" 
-            style={{
-              position: 'absolute',
-              top: '12px',
-              right: '12px',
-              zIndex: 10005,
-              padding: '6px 12px',
-              fontSize: '0.75rem',
-              borderColor: 'var(--color-blood-glow)',
-              background: 'rgba(0,0,0,0.6)',
-              color: '#fff',
-            }} 
-            onClick={toggleFullscreenFocus}
-          >
-            {isFullscreenFocus ? '🌌 СВЕРНУТЬ В ОКНО' : '🌌 ПОЛНОЭКРАННЫЙ РЕЖИМ'}
-          </button>
           <h2 className="gothic-title" style={{ fontSize: '1.8rem', color: '#ff4d4d', marginBottom: '1.2rem', textShadow: '0 0 10px rgba(255, 77, 77, 0.5)' }}>
             🚨 ПОДГОТОВИТЬСЯ К БОЮ! 🚨
           </h2>
@@ -4840,18 +4811,9 @@ if (setupStage === 'resolution') {
 
     return (
       <div 
-        className="gothic-modal-overlay" 
+        className="gothic-modal-overlay animate-fade-in" 
         style={{ 
-          position: isFullscreenFocus ? 'fixed' : 'absolute',
-          top: 0,
-          left: 0,
-          width: isFullscreenFocus ? '100vw' : '100%',
-          height: isFullscreenFocus ? '100vh' : 'auto',
-          minHeight: isFullscreenFocus ? '100vh' : 'calc(100vh - 120px)',
-          zIndex: 9999,
           background: 'radial-gradient(circle, rgba(14, 5, 20, 0.5) 0%, rgba(5, 3, 6, 0.65) 100%)',
-          backdropFilter: 'blur(8px)',
-          WebkitBackdropFilter: 'blur(8px)',
           animation: ritualTimerActive ? `pulse-red ${pulseSpeed} infinite alternate` : 'none'
         }}
       >
@@ -4877,23 +4839,6 @@ if (setupStage === 'resolution') {
             position: 'relative'
           }}
         >
-          <button 
-            className="rpg-btn" 
-            style={{
-              position: 'absolute',
-              top: '12px',
-              right: '12px',
-              zIndex: 10005,
-              padding: '6px 12px',
-              fontSize: '0.75rem',
-              borderColor: '#9b5de5',
-              background: 'rgba(0,0,0,0.6)',
-              color: '#fff',
-            }} 
-            onClick={toggleFullscreenFocus}
-          >
-            {isFullscreenFocus ? '🌌 СВЕРНУТЬ В ОКНО' : '🌌 ПОЛНОЭКРАННЫЙ РЕЖИМ'}
-          </button>
           <h2 className="gothic-title" style={{ fontSize: '1.6rem', color: '#9b5de5', marginBottom: '1.5rem', textShadow: '0 0 10px rgba(155, 93, 229, 0.4)' }}>
             🔮 РИТУАЛ 🔮
           </h2>
@@ -5085,18 +5030,9 @@ if (setupStage === 'resolution') {
 
     return (
       <div 
-        className="gothic-modal-overlay" 
+        className="gothic-modal-overlay animate-fade-in" 
         style={{ 
-          position: isFullscreenFocus ? 'fixed' : 'absolute',
-          top: 0,
-          left: 0,
-          width: isFullscreenFocus ? '100vw' : '100%',
-          height: isFullscreenFocus ? '100vh' : 'auto',
-          minHeight: isFullscreenFocus ? '100vh' : 'calc(100vh - 120px)',
-          zIndex: 9999,
-          background: 'radial-gradient(circle, rgba(14, 10, 5, 0.5) 0%, rgba(5, 3, 6, 0.65) 100%)',
-          backdropFilter: 'blur(8px)',
-          WebkitBackdropFilter: 'blur(8px)'
+          background: 'radial-gradient(circle, rgba(14, 10, 5, 0.5) 0%, rgba(5, 3, 6, 0.65) 100%)'
         }}
       >
         <div 
@@ -5112,23 +5048,6 @@ if (setupStage === 'resolution') {
             position: 'relative'
           }}
         >
-          <button 
-            className="rpg-btn" 
-            style={{
-              position: 'absolute',
-              top: '12px',
-              right: '12px',
-              zIndex: 10005,
-              padding: '6px 12px',
-              fontSize: '0.75rem',
-              borderColor: 'var(--color-blood-glow)',
-              background: 'rgba(0,0,0,0.6)',
-              color: '#fff',
-            }} 
-            onClick={toggleFullscreenFocus}
-          >
-            {isFullscreenFocus ? '🌌 СВЕРНУТЬ В ОКНО' : '🌌 ПОЛНОЭКРАННЫЙ РЕЖИМ'}
-          </button>
           <h2 className="gothic-title" style={{ fontSize: '1.5rem', color: '#ffcc00', marginBottom: '1.5rem', textShadow: '0 0 10px rgba(255, 204, 0, 0.3)' }}>
             ОХОТА
           </h2>
@@ -6328,24 +6247,7 @@ if (setupStage === 'resolution') {
       return (
         <div 
           className="rpg-panel rest-camp-overlay animate-fade-in" 
-          style={isFullscreenFocus ? {
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            width: '100vw',
-            height: '100vh',
-            zIndex: 9999,
-            overflowY: 'auto',
-            background: 'radial-gradient(circle, #24140b 0%, #080301 100%)',
-            padding: '2.5rem',
-            border: '3px solid #ff9f43',
-            boxShadow: '0 0 35px rgba(255, 159, 67, 0.4), inset 0 0 20px rgba(0,0,0,0.8)',
-            boxSizing: 'border-box',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center'
-          } : {
+          style={{
             maxWidth: '950px',
             margin: '0 auto',
             padding: '2.5rem',
@@ -6356,23 +6258,6 @@ if (setupStage === 'resolution') {
             position: 'relative'
           }}
         >
-          <button 
-            className="rpg-btn" 
-            style={{
-              position: 'absolute',
-              top: '12px',
-              right: '12px',
-              zIndex: 10005,
-              padding: '6px 12px',
-              fontSize: '0.75rem',
-              borderColor: '#ff9f43',
-              background: 'rgba(0,0,0,0.6)',
-              color: '#ff9f43',
-            }} 
-            onClick={toggleFullscreenFocus}
-          >
-            {isFullscreenFocus ? '🌌 СВЕРНУТЬ В ОКНО' : '🌌 ПОЛНОЭКРАННЫЙ РЕЖИМ'}
-          </button>
 
           <span style={{ fontSize: '4rem', filter: 'drop-shadow(0 0 15px rgba(255, 159, 67, 0.4))' }}>⛺</span>
           
@@ -6482,48 +6367,14 @@ if (setupStage === 'resolution') {
 
     return (
       <div 
-        className={`rpg-panel ${isFullscreenFocus ? 'immersive-fullscreen-arena' : ''}`}
-        style={isFullscreenFocus ? {
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100vw',
-          height: '100vh',
-          zIndex: 9999,
-          overflowY: 'auto',
-          background: 'radial-gradient(circle, #0e0813 0%, #030106 100%)',
-          padding: '2rem',
-          maxWidth: '100vw',
-          margin: 0,
-          border: `3px solid ${isBoss ? 'var(--color-blood-glow)' : 'var(--color-relic-glow)'}`,
-          boxSizing: 'border-box'
-        } : {
+        className="rpg-panel"
+        style={{
           maxWidth: '950px',
           margin: '0 auto',
           border: `2px solid ${isBoss ? 'var(--color-blood-glow)' : 'var(--color-iron-light)'}`,
           position: 'relative'
         }}
       >
-        <button 
-          className="rpg-btn" 
-          style={{
-            position: 'absolute',
-            top: '12px',
-            right: '12px',
-            zIndex: 10005,
-            padding: '6px 12px',
-            fontSize: '0.75rem',
-            borderColor: isBoss ? 'var(--color-blood-glow)' : 'var(--color-relic-glow)',
-            background: 'rgba(0,0,0,0.6)',
-            color: '#fff',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '4px'
-          }} 
-          onClick={toggleFullscreenFocus}
-        >
-          {isFullscreenFocus ? '🌌 СВЕРНУТЬ В ОКНО' : '🌌 ПОЛНОЭКРАННЫЙ РЕЖИМ'}
-        </button>
 
         {/* Screen Flash overlays */}
         {screenFlash && <div className={`screen-flash flash-${screenFlash}`} />}
