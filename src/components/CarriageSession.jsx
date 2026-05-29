@@ -348,6 +348,7 @@ export default function CarriageSession({
 
   // Preparation (Prepare for Battle) overlay states
   const [prepTask, setPrepTask] = useState(null);
+  const [autoAskedForIndex, setAutoAskedForIndex] = useState(-1);
   const [prepExecutionMode, setPrepExecutionMode] = useState(null);
   const [prepActionInput, setPrepActionInput] = useState('');
   const [prepTimerActive, setPrepTimerActive] = useState(false);
@@ -723,9 +724,10 @@ ${loreGuidelines}`;
   useEffect(() => {
     return () => {
       if (setupStageRef.current === 'active' && activeTaskRef.current) {
+        const taskId = activeTaskRef.current.id;
         const storedTime = localStorage.getItem('combat_time_left');
         const finalTime = storedTime !== null ? Number(storedTime) : timeLeftRef.current;
-        setTasks(prev => prev.map(t => t.id === activeTaskRef.current.id ? { ...t, timeLeft: finalTime } : t));
+        setTasks(prev => prev.map(t => (t && t.id === taskId) ? { ...t, timeLeft: finalTime } : t));
         localStorage.removeItem('active_task_id');
         localStorage.removeItem('combat_time_left');
         localStorage.setItem('combat_is_running', 'false');
@@ -1463,22 +1465,28 @@ ${legacyPromptContext}
     const initialTime = task.timeLeft !== undefined ? task.timeLeft : task.pomodoroTime * 60;
     setTimeLeft(initialTime);
     setSessionSteps(task.steps || []);
-    setSetupStage('active');
     generateCombatEncounter(task);
     localStorage.setItem('active_task_id', task.id);
     localStorage.setItem('combat_time_left', initialTime);
     setDeadlineDmgApplied(false);
-    if (mode === 'timer') {
-      localStorage.setItem('combat_timer_start_time', Date.now());
-      localStorage.setItem('combat_timer_start_value', initialTime);
-      localStorage.setItem('combat_is_running', 'true');
-      setIsRunning(true);
+
+    if (character.shacklesBroken) {
+      setSetupStage('active');
+      if (mode === 'timer') {
+        localStorage.setItem('combat_timer_start_time', Date.now());
+        localStorage.setItem('combat_timer_start_value', initialTime);
+        localStorage.setItem('combat_is_running', 'true');
+        setIsRunning(true);
+      } else {
+        localStorage.setItem('combat_is_running', 'false');
+        setIsRunning(false);
+      }
+      setAtmosphereMood(task.type === 'siege' ? 'siege' : 'hunt');
+      if (playActiveSessionTrack) playActiveSessionTrack(task.type === 'siege' ? 'siege' : 'hunt');
     } else {
-      localStorage.setItem('combat_is_running', 'false');
-      setIsRunning(false);
+      setSetupStage('crash');
+      setAtmosphereMood('escape');
     }
-    setAtmosphereMood(task.type === 'siege' ? 'siege' : 'hunt');
-    if (playActiveSessionTrack) playActiveSessionTrack(task.type === 'siege' ? 'siege' : 'hunt');
     
     // Async enrich lore and steps using AI!
     enrichTaskAndLore(task);
@@ -2538,6 +2546,17 @@ ${qaText}
     }
   };
 
+  useEffect(() => {
+    if (setupStage === 'review' && parsedList && parsedList[reviewIndex]) {
+      const currentCard = parsedList[reviewIndex];
+      const hasNoSteps = !currentCard.steps || currentCard.steps.length === 0;
+      if (hasNoSteps && autoAskedForIndex !== reviewIndex && !reviewGuidedActive && !loadingAI) {
+        setAutoAskedForIndex(reviewIndex);
+        handleRequestReviewQuestions();
+      }
+    }
+  }, [setupStage, reviewIndex, parsedList, autoAskedForIndex, reviewGuidedActive, loadingAI]);
+
   const handleSplitReviewTask = (index) => {
     const taskToSplit = parsedList[index];
     if (!taskToSplit) return;
@@ -2635,42 +2654,12 @@ ${qaText}
 
     setTasks(prev => [...prev, ...newTasks]);
 
-    if (newTasks.length > 1 || skipCombat) {
-      // Go directly to contracts grid lobby to choose!
-      setActiveTask(null);
-      setSetupStage('hub');
-      localStorage.removeItem('active_task_id');
-      localStorage.setItem('combat_is_running', 'false');
-      setIsRunning(false);
-    } else {
-      // Single task and not skipped: auto-start combat session
-      const target = newTasks[0] || null;
-      setActiveTask(target);
-      if (target) {
-        setTimeLeft(target.pomodoroTime * 60);
-        setSessionSteps(target.steps);
-        generateCombatEncounter(target);
-        localStorage.setItem('active_task_id', target.id);
-        localStorage.setItem('combat_time_left', target.pomodoroTime * 60);
-      }
-
-      if (character.shacklesBroken) {
-        setSetupStage('active');
-        const initialTime = target.pomodoroTime * 60;
-        localStorage.setItem('combat_timer_start_time', Date.now());
-        localStorage.setItem('combat_timer_start_value', initialTime);
-        
-        const isTimer = target.executionMode !== 'day'; // False for 'day' (Free Transition/No timer)
-        localStorage.setItem('combat_is_running', isTimer ? 'true' : 'false');
-        setDeadlineDmgApplied(false);
-        setIsRunning(isTimer);
-        setAtmosphereMood(target?.type === 'siege' ? 'siege' : 'hunt');
-        if (playActiveSessionTrack) playActiveSessionTrack(target?.type === 'siege' ? 'siege' : 'hunt');
-      } else {
-        setSetupStage('crash');
-        setAtmosphereMood('escape');
-      }
-    }
+    // Always go to the contracts grid lobby so the user can choose which quest to start!
+    setActiveTask(null);
+    setSetupStage('hub');
+    localStorage.removeItem('active_task_id');
+    localStorage.setItem('combat_is_running', 'false');
+    setIsRunning(false);
   };
 
   // "Write to Survive" countdown logic
@@ -5600,14 +5589,35 @@ if (setupStage === 'resolution') {
             marginBottom: '1.5rem',
             position: 'relative'
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.8rem' }}>
-              <b style={{ color: '#fff', fontSize: '1.15rem' }}>{currentCard.title}</b>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem', gap: '10px' }}>
+              <input 
+                type="text" 
+                value={currentCard.title || ''} 
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setParsedList(prev => prev.map((item, idx) => idx === reviewIndex ? { ...item, title: val } : item));
+                }}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
+                  color: '#fff',
+                  fontSize: '1.15rem',
+                  fontWeight: 'bold',
+                  flex: 1,
+                  padding: '2px 0',
+                  outline: 'none',
+                  fontFamily: 'inherit'
+                }}
+                placeholder="Название квеста..."
+              />
               <span style={{ 
                 fontSize: '0.72rem', 
                 padding: '2px 8px', 
                 background: currentCard.type === 'siege' ? 'rgba(139,26,26,0.2)' : 'rgba(255,255,255,0.05)',
                 color: currentCard.type === 'siege' ? 'var(--color-blood-glow)' : 'var(--color-bone-dim)',
-                border: `1px solid ${currentCard.type === 'siege' ? 'var(--color-blood)' : 'var(--color-iron-light)'}`
+                border: `1px solid ${currentCard.type === 'siege' ? 'var(--color-blood)' : 'var(--color-iron-light)'}`,
+                whiteSpace: 'nowrap'
               }}>
                 {currentCard.type === 'siege' ? '💥 ОСАДА' : currentCard.type === 'relic' ? '💎 РЕЛИКВИЯ' : currentCard.type === 'corpse' ? '💀 ДОЛГ' : '🏹 ОХОТА'}
               </span>
@@ -5640,7 +5650,7 @@ if (setupStage === 'resolution') {
                 </label>
 
                 <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-bone-dim)' }}>
-                  🚨 Дедлайн квеста:
+                  🚨 Дедлайн:
                   <input 
                     type="text" 
                     placeholder="до 18:00 / среду"
@@ -5650,13 +5660,35 @@ if (setupStage === 'resolution') {
                       setParsedList(prev => prev.map((item, idx) => idx === reviewIndex ? { ...item, deadline: val } : item));
                     }}
                     style={{
-                      width: '160px',
+                      width: '130px',
                       background: 'rgba(0,0,0,0.4)',
                       border: '1px solid var(--color-iron-light)',
                       color: '#fff',
                       padding: '2px 5px',
                       fontFamily: 'var(--font-rpg)',
                       fontSize: '0.8rem'
+                    }}
+                  />
+                </label>
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-bone-dim)' }}>
+                  📅 Дата выполнения:
+                  <input 
+                    type="date" 
+                    value={currentCard.scheduledDate || new Date().toISOString().split('T')[0]}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setParsedList(prev => prev.map((item, idx) => idx === reviewIndex ? { ...item, scheduledDate: val } : item));
+                    }}
+                    style={{
+                      width: '135px',
+                      background: 'rgba(0,0,0,0.4)',
+                      border: '1px solid var(--color-iron-light)',
+                      color: '#fff',
+                      padding: '2px 5px',
+                      fontFamily: 'var(--font-rpg)',
+                      fontSize: '0.8rem',
+                      cursor: 'pointer'
                     }}
                   />
                 </label>
@@ -5701,7 +5733,7 @@ if (setupStage === 'resolution') {
                     </div>
                   ))}
                 </div>
-                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1.2rem' }}>
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1.2rem', flexWrap: 'wrap' }}>
                   <button 
                     className="rpg-btn rpg-btn-mana" 
                     style={{ fontSize: '0.78rem', padding: '5px 12px' }}
@@ -5712,8 +5744,24 @@ if (setupStage === 'resolution') {
                   </button>
                   <button 
                     className="rpg-btn" 
+                    style={{ fontSize: '0.78rem', padding: '5px 12px', borderColor: 'var(--color-iron-light)' }}
+                    onClick={() => {
+                      playClick();
+                      setReviewGuidedActive(false);
+                      handleDetailedDeconstruction();
+                    }}
+                    disabled={loadingAI}
+                  >
+                    ✨ Достаточно (Спланировать как есть)
+                  </button>
+                  <button 
+                    className="rpg-btn" 
                     style={{ fontSize: '0.78rem', padding: '5px 12px' }}
-                    onClick={() => setReviewGuidedActive(false)}
+                    onClick={() => {
+                      playClick();
+                      setReviewGuidedActive(false);
+                    }}
+                    disabled={loadingAI}
                   >
                     ОТМЕНА
                   </button>
@@ -5721,15 +5769,83 @@ if (setupStage === 'resolution') {
               </div>
             ) : (
               <>
-                <h4 style={{ fontSize: '0.85rem', color: 'var(--color-bone)', marginBottom: '6px', fontFamily: 'var(--font-rpg)' }}>Шаги прорыва:</h4>
+                <h4 style={{ fontSize: '0.85rem', color: 'var(--color-bone)', marginBottom: '6px', fontFamily: 'var(--font-rpg)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>Шаги прорыва:</span>
+                  <button 
+                    className="rpg-btn" 
+                    style={{ fontSize: '0.7rem', padding: '2px 6px', height: 'auto', lineHeight: '1' }}
+                    onClick={() => {
+                      playClick();
+                      setParsedList(prev => prev.map((item, idx) => {
+                        if (idx === reviewIndex) {
+                          return { ...item, steps: [...(item.steps || []), ''] };
+                        }
+                        return item;
+                      }));
+                    }}
+                  >
+                    ➕ Добавить шаг
+                  </button>
+                </h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '1.2rem', paddingLeft: '0.5rem', borderLeft: '1px dashed var(--color-iron-light)' }}>
                   {currentCard.steps && currentCard.steps.map((s, sIdx) => (
-                    <div key={sIdx} style={{ fontSize: '0.85rem', color: 'var(--color-bone-dim)' }}>
-                      • {s}
+                    <div key={sIdx} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ color: 'var(--color-bone-dim)', fontSize: '0.85rem' }}>•</span>
+                      <input 
+                        type="text"
+                        value={s}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setParsedList(prev => prev.map((item, idx) => {
+                            if (idx === reviewIndex) {
+                              const updatedSteps = [...(item.steps || [])];
+                              updatedSteps[sIdx] = val;
+                              return { ...item, steps: updatedSteps };
+                            }
+                            return item;
+                          }));
+                        }}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          borderBottom: '1px dashed rgba(255,255,255,0.15)',
+                          color: 'var(--color-bone-dim)',
+                          fontSize: '0.85rem',
+                          flex: 1,
+                          padding: '2px 0',
+                          outline: 'none',
+                          fontFamily: 'inherit'
+                        }}
+                        placeholder="Напишите физическое действие..."
+                      />
+                      <button 
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          color: 'var(--color-blood-glow)',
+                          cursor: 'pointer',
+                          fontSize: '0.85rem',
+                          padding: '0 4px',
+                          display: 'flex',
+                          alignItems: 'center'
+                        }}
+                        onClick={() => {
+                          playClick();
+                          setParsedList(prev => prev.map((item, idx) => {
+                            if (idx === reviewIndex) {
+                              return { ...item, steps: (item.steps || []).filter((_, stepI) => stepI !== sIdx) };
+                            }
+                            return item;
+                          }));
+                        }}
+                        title="Удалить шаг"
+                      >
+                        ❌
+                      </button>
                     </div>
                   ))}
                   {(!currentCard.steps || currentCard.steps.length === 0) && (
-                    <div style={{ fontStyle: 'italic', color: 'var(--color-iron-light)', fontSize: '0.8rem' }}>Нет шагов. Нажмите кнопку ниже для авто-расширения.</div>
+                    <div style={{ fontStyle: 'italic', color: 'var(--color-iron-light)', fontSize: '0.8rem' }}>Нет шагов. Нажмите кнопку выше для добавления или ниже для авто-расширения.</div>
                   )}
                 </div>
               </>
@@ -5754,7 +5870,7 @@ if (setupStage === 'resolution') {
                   </p>
                 ) : (
                   <p style={{ color: 'var(--color-bone-dim)', margin: '0 0 8px 0', fontSize: '0.8rem' }}>
-                    Вы объявили этот квест Длительным путешествием. Для таких тяжелых контрактов Бездна рекомендует детально спланировать дедлайн или разделить его силы.
+                    Квест определен как Длительное путешествие. Для таких тяжелых контрактов Бездна рекомендует детально спланировать дедлайн или разделить его силы.
                   </p>
                 )}
 
@@ -5842,7 +5958,7 @@ if (setupStage === 'resolution') {
                   onClick={handleRequestReviewQuestions}
                   disabled={loadingAI || reviewGuidedActive}
                 >
-                  💬 Расспросить Бездну (Диалог)
+                  💬 Расспросить Бездну
                 </button>
               </div>
             </div>
@@ -5938,10 +6054,34 @@ if (setupStage === 'resolution') {
           <h1 className="gothic-title" style={{ fontSize: '2.5rem', color: 'var(--color-blood-glow)', marginBottom: '1rem', letterSpacing: '0.15em' }}>
             НАПИШИ, ЧТОБЫ ВЫЖИТЬ
           </h1>
-          <p style={{ fontSize: '1rem', color: 'var(--color-bone-dim)', marginBottom: '2rem' }}>
-            Повозка перевернулась и разбита в щепки! Вы очнулись в кандалах под дождем. 
-            Каргахаульские конвоиры лежат без сознания, но скверна стягивается.
-            <b> Напишите первое элементарное физическое или умственное действие, которое вы сделаете ПРЯМО СЕЙЧАС, чтобы запустить путешествие.</b>
+          <p style={{ fontSize: '1rem', color: 'var(--color-bone-dim)', marginBottom: '2rem', lineHeight: '1.4' }}>
+            {(() => {
+              const taskCount = character.completedTasksCount || 0;
+              const hashStr = (activeTask?.id || '') + taskCount;
+              let hash = 0;
+              for (let i = 0; i < hashStr.length; i++) {
+                hash = hashStr.charCodeAt(i) + ((hash << 5) - hash);
+              }
+              hash = Math.abs(hash);
+
+              const firstQuestScenarios = [
+                "Повозка Империи Света перевернулась и разбита в щепки! Вы очнулись в кандалах под проливным дождем. Инквизиторы Света лежат без сознания, но коварная скверна стягивается из глубин леса...",
+                "Повозка Империи Света атакована дикими тварями! Вы очнулись в полуразрушенной клетке среди обломков. Вокруг царит зловещая тишина, но тени Бездны уже ползут к вашей душе..."
+              ];
+
+              const subsequentScenarios = [
+                "Бездна Абаддона внезапно сковала ваши мысли ледяным параличом внимания! Призраки прокрастинации кружат над вами, готовясь поглотить волю разума...",
+                "Вы очнулись посреди черного пепелища, скованные тяжелыми цепями сомнений и страха. Дух Когнитивного Тупика нависает над вашим изголовьем...",
+                "Скверна опутала ваши руки колючими лозами апатии. Каждый вдох дается с трудом, а враг уже занес свой призрачный клинок над вашей головой...",
+                "Вы провалились в зыбучие пески сомнений во время ночного перехода. Тьма сгущается с каждой секундой, заглушая биение вашего сердца..."
+              ];
+
+              return taskCount === 0 
+                ? firstQuestScenarios[hash % firstQuestScenarios.length]
+                : subsequentScenarios[hash % subsequentScenarios.length];
+            })()}
+            <br /><br />
+            <b>Напишите первое элементарное физическое или умственное действие, которое вы сделаете ПРЯМО СЕЙЧАС, чтобы запустить путешествие.</b>
           </p>
 
           <div style={{ fontSize: '1.2rem', color: '#fff', fontFamily: 'var(--font-rpg)', marginBottom: '1.5rem' }}>
