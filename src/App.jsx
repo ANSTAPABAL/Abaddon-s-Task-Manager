@@ -1925,21 +1925,22 @@ ${contextPrompt}`;
                     onClick={() => {
                       playClick();
                       const task = judgmentTasks[judgmentIndex];
-                      let isNewFocusTask = false;
-                      if (task.createdAt) {
-                        const createdDate = new Date(task.createdAt);
-                        const todayDate = new Date();
-                        const yesterdayDate = new Date(todayDate);
-                        yesterdayDate.setDate(todayDate.getDate() - 1);
-                        const isCreatedToday = createdDate.toDateString() === todayDate.toDateString();
-                        const isCreatedYesterday = createdDate.toDateString() === yesterdayDate.toDateString();
-                        isNewFocusTask = isCreatedToday || (isCreatedYesterday && createdDate.getHours() >= 7);
-                      }
-
-                      const performRescheduleToday = (runeData) => {
+                      triggerRuneOfReturn(task, (runeData) => {
                         const todayStr = getVirtualTodayStr();
-                        const nextCurse = isNewFocusTask ? (task.curseLevel || 0) : Math.min(5, (task.curseLevel || 0) + 1);
-                        const updated = tasks.map(t => t.id === task.id ? { ...t, date: todayStr, curseLevel: nextCurse, runeOfReturn: isNewFocusTask ? t.runeOfReturn : runeData } : t);
+                        const updated = tasks.map(t => {
+                          if (t.id === task.id) {
+                            const currentMax = t.maxScheduledDate || t.date;
+                            const newMax = (todayStr && (!currentMax || todayStr > currentMax)) ? todayStr : currentMax;
+                            return {
+                              ...t,
+                              date: todayStr,
+                              maxScheduledDate: newMax,
+                              curseLevel: Math.min(5, (t.curseLevel || 0) + 1),
+                              runeOfReturn: runeData
+                            };
+                          }
+                          return t;
+                        });
                         setTasks(updated);
                         if (activeSessionSync.activeTask && activeSessionSync.activeTask.id === task.id) {
                           clearActiveCombat();
@@ -1957,13 +1958,7 @@ ${contextPrompt}`;
                         } else {
                           setJudgmentOpen(false);
                         }
-                      };
-
-                      if (isNewFocusTask) {
-                        performRescheduleToday(null);
-                      } else {
-                        triggerRuneOfReturn(task, performRescheduleToday);
-                      }
+                      });
                     }}
                   >
                     📅 Перенести на СЕГОДНЯ
@@ -1974,24 +1969,36 @@ ${contextPrompt}`;
                     onClick={() => {
                       playClick();
                       const task = judgmentTasks[judgmentIndex];
-                      let isNewFocusTask = false;
-                      if (task.createdAt) {
-                        const createdDate = new Date(task.createdAt);
-                        const todayDate = new Date();
-                        const yesterdayDate = new Date(todayDate);
-                        yesterdayDate.setDate(todayDate.getDate() - 1);
-                        const isCreatedToday = createdDate.toDateString() === todayDate.toDateString();
-                        const isCreatedYesterday = createdDate.toDateString() === yesterdayDate.toDateString();
-                        isNewFocusTask = isCreatedToday || (isCreatedYesterday && createdDate.getHours() >= 7);
-                      }
-
-                      const performRescheduleTomorrow = (runeData) => {
+                      triggerRuneOfReturn(task, (runeData) => {
                         let tomorrowStr = getVirtualTomorrowStr();
-                        if (isNewFocusTask) {
-                          tomorrowStr = getVirtualTodayStr();
+                        if (task.createdAt) {
+                          const createdDate = new Date(task.createdAt);
+                          const todayDate = new Date();
+                          const yesterdayDate = new Date(todayDate);
+                          yesterdayDate.setDate(todayDate.getDate() - 1);
+                          
+                          const isCreatedToday = createdDate.toDateString() === todayDate.toDateString();
+                          const isCreatedYesterday = createdDate.toDateString() === yesterdayDate.toDateString();
+                          
+                          if (isCreatedToday || (isCreatedYesterday && createdDate.getHours() >= 7)) {
+                            tomorrowStr = getVirtualTodayStr();
+                          }
                         }
-                        const nextCurse = isNewFocusTask ? (task.curseLevel || 0) : Math.min(5, (task.curseLevel || 0) + 1);
-                        const updated = tasks.map(t => t.id === task.id ? { ...t, date: tomorrowStr, curseLevel: nextCurse, runeOfReturn: isNewFocusTask ? t.runeOfReturn : runeData } : t);
+
+                        const updated = tasks.map(t => {
+                          if (t.id === task.id) {
+                            const currentMax = t.maxScheduledDate || t.date;
+                            const newMax = (tomorrowStr && (!currentMax || tomorrowStr > currentMax)) ? tomorrowStr : currentMax;
+                            return {
+                              ...t,
+                              date: tomorrowStr,
+                              maxScheduledDate: newMax,
+                              curseLevel: Math.min(5, (t.curseLevel || 0) + 1),
+                              runeOfReturn: runeData
+                            };
+                          }
+                          return t;
+                        });
                         setTasks(updated);
                         if (activeSessionSync.activeTask && activeSessionSync.activeTask.id === task.id) {
                           clearActiveCombat();
@@ -2009,13 +2016,7 @@ ${contextPrompt}`;
                         } else {
                           setJudgmentOpen(false);
                         }
-                      };
-
-                      if (isNewFocusTask) {
-                        performRescheduleTomorrow(null);
-                      } else {
-                        triggerRuneOfReturn(task, performRescheduleTomorrow);
-                      }
+                      });
                     }}
                   >
                     ⏳ Отложить на ЗАВТРА
@@ -2027,7 +2028,18 @@ ${contextPrompt}`;
                       playClick();
                       const task = judgmentTasks[judgmentIndex];
                       triggerRuneOfReturn(task, (runeData) => {
-                        const updated = tasks.map(t => t.id === task.id ? { ...t, date: null, curseLevel: Math.min(5, (t.curseLevel || 0) + 1), runeOfReturn: runeData } : t);
+                        const updated = tasks.map(t => {
+                          if (t.id === task.id) {
+                            return {
+                              ...t,
+                              date: null,
+                              maxScheduledDate: t.maxScheduledDate || t.date,
+                              curseLevel: Math.min(5, (t.curseLevel || 0) + 1),
+                              runeOfReturn: runeData
+                            };
+                          }
+                          return t;
+                        });
                         setTasks(updated);
                         if (activeSessionSync.activeTask && activeSessionSync.activeTask.id === task.id) {
                           clearActiveCombat();

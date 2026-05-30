@@ -195,6 +195,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
             type: initialType,
             status: 'active',
             date: t.scheduledDate || parseDeadlineTextToDate(t.deadline, todayDateStr) || (t.deadline ? todayDateStr : null), // parse deadline correctly or put in today/backlog
+            maxScheduledDate: t.scheduledDate || parseDeadlineTextToDate(t.deadline, todayDateStr) || (t.deadline ? todayDateStr : null),
             pomodoroTime: t.estimatedTime || (initialType === 'siege' ? 50 : 25),
             pomodoroSpent: 0,
             isSurvival: isChaosSurvivalMode,
@@ -661,6 +662,9 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
     setTasks(prev => prev.map(t => {
       if (t.id === editingTask.id) {
         const parsedDate = editDeadline ? parseDeadlineTextToDate(editDeadline, todayStr) : null;
+        const newDate = parsedDate || t.date || (editDeadline ? todayStr : null);
+        const currentMax = t.maxScheduledDate || t.date;
+        const newMax = (newDate && (!currentMax || newDate > currentMax)) ? newDate : currentMax;
         return {
           ...t,
           title: editTitle,
@@ -671,7 +675,8 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
           nature: editNature,
           executionMode: editExecutionMode,
           deadline: editDeadline,
-          date: parsedDate || t.date || (editDeadline ? todayStr : null),
+          date: newDate,
+          maxScheduledDate: newMax,
           isSurvival: editIsSurvival
         };
       }
@@ -793,6 +798,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
       type: initialType,
       status: 'active',
       date: dateStr, // Null for backlog
+      maxScheduledDate: dateStr,
       pomodoroTime: initialType === 'siege' ? 50 : 25,
       pomodoroSpent: 0,
       toxicity: 'standard',
@@ -1023,15 +1029,19 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
     const targetTask = tasks.find(t => t.id === taskId);
     if (!targetTask) return;
 
-    const isPostponing = targetTask.date && targetDateStr && targetDateStr > targetTask.date;
+    const maxDate = targetTask.maxScheduledDate || targetTask.date;
+    const isPostponing = maxDate && targetDateStr && targetDateStr > maxDate;
 
     const performPostpone = (runeData) => {
       const updatedTasks = tasks.map(t => {
         if (t.id === taskId) {
           const nextCurse = isPostponing ? Math.min(5, t.curseLevel + 1) : t.curseLevel;
+          const currentMax = t.maxScheduledDate || t.date;
+          const newMax = (targetDateStr && (!currentMax || targetDateStr > currentMax)) ? targetDateStr : currentMax;
           return {
             ...t,
             date: targetDateStr,
+            maxScheduledDate: newMax,
             curseLevel: nextCurse,
             runeOfReturn: isPostponing ? runeData : t.runeOfReturn
           };
@@ -1091,22 +1101,26 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
     playClick();
 
     // Check if the date is actually changing (meaning a reschedule/postponement)
-    const isRescheduling = targetTask.date && targetDateStr && targetDateStr > targetTask.date;
+    const maxDate = targetTask.maxScheduledDate || targetTask.date;
+    const isRescheduling = maxDate && targetDateStr && targetDateStr > maxDate;
 
     const performDrop = (runeData) => {
       let dateChanged = false;
       const updatedTasks = tasks.map(t => {
         if (t.id === taskId) {
+          const currentMax = t.maxScheduledDate || t.date;
+          const newMax = (targetDateStr && (!currentMax || targetDateStr > currentMax)) ? targetDateStr : currentMax;
           let curse = t.curseLevel;
-          if (t.date && targetDateStr && targetDateStr > t.date) {
+          if (currentMax && targetDateStr && targetDateStr > currentMax) {
             curse = Math.min(5, curse + 1);
             dateChanged = true;
           }
           return {
             ...t,
             date: targetDateStr,
+            maxScheduledDate: newMax,
             curseLevel: curse,
-            runeOfReturn: (t.date && targetDateStr && targetDateStr > t.date) ? (runeData || t.runeOfReturn) : t.runeOfReturn
+            runeOfReturn: (currentMax && targetDateStr && targetDateStr > currentMax) ? (runeData || t.runeOfReturn) : t.runeOfReturn
           };
         }
         return t;
