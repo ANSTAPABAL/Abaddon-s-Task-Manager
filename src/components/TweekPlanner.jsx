@@ -1350,7 +1350,20 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
       }
     }
 
-    const progressPercent = Math.min(100, (kilometers / 200) * 100);
+    let progressPercent = 0;
+    if (kilometers <= 0) {
+      progressPercent = 0;
+    } else if (kilometers <= 20) {
+      progressPercent = (kilometers / 20) * 25;
+    } else if (kilometers <= 50) {
+      progressPercent = 25 + ((kilometers - 20) / (50 - 20)) * 25;
+    } else if (kilometers <= 100) {
+      progressPercent = 50 + ((kilometers - 50) / (100 - 50)) * 25;
+    } else if (kilometers <= 180) {
+      progressPercent = 75 + ((kilometers - 100) / (180 - 100)) * 25;
+    } else {
+      progressPercent = 100;
+    }
 
     // Fog of war calculations for milestones
     const getMilestoneLabel = (threshold, hiddenLabel) => {
