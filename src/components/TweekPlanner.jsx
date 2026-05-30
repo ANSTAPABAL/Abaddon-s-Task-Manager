@@ -179,6 +179,84 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
     }
   };
 
+  const [hoveredTaskBaseTitle, setHoveredTaskBaseTitle] = useState(null);
+  const [connectorLines, setConnectorLines] = useState([]);
+
+  const getBaseTitle = (title) => {
+    if (!title) return "";
+    return title
+      .replace(/[-(\s]+(часть|part)\s+[ivx\d]+[\s)]*$/i, '')
+      .trim()
+      .toLowerCase();
+  };
+
+  useEffect(() => {
+    const updateConnectorLines = () => {
+      if (!hoveredTaskBaseTitle) {
+        setConnectorLines([]);
+        return;
+      }
+
+      const scrollboard = scrollRef.current;
+      if (!scrollboard) return;
+
+      const cards = Array.from(scrollboard.querySelectorAll(`[data-base-title="${hoveredTaskBaseTitle}"]`));
+      if (cards.length < 2) {
+        setConnectorLines([]);
+        return;
+      }
+
+      const scrollboardRect = scrollboard.getBoundingClientRect();
+      const lines = [];
+
+      const cardData = cards.map(card => {
+        const rect = card.getBoundingClientRect();
+        return {
+          element: card,
+          dateStr: card.getAttribute('data-date'),
+          rect: {
+            left: rect.left - scrollboardRect.left + scrollboard.scrollLeft,
+            right: rect.right - scrollboardRect.left + scrollboard.scrollLeft,
+            top: rect.top - scrollboardRect.top + scrollboard.scrollTop,
+            bottom: rect.bottom - scrollboardRect.top + scrollboard.scrollTop,
+            width: rect.width,
+            height: rect.height
+          }
+        };
+      });
+
+      cardData.sort((a, b) => a.dateStr.localeCompare(b.dateStr));
+
+      for (let i = 0; i < cardData.length - 1; i++) {
+        const c1 = cardData[i];
+        const c2 = cardData[i + 1];
+
+        const d1 = new Date(c1.dateStr);
+        const d2 = new Date(c2.dateStr);
+        const diffTime = Math.abs(d2 - d1);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        if (diffDays === 1) {
+          const x1 = c1.rect.right;
+          const y1 = c1.rect.top + c1.rect.height / 2;
+          const x2 = c2.rect.left;
+          const y2 = c2.rect.top + c2.rect.height / 2;
+
+          lines.push({ x1, y1, x2, y2 });
+        }
+      }
+
+      setConnectorLines(lines);
+    };
+
+    updateConnectorLines();
+
+    window.addEventListener('resize', updateConnectorLines);
+    return () => {
+      window.removeEventListener('resize', updateConnectorLines);
+    };
+  }, [hoveredTaskBaseTitle]);
+
   const handleChaosDumpParse = async () => {
     if (!chaosText.trim() || !parseMessyTasks) return;
     playClick();
@@ -1512,6 +1590,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
         onMouseLeave={handleMouseLeave}
         onMouseUp={handleMouseUp}
         onMouseMove={handleMouseMove}
+        style={{ position: 'relative' }}
       >
         {weekDays.map(day => {
           const dayTasks = tasks.filter(t => t.date === day.dateStr && t.status !== 'buried');
@@ -1543,55 +1622,115 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
 
               {/* Day Tasks List */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1, overflowY: 'auto' }}>
-                {dayTasks.map(task => (
-                  <div
-                    key={task.id}
-                    className={`task-card ${task.type} ${task.status === 'completed' ? 'completed' : ''} ${task.curseLevel > 2 ? 'cursed' : ''}`}
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, task.id)}
-                    onDoubleClick={() => handleOpenEdit(task)}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      {renderTaskTitle(task, '0.9rem')}
-                      {task.curseLevel > 0 && (
-                        <span style={{ fontSize: '0.65rem', color: 'var(--color-curse-glow)' }}>
-                          ☠ {task.curseLevel}
-                        </span>
-                      )}
-                    </div>
-                    {renderTaskNatureBadge(task)}
+                {dayTasks.map(task => {
+                  const isHoveredMatch = hoveredTaskBaseTitle && getBaseTitle(task.title) === hoveredTaskBaseTitle;
+                  return (
+                    <div
+                      key={task.id}
+                      className={`task-card ${task.type} ${task.status === 'completed' ? 'completed' : ''} ${task.curseLevel > 2 ? 'cursed' : ''} ${isHoveredMatch ? 'highlighted' : ''}`}
+                      data-base-title={getBaseTitle(task.title)}
+                      data-date={day.dateStr}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, task.id)}
+                      onDoubleClick={() => handleOpenEdit(task)}
+                      onMouseEnter={() => setHoveredTaskBaseTitle(getBaseTitle(task.title))}
+                      onMouseLeave={() => setHoveredTaskBaseTitle(null)}
+                      style={{ 
+                        cursor: 'pointer',
+                        transition: 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)',
+                        boxShadow: isHoveredMatch 
+                          ? '0 0 15px rgba(255, 77, 77, 0.5), inset 0 0 8px rgba(255, 77, 77, 0.2)' 
+                          : 'none',
+                        transform: isHoveredMatch ? 'scale(1.025)' : 'none',
+                        position: 'relative'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        {renderTaskTitle(task, '0.9rem')}
+                        {task.curseLevel > 0 && (
+                          <span style={{ fontSize: '0.65rem', color: 'var(--color-curse-glow)' }}>
+                            ☠ {task.curseLevel}
+                          </span>
+                        )}
+                      </div>
+                      {renderTaskNatureBadge(task)}
 
-                    {/* Small action bars */}
-                    <div style={{ display: 'flex', gap: '0.3rem', marginTop: '0.5rem', justifyContent: 'flex-end' }}>
-                      {task.status !== 'completed' && (
-                        <>
-                          <button
-                            className="rpg-btn"
-                            style={{ fontSize: '0.65rem', padding: '2px 5px' }}
-                            onClick={() => handleSealTask(task.id)}
-                          >
-                            Запечатать
-                          </button>
-                          <button
-                            className="rpg-btn rpg-btn-blood"
-                            style={{ fontSize: '0.65rem', padding: '2px 5px' }}
-                            onClick={() => handleBuryTask(task.id)}
-                          >
-                            Похоронить
-                          </button>
-                        </>
-                      )}
-                      {task.status === 'completed' && (
-                        <span style={{ fontSize: '0.7rem', color: 'var(--color-bone-dim)' }}>✓ Запечатан</span>
-                      )}
+                      {/* Small action bars */}
+                      <div style={{ display: 'flex', gap: '0.3rem', marginTop: '0.5rem', justifyContent: 'flex-end' }}>
+                        {task.status !== 'completed' && (
+                          <>
+                            <button
+                              className="rpg-btn"
+                              style={{ fontSize: '0.65rem', padding: '2px 5px' }}
+                              onClick={() => handleSealTask(task.id)}
+                            >
+                              Запечатать
+                            </button>
+                            <button
+                              className="rpg-btn rpg-btn-blood"
+                              style={{ fontSize: '0.65rem', padding: '2px 5px' }}
+                              onClick={() => handleBuryTask(task.id)}
+                            >
+                              Похоронить
+                            </button>
+                          </>
+                        )}
+                        {task.status === 'completed' && (
+                          <span style={{ fontSize: '0.7rem', color: 'var(--color-bone-dim)' }}>✓ Запечатан</span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           );
         })}
+
+        {/* SVG Arrow Connectors Overlay */}
+        {connectorLines.length > 0 && (
+          <svg
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: scrollRef.current ? scrollRef.current.scrollWidth : '100%',
+              height: scrollRef.current ? scrollRef.current.scrollHeight : '100%',
+              pointerEvents: 'none',
+              zIndex: 10,
+              overflow: 'visible'
+            }}
+          >
+            <defs>
+              <marker
+                id="red-arrow"
+                viewBox="0 0 10 10"
+                refX="6"
+                refY="5"
+                markerWidth="6"
+                markerHeight="6"
+                orient="auto-start-reverse"
+              >
+                <path d="M 0 1 L 10 5 L 0 9 z" fill="var(--color-blood)" />
+              </marker>
+            </defs>
+            {connectorLines.map((line, idx) => (
+              <path
+                key={idx}
+                d={`M ${line.x1} ${line.y1} C ${(line.x1 + line.x2) / 2} ${line.y1}, ${(line.x1 + line.x2) / 2} ${line.y2}, ${line.x2} ${line.y2}`}
+                stroke="var(--color-blood)"
+                strokeWidth="2"
+                fill="none"
+                strokeDasharray="4 3"
+                markerEnd="url(#red-arrow)"
+                style={{
+                  filter: 'drop-shadow(0 0 4px rgba(255, 77, 77, 0.75))',
+                  animation: 'dash 10s linear infinite'
+                }}
+              />
+            ))}
+          </svg>
+        )}
       </div>
 
       {/* 3. Bottom Row: Backlog Skull Contract & Cemetery list */}
@@ -1609,33 +1748,49 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
           </h3>
 
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', maxHeight: '180px', overflowY: 'auto' }}>
-            {tasks.filter(t => t.date === null && t.status !== 'buried').map(task => (
-              <div
-                key={task.id}
-                className={`task-card ${task.type} ${task.curseLevel > 2 ? 'cursed' : ''}`}
-                style={{ flex: '0 0 200px', margin: 0 }}
-                draggable
-                onDragStart={(e) => handleDragStart(e, task.id)}
-                onDoubleClick={() => handleOpenEdit(task)}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>
-                  {renderTaskTitle(task, '0.85rem')}
+            {tasks.filter(t => t.date === null && t.status !== 'buried').map(task => {
+              const isHoveredMatch = hoveredTaskBaseTitle && getBaseTitle(task.title) === hoveredTaskBaseTitle;
+              return (
+                <div
+                  key={task.id}
+                  className={`task-card ${task.type} ${task.curseLevel > 2 ? 'cursed' : ''} ${isHoveredMatch ? 'highlighted' : ''}`}
+                  data-base-title={getBaseTitle(task.title)}
+                  data-date=""
+                  style={{ 
+                    flex: '0 0 200px', 
+                    margin: 0,
+                    cursor: 'pointer',
+                    transition: 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)',
+                    boxShadow: isHoveredMatch 
+                      ? '0 0 15px rgba(255, 77, 77, 0.5), inset 0 0 8px rgba(255, 77, 77, 0.2)' 
+                      : 'none',
+                    transform: isHoveredMatch ? 'scale(1.025)' : 'none'
+                  }}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, task.id)}
+                  onDoubleClick={() => handleOpenEdit(task)}
+                  onMouseEnter={() => setHoveredTaskBaseTitle(getBaseTitle(task.title))}
+                  onMouseLeave={() => setHoveredTaskBaseTitle(null)}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>
+                    {renderTaskTitle(task, '0.85rem')}
+                  </div>
+                  {renderTaskNatureBadge(task)}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '5px' }}>
+                    <span style={{ fontSize: '0.65rem', color: 'var(--color-bone-dim)' }}>
+                      {task.type === 'siege' ? 'Осада' : 'Охота'}
+                    </span>
+                    <button
+                      className="rpg-btn"
+                      style={{ fontSize: '0.6rem', padding: '1px 4px' }}
+                      onClick={() => handleSealTask(task.id)}
+                    >
+                      Да
+                    </button>
+                  </div>
                 </div>
-                {renderTaskNatureBadge(task)}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '5px' }}>
-                  <span style={{ fontSize: '0.65rem', color: 'var(--color-bone-dim)' }}>
-                    {task.type === 'siege' ? 'Осада' : 'Охота'}
-                  </span>
-                  <button
-                    className="rpg-btn"
-                    style={{ fontSize: '0.6rem', padding: '1px 4px' }}
-                    onClick={() => handleSealTask(task.id)}
-                  >
-                    Да
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
             {tasks.filter(t => t.date === null && t.status !== 'buried').length === 0 && (
               <div style={{ fontSize: '0.85rem', color: '#8c7d6b', fontStyle: 'italic', padding: '1rem' }}>
                 Пакт чист. Утащите сюда любые задачи для отложенного созревания...
@@ -1840,22 +1995,35 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
               >
                 <h4 className="kanban-col-title">📜 Контракты (To Do)</h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  {tasks.filter(t => t.date === activeKanbanDay && t.status === 'active' && (!t.steps || !t.steps.some(s => s.completed))).map(task => (
-                    <div
-                      key={task.id}
-                      className={`task-card ${task.type}`}
-                      draggable
-                      onDragStart={(e) => handleDragStart(e, task.id)}
-                      onDoubleClick={() => { playClick(); handleOpenEdit(task); }}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>{renderTaskTitle(task, '0.85rem')}</div>
-                      {renderTaskNatureBadge(task)}
-                      <div style={{ display: 'flex', gap: '0.3rem', marginTop: '5px', justifyContent: 'flex-end' }}>
-                        <button className="rpg-btn" style={{ fontSize: '0.6rem', padding: '2px' }} onClick={() => handleSealTask(task.id)}>Да</button>
+                  {tasks.filter(t => t.date === activeKanbanDay && t.status === 'active' && (!t.steps || !t.steps.some(s => s.completed))).map(task => {
+                    const isHoveredMatch = hoveredTaskBaseTitle && getBaseTitle(task.title) === hoveredTaskBaseTitle;
+                    return (
+                      <div
+                        key={task.id}
+                        className={`task-card ${task.type} ${isHoveredMatch ? 'highlighted' : ''}`}
+                        data-base-title={getBaseTitle(task.title)}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, task.id)}
+                        onDoubleClick={() => { playClick(); handleOpenEdit(task); }}
+                        onMouseEnter={() => setHoveredTaskBaseTitle(getBaseTitle(task.title))}
+                        onMouseLeave={() => setHoveredTaskBaseTitle(null)}
+                        style={{ 
+                          cursor: 'pointer',
+                          transition: 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)',
+                          boxShadow: isHoveredMatch 
+                            ? '0 0 15px rgba(255, 77, 77, 0.5), inset 0 0 8px rgba(255, 77, 77, 0.2)' 
+                            : 'none',
+                          transform: isHoveredMatch ? 'scale(1.025)' : 'none'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>{renderTaskTitle(task, '0.85rem')}</div>
+                        {renderTaskNatureBadge(task)}
+                        <div style={{ display: 'flex', gap: '0.3rem', marginTop: '5px', justifyContent: 'flex-end' }}>
+                          <button className="rpg-btn" style={{ fontSize: '0.6rem', padding: '2px' }} onClick={() => handleSealTask(task.id)}>Да</button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
@@ -1863,23 +2031,36 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
               <div className="kanban-col">
                 <h4 className="kanban-col-title">⚔ В разгаре боя (In Progress)</h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  {tasks.filter(t => t.date === activeKanbanDay && t.status === 'active' && t.steps && t.steps.some(s => s.completed)).map(task => (
-                    <div
-                      key={task.id}
-                      className={`task-card ${task.type}`}
-                      style={{ borderLeftColor: 'var(--color-mana)', cursor: 'pointer' }}
-                      onDoubleClick={() => { playClick(); handleOpenEdit(task); }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>{renderTaskTitle(task, '0.85rem')}</div>
-                      {renderTaskNatureBadge(task)}
-                      <div style={{ fontSize: '0.7rem', color: 'var(--color-bone-dim)', marginTop: '2px' }}>
-                        Шагов сделано: {task.steps.filter(s => s.completed).length}/{task.steps.length}
+                  {tasks.filter(t => t.date === activeKanbanDay && t.status === 'active' && t.steps && t.steps.some(s => s.completed)).map(task => {
+                    const isHoveredMatch = hoveredTaskBaseTitle && getBaseTitle(task.title) === hoveredTaskBaseTitle;
+                    return (
+                      <div
+                        key={task.id}
+                        className={`task-card ${task.type} ${isHoveredMatch ? 'highlighted' : ''}`}
+                        onDoubleClick={() => { playClick(); handleOpenEdit(task); }}
+                        onMouseEnter={() => setHoveredTaskBaseTitle(getBaseTitle(task.title))}
+                        onMouseLeave={() => setHoveredTaskBaseTitle(null)}
+                        style={{ 
+                          borderLeftColor: 'var(--color-mana)', 
+                          cursor: 'pointer',
+                          transition: 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)',
+                          boxShadow: isHoveredMatch 
+                            ? '0 0 15px rgba(255, 77, 77, 0.5), inset 0 0 8px rgba(255, 77, 77, 0.2)' 
+                            : 'none',
+                          transform: isHoveredMatch ? 'scale(1.025)' : 'none'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>{renderTaskTitle(task, '0.85rem')}</div>
+                        {renderTaskNatureBadge(task)}
+                        <div style={{ fontSize: '0.7rem', color: 'var(--color-bone-dim)', marginTop: '2px' }}>
+                          Шагов сделано: {task.steps.filter(s => s.completed).length}/{task.steps.length}
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.3rem', marginTop: '5px', justifyContent: 'flex-end' }}>
+                          <button className="rpg-btn" style={{ fontSize: '0.6rem', padding: '2px' }} onClick={() => handleSealTask(task.id)}>Завершить</button>
+                        </div>
                       </div>
-                      <div style={{ display: 'flex', gap: '0.3rem', marginTop: '5px', justifyContent: 'flex-end' }}>
-                        <button className="rpg-btn" style={{ fontSize: '0.6rem', padding: '2px' }} onClick={() => handleSealTask(task.id)}>Завершить</button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
@@ -1887,18 +2068,30 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
               <div className="kanban-col">
                 <h4 className="kanban-col-title">💎 Победа / Запечатано (Done)</h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  {tasks.filter(t => t.date === activeKanbanDay && t.status === 'completed').map(task => (
-                    <div
-                      key={task.id}
-                      className="task-card completed"
-                      onDoubleClick={() => { playClick(); handleOpenEdit(task); }}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>{renderTaskTitle(task, '0.85rem')}</div>
-                      {renderTaskNatureBadge(task)}
-                      <span style={{ fontSize: '0.7rem', color: 'var(--color-bone-dim)' }}>✓ Ритуал проведен</span>
-                    </div>
-                  ))}
+                  {tasks.filter(t => t.date === activeKanbanDay && t.status === 'completed').map(task => {
+                    const isHoveredMatch = hoveredTaskBaseTitle && getBaseTitle(task.title) === hoveredTaskBaseTitle;
+                    return (
+                      <div
+                        key={task.id}
+                        className={`task-card completed ${isHoveredMatch ? 'highlighted' : ''}`}
+                        onDoubleClick={() => { playClick(); handleOpenEdit(task); }}
+                        onMouseEnter={() => setHoveredTaskBaseTitle(getBaseTitle(task.title))}
+                        onMouseLeave={() => setHoveredTaskBaseTitle(null)}
+                        style={{ 
+                          cursor: 'pointer',
+                          transition: 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)',
+                          boxShadow: isHoveredMatch 
+                            ? '0 0 15px rgba(255, 77, 77, 0.5), inset 0 0 8px rgba(255, 77, 77, 0.2)' 
+                            : 'none',
+                          transform: isHoveredMatch ? 'scale(1.025)' : 'none'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>{renderTaskTitle(task, '0.85rem')}</div>
+                        {renderTaskNatureBadge(task)}
+                        <span style={{ fontSize: '0.7rem', color: 'var(--color-bone-dim)' }}>✓ Ритуал проведен</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>

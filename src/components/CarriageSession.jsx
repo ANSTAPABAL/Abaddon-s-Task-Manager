@@ -136,6 +136,79 @@ const NPC_ENCOUNTERS = [
   { name: "Дух Совести", type: "mirror", icon: "💀", prompt: "дух, напоминающий герою о всех откладываемых делах как о неоплаченных долгах перед собой" },
 ];
 
+const generateProceduralNpc = (moral) => {
+  const m = moral !== undefined ? moral : 50;
+
+  // 1% Emperor chance
+  if (Math.random() < 0.01) {
+    if (m >= 50) {
+      return {
+        name: "Император Святозар",
+        type: "motivating",
+        icon: "👑",
+        prompt: "Святозар, первый император Империи Света. Это величественный блондин с роскошными волосами и прекрасными голубыми глазами, сочетающий в себе мужскую маскулинность лица, четкие скулы и волевой подбородок. Он одет в легкие светлые стальные доспехи, не сковывающие его движений. Он величественен, путешествует со своим элитным отрядом рыцарей. Он надменен на первый взгляд, но глубоко чуток, внимателен и проявляет неподдельное любопытство к Изгнаннику, ощущая его внутренний страх, тревогу и неуверенность.",
+        isLegendary: true
+      };
+    } else {
+      return {
+        name: "Владыка Абаддон",
+        type: "provoking",
+        icon: "👹",
+        prompt: "Абаддон, грозный император Ндравна. Мужчина высокого роста в темных доспехах, не сковывающих его движения, обвитых костями. Он не носит шлем, его темные волосы средней длины уложены назад, а на лице выделяются уверенный орлиный нос и густые темные брови. Он величественен, путешествует с личной гвардией скелетов-рыцарей. Он рассудителен, тверд как кремень и абсолютно безжалостен к слабостям.",
+        isLegendary: true
+      };
+    }
+  }
+
+  const races = ["человек", "эльф", "полуорк", "дварф", "тролль", "каргахаулец", "изгнанник", "дух", "селянин", "демон"];
+  const classes = ["странник", "наемник", "маг", "купец", "храмовник", "целитель", "алхимик", "разведчик", "чернокнижник", "рыцарь", "пастух", "кузнец"];
+  const epithets = ["Слепой", "Хмурый", "Отрекшийся", "Бродячий", "Раненый", "Мудрый", "Падший", "Молодой", "Старый", "Безумный", "Стойкий", "Забытый", "Дикий"];
+  
+  const icons = {
+    "человек": "👤",
+    "эльф": "🧝",
+    "полуорк": "🐗",
+    "дварф": "🧔",
+    "тролль": "👹",
+    "каргахаулец": "🏔️",
+    "изгнанник": "⛓️",
+    "дух": "👻",
+    "селянин": "👨‍🌾",
+    "демон": "😈"
+  };
+
+  const race = races[Math.floor(Math.random() * races.length)];
+  const cls = classes[Math.floor(Math.random() * classes.length)];
+  const epithet = epithets[Math.floor(Math.random() * epithets.length)];
+  
+  const name = `${epithet} ${race}-${cls}`;
+  const icon = icons[race] || "🧙";
+
+  let type = "motivating";
+  if (m >= 60) {
+    type = Math.random() < 0.5 ? "motivating" : "helping";
+  } else if (m < 40) {
+    type = Math.random() < 0.5 ? "provoking" : "mirror";
+  } else {
+    const types = ["motivating", "helping", "provoking", "mirror"];
+    type = types[Math.floor(Math.random() * types.length)];
+  }
+
+  const prompts = {
+    motivating: `мудрый путник-собеседник, подбадривающий Изгнанника, говорящий о важности надежды и победы над унынием`,
+    helping: `опытный мастер своего дела, делящийся секретами выживания и практическими советами по концентрации ума в диких землях`,
+    provoking: `дерзкий и ехидный противник или провокатор, испытывающий волю Изгнанника, подначивающий его двигаться быстрее`,
+    mirror: `таинственная мистическая сущность, заставляющая Изгнанника заглянуть в глубины своей совести, порицающая прокрастинацию и лень`
+  };
+
+  return {
+    name,
+    type,
+    icon,
+    prompt: `${name}, ${prompts[type]}`
+  };
+};
+
 const chooseDynamicNpc = (moral) => {
   const m = moral !== undefined ? moral : 50;
   
@@ -149,16 +222,8 @@ const chooseDynamicNpc = (moral) => {
     return null; // Hero meets NO NPC at all! Just raw threats or empty camps.
   }
 
-  // 2. Filter NPC encounters based on moral alignment
-  let availableNpcs = [...NPC_ENCOUNTERS];
-  if (m >= 60) {
-    availableNpcs = NPC_ENCOUNTERS.filter(n => n.type === 'motivating' || n.type === 'helping');
-  } else if (m < 40) {
-    availableNpcs = NPC_ENCOUNTERS.filter(n => n.type === 'provoking' || n.type === 'mirror');
-  }
-
-  if (availableNpcs.length === 0) availableNpcs = [...NPC_ENCOUNTERS];
-  return availableNpcs[Math.floor(Math.random() * availableNpcs.length)];
+  // 2. Generate a procedural NPC (including 1% legendary Emperor check)
+  return generateProceduralNpc(m);
 };
 
 // Мини-перерывы (каждые 30 минут активной работы)
@@ -555,13 +620,17 @@ export default function CarriageSession({
         title: '☀️ Путь Милосердия (Искупление)',
         text: `Вступиться за жителей деревни, поделиться с «${npc.name}» пищей и помолиться о его пути у костра.`,
         resolutionText: `Вы проявили истинное благородство духа. Поделившись крохами пищи с «${npc.name}», вы тихо молились у костра. В вашей душе зажегся огонь искупления, согревающий разум во мгле.`,
-        statChangeText: '❤️ +8 HP, 🔮 Моральный компас +5, 🪙 -2 Золота',
-        apply: (char) => ({
-          ...char,
-          hp: Math.min(char.maxHp || 100, (char.hp || 80) + 8),
-          moralCompass: Math.min(100, (char.moralCompass !== undefined ? char.moralCompass : 50) + 5),
-          gold: Math.max(0, (char.gold || 0) - 2)
-        })
+        statChangeText: `❤️ +8 HP, 🔮 Моральный компас +${moral < 40 ? 1 : moral < 60 ? 3 : 5}, 🪙 -2 Золота`,
+        apply: (char) => {
+          const currentMoral = char.moralCompass !== undefined ? char.moralCompass : 50;
+          const moralGain = currentMoral < 40 ? 1 : currentMoral < 60 ? 3 : 5;
+          return {
+            ...char,
+            hp: Math.min(char.maxHp || 100, (char.hp || 80) + 8),
+            moralCompass: Math.min(100, currentMoral + moralGain),
+            gold: Math.max(0, (char.gold || 0) - 2)
+          };
+        }
       },
       {
         type: 'cynic',
@@ -627,6 +696,15 @@ export default function CarriageSession({
     const isLargeQuest = task?.pomodoroTime >= 50 || task?.type === 'siege';
     const hpContext = character.hp <= 30 ? `Герой истощен, едва держится на ногах (критический уровень здоровья HP: ${character.hp})` : `Герой крепок и полон сил (здоровье HP: ${character.hp})`;
     
+    const battleBackdrops = [
+      "По пути Изгнанник проходит мимо ожесточенного сражения между авангардом Империи Света и ордой нежити, не касающегося его напрямую. Он прокрадывается сквозь тени, уклоняясь от шальных стрел и взрывов магии.",
+      "Сразу после победы Изгнанник натыкается на свежее поле боя, усеянное телами павших рыцарей и разбитыми повозками, где бродят мародеры. У него есть выбор — обыскать мертвецов ради золота или пройти мимо с презрением.",
+      "Во время выполнения контракта Изгнанник замечает раненого мирного жителя, прижатого тяжелым щитом в эпицентре стычки. Его выбор — проявить милосердие и спасти несчастного под градом ударов, либо хладнокровно проигнорировать крики о помощи.",
+      "Герой движется мимо пылающего блокпоста, где дикие наемники Каргахаула делят добычу и спорят над пленным разведчиком эльфов. Изгнанник может вмешаться ради справедливости, либо пройти мимо.",
+      "Битва застает Изгнанника на разрушенном мосту, где сталкиваются силы Хаоса и Деревянные Люди. Осколки заклинаний взрываются вокруг, заставляя героя маневрировать на краю бездны."
+    ];
+    const randomBackdrop = battleBackdrops[Math.floor(Math.random() * battleBackdrops.length)];
+    
     const moralVal = character.moralCompass !== undefined ? character.moralCompass : 50;
     let spiritContext = "";
     if (moralVal >= 80) {
@@ -672,6 +750,11 @@ ${loreGuidelines}`;
     } else if (type === 'victory') {
       prompt = `Ты — Летописец Ничейных Земель во вселенной Абаддона. Опиши короткую, суровую и грязную летопись-эпитафию в стиле Джо Аберкромби (темное фэнтези, реализм, цинизм, кровь, пот и грязь). Действие разворачивается на Ничейных Землях — суровом фронтире Абаддона, где беспрерывно воюют Империя Света (люди), разрозненные людские королевства, дикий Каргахаул, Деревянные Люди, Хаос и Нежить. Иногда здесь можно встретить разведку эльфов, еще реже бродячих троллей или опасных гарпий с небесных островов. Потусторонняя Бездна — это потусторонний мир в нашем мире, за пределами человеческого восприятия.
 Изгнанник одержал победу в фокус-сессии над когнитивной тварью: «${enemy}» (задача: "${task?.title || ''}").
+
+АТМОСФЕРНЫЙ КОНТЕКСТ СОБЫТИЯ НА ПУТИ:
+${randomBackdrop}
+Вплети это событие в летопись. Изгнанник должен отреагировать на него в соответствии со своим духом (Дух: ${moralVal}/100, стиль реакции: ${spiritContext}). Поведение и его выбор (проявить благородство и спасти раненого, хладнокровно обыскать тела, или с презрением пройти мимо битвы) должны отражать его текущее моральное состояние.
+
 ${legacyPromptContext}
 
 ТЕХНИЧЕСКИЙ КОНТЕКСТ ГЕРОЯ:
@@ -1883,7 +1966,7 @@ const handleWinActiveSession = (task) => {
         xp: remXp,
         gold: (prev.gold || 0) + earnedGold,
         hp: nextHp,
-        moralCompass: Math.min(100, (prev.moralCompass || 50) + 5),
+        moralCompass: Math.min(100, (prev.moralCompass || 50) + ((prev.moralCompass || 50) < 40 ? 1 : (prev.moralCompass || 50) < 60 ? 3 : 5)),
         completedTasksCount: (prev.completedTasksCount || 0) + 1,
         completedSiegesCount: (prev.completedSiegesCount || 0) + (isSiege ? 1 : 0),
         totalGoldEarned: (prev.totalGoldEarned || 0) + earnedGold,
@@ -1991,7 +2074,7 @@ const handleWinActiveSession = (task) => {
         xp: remXp,
         gold: (prev.gold || 0) + earnedGold,
         hp: nextHp,
-        moralCompass: Math.min(100, (prev.moralCompass || 50) + 5),
+        moralCompass: Math.min(100, (prev.moralCompass || 50) + ((prev.moralCompass || 50) < 40 ? 1 : (prev.moralCompass || 50) < 60 ? 3 : 5)),
         completedTasksCount: (prev.completedTasksCount || 0) + 1,
         completedSiegesCount: (prev.completedSiegesCount || 0) + (isSiege ? 1 : 0),
         totalGoldEarned: (prev.totalGoldEarned || 0) + earnedGold,

@@ -1872,7 +1872,7 @@ ${contextPrompt}`;
                           level: nextLvl,
                           xp: rx,
                           gold: (c.gold || 0) + gold,
-                          moralCompass: Math.min(100, (c.moralCompass || 50) + 5),
+                          moralCompass: Math.min(100, (c.moralCompass || 50) + ((c.moralCompass || 50) < 40 ? 1 : (c.moralCompass || 50) < 60 ? 3 : 5)),
                           completedTasksCount: (c.completedTasksCount || 0) + 1,
                           completedSiegesCount: (c.completedSiegesCount || 0) + (isSiege ? 1 : 0),
                           totalGoldEarned: (c.totalGoldEarned || 0) + gold
