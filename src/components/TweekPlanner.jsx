@@ -659,30 +659,63 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
   const handleSaveEdits = () => {
     playSuccess();
     const todayStr = getVirtualTodayStr();
-    setTasks(prev => prev.map(t => {
-      if (t.id === editingTask.id) {
-        const parsedDate = editDeadline ? parseDeadlineTextToDate(editDeadline, todayStr) : null;
-        const newDate = parsedDate || t.date || (editDeadline ? todayStr : null);
-        const currentMax = t.maxScheduledDate || t.date;
-        const newMax = (newDate && (!currentMax || newDate > currentMax)) ? newDate : currentMax;
-        return {
-          ...t,
-          title: editTitle,
-          type: editType,
-          pomodoroTime: Number(editTime),
-          intent: editIntent,
-          steps: editSteps,
-          nature: editNature,
-          executionMode: editExecutionMode,
-          deadline: editDeadline,
-          date: newDate,
-          maxScheduledDate: newMax,
-          isSurvival: editIsSurvival
-        };
+    
+    const targetTask = tasks.find(t => t.id === editingTask.id);
+    if (!targetTask) return;
+
+    const parsedDate = editDeadline ? parseDeadlineTextToDate(editDeadline, todayStr) : null;
+    const newDate = parsedDate || targetTask.date || (editDeadline ? todayStr : null);
+    const isOverdue = targetTask.date && targetTask.date < todayStr && targetTask.status === 'active';
+    const dateChanged = newDate !== targetTask.date;
+
+    const currentMax = targetTask.maxScheduledDate || targetTask.date;
+    const isPostponing = isOverdue || (currentMax && newDate && newDate > currentMax);
+
+    const performSave = (runeData) => {
+      if (isOverdue && dateChanged) {
+        const hpPenalty = targetTask.isSurvival ? 30 : 10;
+        setCharacter(c => ({
+          ...c,
+          hp: Math.max(1, c.hp - hpPenalty),
+          moralCompass: Math.max(0, (c.moralCompass || 50) - 10),
+          totalHpSacrificed: (c.totalHpSacrificed || 0) + hpPenalty
+        }));
+        setRitualMessage(`💥 Вы провалили своевременный контракт «${targetTask.title}»! Потеряно ${hpPenalty} HP рассудка и 10 силы духа.`);
+        setTimeout(() => setRitualMessage(''), 7000);
       }
-      return t;
-    }));
-    setEditingTask(null);
+
+      const updatedTasks = tasks.map(t => {
+        if (t.id === editingTask.id) {
+          const nextCurse = (isPostponing && dateChanged) ? Math.min(5, (t.curseLevel || 0) + 1) : t.curseLevel;
+          const newMax = (newDate && (!currentMax || newDate > currentMax)) ? newDate : currentMax;
+          return {
+            ...t,
+            title: editTitle,
+            type: editType,
+            pomodoroTime: Number(editTime),
+            intent: editIntent,
+            steps: editSteps,
+            nature: editNature,
+            executionMode: editExecutionMode,
+            deadline: editDeadline,
+            date: newDate,
+            maxScheduledDate: newMax,
+            curseLevel: nextCurse,
+            runeOfReturn: (isPostponing && dateChanged) ? (runeData || t.runeOfReturn) : t.runeOfReturn,
+            isSurvival: editIsSurvival
+          };
+        }
+        return t;
+      });
+      setTasks(updatedTasks);
+      setEditingTask(null);
+    };
+
+    if (isPostponing && dateChanged && triggerRuneOfReturn) {
+      triggerRuneOfReturn(targetTask, performSave);
+    } else {
+      performSave(null);
+    }
   };
 
   const handleAddToBacklog = () => {
@@ -1029,13 +1062,27 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
     const targetTask = tasks.find(t => t.id === taskId);
     if (!targetTask) return;
 
+    const todayStr = getVirtualTodayStr();
+    const isOverdue = targetTask.date && targetTask.date < todayStr && targetTask.status === 'active';
     const maxDate = targetTask.maxScheduledDate || targetTask.date;
-    const isPostponing = maxDate && targetDateStr && targetDateStr > maxDate;
+    const isPostponing = isOverdue || (maxDate && targetDateStr && targetDateStr > maxDate);
 
     const performPostpone = (runeData) => {
+      if (isOverdue) {
+        const hpPenalty = targetTask.isSurvival ? 30 : 10;
+        setCharacter(c => ({
+          ...c,
+          hp: Math.max(1, c.hp - hpPenalty),
+          moralCompass: Math.max(0, (c.moralCompass || 50) - 10),
+          totalHpSacrificed: (c.totalHpSacrificed || 0) + hpPenalty
+        }));
+        setRitualMessage(`💥 Вы провалили своевременный контракт «${targetTask.title}»! Потеряно ${hpPenalty} HP рассудка и 10 силы духа.`);
+        setTimeout(() => setRitualMessage(''), 7000);
+      }
+
       const updatedTasks = tasks.map(t => {
         if (t.id === taskId) {
-          const nextCurse = isPostponing ? Math.min(5, t.curseLevel + 1) : t.curseLevel;
+          const nextCurse = isPostponing ? Math.min(5, (t.curseLevel || 0) + 1) : t.curseLevel;
           const currentMax = t.maxScheduledDate || t.date;
           const newMax = (targetDateStr && (!currentMax || targetDateStr > currentMax)) ? targetDateStr : currentMax;
           return {
@@ -1043,7 +1090,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
             date: targetDateStr,
             maxScheduledDate: newMax,
             curseLevel: nextCurse,
-            runeOfReturn: isPostponing ? runeData : t.runeOfReturn
+            runeOfReturn: isPostponing ? (runeData || t.runeOfReturn) : t.runeOfReturn
           };
         }
         return t;
@@ -1100,19 +1147,32 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
 
     playClick();
 
-    // Check if the date is actually changing (meaning a reschedule/postponement)
+    const todayStr = getVirtualTodayStr();
+    const isOverdue = targetTask.date && targetTask.date < todayStr && targetTask.status === 'active';
     const maxDate = targetTask.maxScheduledDate || targetTask.date;
-    const isRescheduling = maxDate && targetDateStr && targetDateStr > maxDate;
+    const isRescheduling = isOverdue || (maxDate && targetDateStr && targetDateStr > maxDate);
 
     const performDrop = (runeData) => {
+      if (isOverdue) {
+        const hpPenalty = targetTask.isSurvival ? 30 : 10;
+        setCharacter(c => ({
+          ...c,
+          hp: Math.max(1, c.hp - hpPenalty),
+          moralCompass: Math.max(0, (c.moralCompass || 50) - 10),
+          totalHpSacrificed: (c.totalHpSacrificed || 0) + hpPenalty
+        }));
+        setRitualMessage(`💥 Вы провалили своевременный контракт «${targetTask.title}»! Потеряно ${hpPenalty} HP рассудка и 10 силы духа.`);
+        setTimeout(() => setRitualMessage(''), 7000);
+      }
+
       let dateChanged = false;
       const updatedTasks = tasks.map(t => {
         if (t.id === taskId) {
           const currentMax = t.maxScheduledDate || t.date;
           const newMax = (targetDateStr && (!currentMax || targetDateStr > currentMax)) ? targetDateStr : currentMax;
           let curse = t.curseLevel;
-          if (currentMax && targetDateStr && targetDateStr > currentMax) {
-            curse = Math.min(5, curse + 1);
+          if (isOverdue || (currentMax && targetDateStr && targetDateStr > currentMax)) {
+            curse = Math.min(5, (curse || 0) + 1);
             dateChanged = true;
           }
           return {
@@ -1120,7 +1180,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
             date: targetDateStr,
             maxScheduledDate: newMax,
             curseLevel: curse,
-            runeOfReturn: (currentMax && targetDateStr && targetDateStr > currentMax) ? (runeData || t.runeOfReturn) : t.runeOfReturn
+            runeOfReturn: (isOverdue || (currentMax && targetDateStr && targetDateStr > currentMax)) ? (runeData || t.runeOfReturn) : t.runeOfReturn
           };
         }
         return t;
