@@ -78,7 +78,13 @@ export const parseDeadlineTextToDate = (deadlineText, baseDateStr) => {
   ];
   
   for (const day of weekdays) {
-    if (day.names.some(name => text.includes(name))) {
+    if (day.names.some(name => {
+      if (name.length <= 2) {
+        const regex = new RegExp('(^|[^а-яё])' + name + '([^а-яё]|$)', 'i');
+        return regex.test(text);
+      }
+      return text.includes(name);
+    })) {
       const currentDay = baseDate.getDay(); // 0-6 (0 is Sunday)
       let daysToAdd = day.dayNum - currentDay;
       if (daysToAdd <= 0) {

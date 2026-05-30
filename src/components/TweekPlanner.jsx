@@ -744,7 +744,8 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
     if (!targetTask) return;
 
     const parsedDate = editDeadline ? parseDeadlineTextToDate(editDeadline, todayStr) : null;
-    const newDate = parsedDate || targetTask.date || (editDeadline ? todayStr : null);
+    const deadlineChanged = editDeadline !== (targetTask.deadline || '');
+    const newDate = (deadlineChanged && parsedDate) ? parsedDate : (targetTask.date || parsedDate || (editDeadline ? todayStr : null));
     const isOverdue = targetTask.date && targetTask.date < todayStr && targetTask.status === 'active';
     const dateChanged = newDate !== targetTask.date;
 
