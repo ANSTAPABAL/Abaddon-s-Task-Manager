@@ -453,14 +453,15 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
       });
       setTasks(updatedTasks);
 
-      // Deduct HP
+      // Deduct HP and Moral Compass
       setCharacter(prev => ({
         ...prev,
         hp: Math.max(1, prev.hp - 5),
+        moralCompass: Math.max(0, (prev.moralCompass || 50) - 15),
         totalHpSacrificed: (prev.totalHpSacrificed || 0) + 5
       }));
 
-      setRitualMessage(`💀 Сделка совершена! ${todayActiveTasks.length} задач перенесены на завтра. Потеряно 5 HP рассудка. Скверна перенесенных задач возросла!`);
+      setRitualMessage(`💀 Сделка совершена! ${todayActiveTasks.length} задач перенесены на завтра. Потеряно 5 HP рассудка и 15 силы духа!`);
       setTimeout(() => setRitualMessage(''), 7000);
 
       // Automatically trigger AI Spirits Counsel
@@ -542,11 +543,12 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
       setCharacter(prev => ({
         ...prev,
         hp: Math.max(1, prev.hp - hpPenalty),
+        moralCompass: Math.max(0, (prev.moralCompass || 50) - 15),
         totalHpSacrificed: (prev.totalHpSacrificed || 0) + hpPenalty
       }));
 
       const destLabel = destination === 'tomorrow' ? 'на завтра' : 'в Бэклог';
-      setRitualMessage(`💀 Задача «${targetTask.title}» изгнана ${destLabel}! Потеряно ${hpPenalty} HP. Скверна задачи возросла.`);
+      setRitualMessage(`💀 Задача «${targetTask.title}» изгнана ${destLabel}! Потеряно ${hpPenalty} HP и 15 силы духа.`);
       setTimeout(() => setRitualMessage(''), 5000);
       setTaskToPushId('');
 
@@ -672,16 +674,27 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
     const isPostponing = isOverdue || (currentMax && newDate && newDate > currentMax);
 
     const performSave = (runeData) => {
+      let moralPenalty = 0;
+      let hpPenalty = 0;
+
       if (isOverdue && dateChanged) {
-        const hpPenalty = targetTask.isSurvival ? 30 : 10;
+        hpPenalty = targetTask.isSurvival ? 30 : 10;
+        moralPenalty = 15;
+        setRitualMessage(`💥 Вы провалили своевременный контракт «${targetTask.title}»! Потеряно ${hpPenalty} HP рассудка и 15 силы духа.`);
+        setTimeout(() => setRitualMessage(''), 7000);
+      } else if (isPostponing && dateChanged) {
+        moralPenalty = 15;
+        setRitualMessage(`💀 Скверна прокрастинации сгущается! Контракт «${targetTask.title}» перенесен. Потеряно 15 силы духа.`);
+        setTimeout(() => setRitualMessage(''), 7000);
+      }
+
+      if (moralPenalty > 0 || hpPenalty > 0) {
         setCharacter(c => ({
           ...c,
           hp: Math.max(1, c.hp - hpPenalty),
-          moralCompass: Math.max(0, (c.moralCompass || 50) - 10),
+          moralCompass: Math.max(0, (c.moralCompass || 50) - moralPenalty),
           totalHpSacrificed: (c.totalHpSacrificed || 0) + hpPenalty
         }));
-        setRitualMessage(`💥 Вы провалили своевременный контракт «${targetTask.title}»! Потеряно ${hpPenalty} HP рассудка и 10 силы духа.`);
-        setTimeout(() => setRitualMessage(''), 7000);
       }
 
       const updatedTasks = tasks.map(t => {
@@ -1068,16 +1081,27 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
     const isPostponing = isOverdue || (maxDate && targetDateStr && targetDateStr > maxDate);
 
     const performPostpone = (runeData) => {
+      let moralPenalty = 0;
+      let hpPenalty = 0;
+
       if (isOverdue) {
-        const hpPenalty = targetTask.isSurvival ? 30 : 10;
+        hpPenalty = targetTask.isSurvival ? 30 : 10;
+        moralPenalty = 15;
+        setRitualMessage(`💥 Вы провалили своевременный контракт «${targetTask.title}»! Потеряно ${hpPenalty} HP рассудка и 15 силы духа.`);
+        setTimeout(() => setRitualMessage(''), 7000);
+      } else if (isPostponing) {
+        moralPenalty = 15;
+        setRitualMessage(`💀 Скверна прокрастинации сгущается! Контракт «${targetTask.title}» отложен. Потеряно 15 силы духа.`);
+        setTimeout(() => setRitualMessage(''), 7000);
+      }
+
+      if (moralPenalty > 0 || hpPenalty > 0) {
         setCharacter(c => ({
           ...c,
           hp: Math.max(1, c.hp - hpPenalty),
-          moralCompass: Math.max(0, (c.moralCompass || 50) - 10),
+          moralCompass: Math.max(0, (c.moralCompass || 50) - moralPenalty),
           totalHpSacrificed: (c.totalHpSacrificed || 0) + hpPenalty
         }));
-        setRitualMessage(`💥 Вы провалили своевременный контракт «${targetTask.title}»! Потеряно ${hpPenalty} HP рассудка и 10 силы духа.`);
-        setTimeout(() => setRitualMessage(''), 7000);
       }
 
       const updatedTasks = tasks.map(t => {
@@ -1153,16 +1177,27 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
     const isRescheduling = isOverdue || (maxDate && targetDateStr && targetDateStr > maxDate);
 
     const performDrop = (runeData) => {
+      let moralPenalty = 0;
+      let hpPenalty = 0;
+
       if (isOverdue) {
-        const hpPenalty = targetTask.isSurvival ? 30 : 10;
+        hpPenalty = targetTask.isSurvival ? 30 : 10;
+        moralPenalty = 15;
+        setRitualMessage(`💥 Вы провалили своевременный контракт «${targetTask.title}»! Потеряно ${hpPenalty} HP рассудка и 15 силы духа.`);
+        setTimeout(() => setRitualMessage(''), 7000);
+      } else if (isRescheduling) {
+        moralPenalty = 15;
+        setRitualMessage(`💀 Скверна прокрастинации сгущается! Контракт «${targetTask.title}» перенесен. Потеряно 15 силы духа.`);
+        setTimeout(() => setRitualMessage(''), 7000);
+      }
+
+      if (moralPenalty > 0 || hpPenalty > 0) {
         setCharacter(c => ({
           ...c,
           hp: Math.max(1, c.hp - hpPenalty),
-          moralCompass: Math.max(0, (c.moralCompass || 50) - 10),
+          moralCompass: Math.max(0, (c.moralCompass || 50) - moralPenalty),
           totalHpSacrificed: (c.totalHpSacrificed || 0) + hpPenalty
         }));
-        setRitualMessage(`💥 Вы провалили своевременный контракт «${targetTask.title}»! Потеряно ${hpPenalty} HP рассудка и 10 силы духа.`);
-        setTimeout(() => setRitualMessage(''), 7000);
       }
 
       let dateChanged = false;
@@ -1203,29 +1238,58 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
 
   const renderJourneyMap = () => {
     const completedCount = tasks.filter(t => t.status === 'completed').length;
-    const miles = tasks.filter(t => t.status === 'completed').reduce((acc, t) => {
+    const kilometers = tasks.filter(t => t.status === 'completed').reduce((acc, t) => {
       if (t.type === 'siege') return acc + 15;
       if (t.type === 'relic') return acc + 10;
       return acc + 5;
     }, 0);
 
-    let location = "🚐 Начало великого Путешествия";
-    let locationDesc = "Вы вырвались из оков и отправляетесь в мрачные земли Абаддона.";
-    if (miles >= 20 && miles < 50) {
-      location = "💀 Равнины Ндравна (Империя Нежити)";
-      locationDesc = "Вокруг расстилается туман, земля усеяна костями. Шепчут духи мертвых.";
-    } else if (miles >= 50 && miles < 100) {
-      location = "🏔 Перевалы Каргахаула ( Pale Lands )";
-      locationDesc = "Бледные гиганты бродят среди обледенелых утесов. Воет зимний ветер.";
-    } else if (miles >= 100 && miles < 180) {
-      location = "🛡 Разрозненные Оплоты Человечества";
-      locationDesc = "Разрушенные железные замки, сырые таверны, где беглецов сдают за горсть медяков.";
-    } else if (miles >= 180) {
-      location = "🔥 Пылающие Пустоши Хаоса";
-      locationDesc = "Небо расколото фиолетовыми разрядами плазмы. Здесь правит первозданный огонь.";
+    const moral = character.moralCompass !== undefined ? character.moralCompass : 50;
+
+    let location = "☀️ Границы Империи Света";
+    let locationDesc = "Начало пути. Здесь небесные крепости сияют чистым белым пламенем, а стражники провожают вас настороженными взглядами.";
+
+    if (kilometers >= 20 && kilometers < 50) {
+      location = "🌫️ Ничейные Земли";
+      locationDesc = "Серый безжизненный фронтир между Светом and Тьмой, укутанный густым туманом, хранящий кости забытых беглецов.";
+    } else if (kilometers >= 50) {
+      // Dynamic location based on moral compass (Дух)
+      if (moral >= 80) {
+        location = "🏰 Священные Обители Ндравна";
+        locationDesc = "Величественный эфирный край, озаренный небесным золотым сиянием. Изгнанник обрел здесь покой и прощение предков.";
+      } else if (moral >= 60) {
+        location = "🛡️ Лоскутные Империи Человечества";
+        locationDesc = "Мелкие царства, княжества и лоскутные империи, где правят гордые короли. Здесь плетутся интриги, но царит закон.";
+      } else if (moral >= 40) {
+        location = "🏔️ Дикие Перевалы Каргахаула";
+        locationDesc = "Ледяные хребты свободных наемников. Здесь не спрашивают о вашем прошлом, а судьба решается крепостью стали.";
+      } else if (moral >= 20) {
+        location = "☠️ Мертвые Земли (Некрополи Вампиров)";
+        locationDesc = "Владения нежити, некромантов и темных культов. Вечный сумрак и ядовитый туман отравляют саму плоть земли.";
+      } else {
+        location = "🔥 Пылающие Пустоши Хаоса";
+        locationDesc = "Первозданная Бездна и безумие. Фиолетовая плазма разрывает небеса, а ваша темная душа близка к полному очернению.";
+      }
     }
 
-    const progressPercent = Math.min(100, (miles / 200) * 100);
+    const progressPercent = Math.min(100, (kilometers / 200) * 100);
+
+    // Fog of war calculations for milestones
+    const getMilestoneLabel = (threshold, hiddenLabel) => {
+      if (kilometers >= threshold) {
+        if (threshold === 0) return `Империя Света (${threshold} км)`;
+        if (threshold === 20) return `Ничейные Земли (${threshold} км)`;
+        
+        // Dynamic labels for reached milestones
+        if (moral >= 80) return `Ндравн (${threshold} км)`;
+        if (moral >= 60) return `Империи Человечества (${threshold} км)`;
+        if (moral >= 40) return `Каргахаул (${threshold} км)`;
+        if (moral >= 20) return `Мертвые Земли (${threshold} км)`;
+        return `Земли Хаоса (${threshold} км)`;
+      } else {
+        return `🔒 ${hiddenLabel} (${threshold} км)`;
+      }
+    };
 
     return (
       <div className="rpg-panel" style={{ background: '#09080a', borderColor: '#3a2d21', marginBottom: '0.2rem' }}>
@@ -1235,7 +1299,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
             <h3 className="gothic-title" style={{ fontSize: '1.25rem', color: 'var(--color-relic-glow)', marginTop: '2px' }}>{location}</h3>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <span style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)' }}>Пройдено: <b>{miles} миль</b></span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--color-bone-dim)' }}>Пройдено: <b>{kilometers} км</b></span>
             <div style={{ fontSize: '0.7rem', color: 'var(--color-mana-glow)' }}>Успешно запечатано: {completedCount} квестов</div>
           </div>
         </div>
@@ -1246,12 +1310,12 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
         </div>
 
         {/* Location tags below progress */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: 'var(--color-bone-dim)', marginTop: '6px', fontFamily: 'var(--font-rpg)' }}>
-          <span>Начало (0м)</span>
-          <span style={{ color: miles >= 20 ? '#fff' : '' }}>Ндравна (20м)</span>
-          <span style={{ color: miles >= 50 ? '#fff' : '' }}>Каргахаул (50м)</span>
-          <span style={{ color: miles >= 100 ? '#fff' : '' }}>Империи (100м)</span>
-          <span style={{ color: miles >= 180 ? '#fff' : '' }}>Хаос (180м+)</span>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.62rem', color: 'var(--color-bone-dim)', marginTop: '6px', fontFamily: 'var(--font-rpg)' }}>
+          <span style={{ color: '#fff' }}>{getMilestoneLabel(0, 'Империя Света')}</span>
+          <span style={{ color: kilometers >= 20 ? '#fff' : '' }}>{getMilestoneLabel(20, 'Ничейные Земли')}</span>
+          <span style={{ color: kilometers >= 50 ? '#fff' : '' }}>{getMilestoneLabel(50, 'Неизвестно')}</span>
+          <span style={{ color: kilometers >= 100 ? '#fff' : '' }}>{getMilestoneLabel(100, 'Скрыто')}</span>
+          <span style={{ color: kilometers >= 180 ? '#fff' : '' }}>{getMilestoneLabel(180, 'Конечная судьба')}</span>
         </div>
 
         <p style={{ fontSize: '0.8rem', fontStyle: 'italic', color: 'var(--color-bone-dim)', marginTop: '0.8rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '0.5rem', lineHeight: '1.4' }}>

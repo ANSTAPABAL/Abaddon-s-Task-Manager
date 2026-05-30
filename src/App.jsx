@@ -1891,7 +1891,7 @@ ${contextPrompt}`;
                   </button>
                   
                    <button 
-                    className="rpg-btn"
+                     className="rpg-btn"
                     style={{ background: '#e74c3c', color: '#fff', borderColor: '#c0392b', padding: '8px 25px' }}
                     onClick={() => {
                       playClick();
@@ -1902,7 +1902,7 @@ ${contextPrompt}`;
                       setCharacter(c => ({
                         ...c,
                         hp: Math.max(1, c.hp - hpPenalty),
-                        moralCompass: Math.max(0, (c.moralCompass || 50) - 10),
+                        moralCompass: Math.max(0, (c.moralCompass || 50) - 15),
                         totalHpSacrificed: (c.totalHpSacrificed || 0) + hpPenalty
                       }));
                       setJudgmentShowReschedule(true);

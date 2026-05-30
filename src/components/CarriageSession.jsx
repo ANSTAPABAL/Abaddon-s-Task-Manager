@@ -136,6 +136,31 @@ const NPC_ENCOUNTERS = [
   { name: "Дух Совести", type: "mirror", icon: "💀", prompt: "дух, напоминающий герою о всех откладываемых делах как о неоплаченных долгах перед собой" },
 ];
 
+const chooseDynamicNpc = (moral) => {
+  const m = moral !== undefined ? moral : 50;
+  
+  // 1. Chance of meeting NO NPC at all (higher chance if moral is lower / black soul)
+  let noNpcChance = 0;
+  if (m < 20) noNpcChance = 0.75;
+  else if (m < 40) noNpcChance = 0.50;
+  else if (m < 50) noNpcChance = 0.25;
+
+  if (Math.random() < noNpcChance) {
+    return null; // Hero meets NO NPC at all! Just raw threats or empty camps.
+  }
+
+  // 2. Filter NPC encounters based on moral alignment
+  let availableNpcs = [...NPC_ENCOUNTERS];
+  if (m >= 60) {
+    availableNpcs = NPC_ENCOUNTERS.filter(n => n.type === 'motivating' || n.type === 'helping');
+  } else if (m < 40) {
+    availableNpcs = NPC_ENCOUNTERS.filter(n => n.type === 'provoking' || n.type === 'mirror');
+  }
+
+  if (availableNpcs.length === 0) availableNpcs = [...NPC_ENCOUNTERS];
+  return availableNpcs[Math.floor(Math.random() * availableNpcs.length)];
+};
+
 // Мини-перерывы (каждые 30 минут активной работы)
 const MINI_BREAK_ACTIVITIES = [
   { id: 'breathing', label: '🫁 Дыхательная техника (4-4-4-4)', lore: 'ритуал очищения дыхания у древнего алтаря' },
@@ -616,6 +641,8 @@ export default function CarriageSession({
       spiritContext = `\nСИЛА ДУХА И МЕНТАЛЬНОЕ СОСТОЯНИЕ: Мясник Бездны (${moralVal}/100). Полное падение духа. Изгнанник абсолютно жесток, кровожаден, безумен от боли и ярости, совершает страшную дикую жестокость, может без повода убить хорошего человека, встреченные им люди нападают на него из самообороны или страха, а диалоги полны угрожающей тьмы и ненависти.`;
     }
 
+    const npcContext = npcName ? `Он пришел на место встречи, но обнаружил лишь растерзанное тело «${npcName}». Герой в ярости перебил бандитов Ничейных Земель, осквернивших привал.` : `Он пришел на место встречи, но попал в смертельную засаду. Вокруг не было ни души — лишь холодные камни пустошей и притаившиеся в тенях разбойники Бездны. Герой в ярости перебил нападавших бандитов Ничейных Земель, устроивших эту засаду.`;
+
     const lastLegend = pedestals && pedestals.length > 0 ? pedestals[pedestals.length - 1] : null;
     let legacyPromptContext = "";
     if (lastLegend) {
@@ -640,7 +667,7 @@ ${spiritContext}
 
     if (isAmbush) {
       prompt = `Ты — Летописец Ничейных Земель во вселенной Абаддона. Опиши короткую, суровую и грязную летопись-эпитафию в стиле Джо Аберкромби. Действие разворачивается на Ничейных Землях — суровом и холодном фронтире Абаддона, где непрерывно сталкиваются и ведут кровопролитные бои Империя Света (люди), разрозненные людские королевства, дикий Каргахаул, Деревянные Люди, орды Хаоса и разгуливающая Нежить. Редко в эти края забредает разведка эльфов, еще реже бродячие тролли, а в небе кружат стаи кровожадных гарпий с небесных островов. Потусторонняя Бездна — это потусторонний мир в нашем мире, нечто за пределами человеческого восприятия.
-Изгнанник завершил контракт «${task?.title || ''}», одолев врага «${enemy}», но его промедление и нерешительность привлекли разбойников. Он пришел на место встречи, но обнаружил лишь растерзанное тело «${npcName}». Герой в ярости перебил бандитов Ничейных Земель, осквернивших привал. Опиши эту суровую схватку и запах крови. До 90 слов, 2 абзаца.
+Изгнанник завершил контракт «${task?.title || ''}», одолев врага «${enemy}», но его промедление и нерешительность привлекли разбойников. ${npcContext} Опиши эту суровую схватку и запах крови. До 90 слов, 2 абзаца.
 ${loreGuidelines}`;
     } else if (type === 'victory') {
       prompt = `Ты — Летописец Ничейных Земель во вселенной Абаддона. Опиши короткую, суровую и грязную летопись-эпитафию в стиле Джо Аберкромби (темное фэнтези, реализм, цинизм, кровь, пот и грязь). Действие разворачивается на Ничейных Землях — суровом фронтире Абаддона, где беспрерывно воюют Империя Света (люди), разрозненные людские королевства, дикий Каргахаул, Деревянные Люди, Хаос и Нежить. Иногда здесь можно встретить разведку эльфов, еще реже бродячих троллей или опасных гарпий с небесных островов. Потусторонняя Бездна — это потусторонний мир в нашем мире, за пределами человеческого восприятия.
@@ -750,7 +777,8 @@ ${loreGuidelines}`;
 
       let textToUse = "";
       if (isAmbush) {
-        textToUse = `Ты завершил контракт «${task?.title || ''}», одолев врага «${enemy}», но твое промедление привело к трагедии. Придя на встречу, ты наткнулся лишь на растерзанный труп «${npcName}», окруженный шакалами Бездны. \n\nВ ярости ты врубился в строй разбойников. Земля пропиталась грязной кровью, когда последний бандит испустил дух. Запах гари и сырого мяса еще долго будет преследовать тебя, а в карманах нападавших нашлось лишь 10 XP и 5 золотых монет.`;
+        const victimText = npcName ? `растерзанный труп «${npcName}», окруженный шакалами Бездны` : `пустую стоянку, ставшую ловушкой, где тебя окружили голодные шакалы Бездны`;
+        textToUse = `Ты завершил контракт «${task?.title || ''}», одолев врага «${enemy}», но твое промедление привело к трагедии. Придя на встречу, ты наткнулся лишь на ${victimText}. \n\nВ ярости ты врубился в строй разбойников. Земля пропиталась грязной кровью, когда последний бандит испустил дух. Запах гари и сырого мяса еще долго будет преследовать тебя, а в карманах нападавших нашлось лишь 10 XP и 5 золотых монет.`;
       } else {
         const fallbacks = {
           victory: `Удар пришелся точно в цель. Зазубренное лезвие вошло по самую рукоять, и эта сука «${enemy}» наконец-то испустила дух, захлебнувшись собственной когнитивной желчью. Твой клинок дымится, а вокруг оседает вонючая тень.${heritageVictoryLine}\n\nТы стоишь по колено в грязи, тяжело дыша, но оковы спали. Голова чиста от дерьма и страхов. ${isLargeQuest || isPastDebt ? 'Этот чертов триумф заставляет тебя вновь поверить в себя, ублюдок, после всей этой бесконечной череды провалов!' : 'Ты победил эту тварь, а значит, и весь остальной мир подождет, пока ты вытираешь кровь с лица.'}`,
@@ -1779,7 +1807,7 @@ const handleWinActiveSession = (task) => {
     setResolutionIsAmbush(isAmbush);
 
     // Choose random NPC for encounter
-    const randNpc = NPC_ENCOUNTERS[Math.floor(Math.random() * NPC_ENCOUNTERS.length)];
+    const randNpc = chooseDynamicNpc(moral);
     setResolutionNpc(randNpc);
     
     const isSiege = task?.type === 'siege';
@@ -1836,13 +1864,15 @@ const handleWinActiveSession = (task) => {
       
       const updatedBio = [...(prev.biography || [])];
       if (isAmbush) {
-        updatedBio.push(`На месте встречи Изгнанник обнаружил лишь растерзанное тело ${randNpc.name}. Ему пришлось вступить в бой с устроившими засаду бандитами Бездны. Разбойники перебиты, с их тел снято +${expReward} XP и +${earnedGold} Золота.`);
+        const victimName = randNpc ? randNpc.name : "местного жителя";
+        updatedBio.push(`На месте встречи Изгнанник обнаружил лишь растерзанное тело ${victimName}. Ему пришлось вступить в бой с устроившими засаду бандитами Бездны. Разбойники перебиты, с их тел снято +${expReward} XP и +${earnedGold} Золота.`);
       } else {
         const modeText = isSurvival ? " [Жизнь и Смерть]" : "";
         const breakText = (accumulatedBreakRewards.xp > 0 || accumulatedBreakRewards.gold > 0)
           ? ` За время привалов в бою зачищены дополнительные цели: +${accumulatedBreakRewards.xp} XP и +${accumulatedBreakRewards.gold} Золота.`
           : "";
-        updatedBio.push(`Выполнен контракт${modeText}: "${task?.title || ''}". Встречен ${randNpc.name}. Получено +${expReward} XP и +${earnedGold} Золота.${breakText}`);
+        const npcText = randNpc ? `Встречен ${randNpc.name}.` : "В этой проклятой глуши никто не встретился Изгнаннику.";
+        updatedBio.push(`Выполнен контракт${modeText}: "${task?.title || ''}". ${npcText} Получено +${expReward} XP и +${earnedGold} Золота.${breakText}`);
       }
 
       const existingDefeated = prev.defeatedEnemies || [];
@@ -1874,7 +1904,7 @@ const handleWinActiveSession = (task) => {
     
     setSetupStage('resolution');
     setResolutionType('victory');
-    handleGenerateResolutionChronicle('victory', task, enemyName, isAmbush, randNpc.name);
+    handleGenerateResolutionChronicle('victory', task, enemyName, isAmbush, randNpc ? randNpc.name : '');
   };
 
   const handleInstantCompleteTask = (task) => {
@@ -1899,7 +1929,7 @@ const handleWinActiveSession = (task) => {
     setResolutionIsAmbush(isAmbush);
 
     // Choose random NPC for encounter
-    const randNpc = NPC_ENCOUNTERS[Math.floor(Math.random() * NPC_ENCOUNTERS.length)];
+    const randNpc = chooseDynamicNpc(moral);
     setResolutionNpc(randNpc);
 
     const isSiege = task.type === 'siege';
@@ -1945,10 +1975,12 @@ const handleWinActiveSession = (task) => {
 
       const updatedBio = [...(prev.biography || [])];
       if (isAmbush) {
-        updatedBio.push(`На месте встречи Изгнанник обнаружил лишь растерзанное тело ${randNpc.name}. Ему пришлось вступить в бой с устроившими засаду бандитами Бездны. Разбойники перебиты, с их тел снято +${expReward} XP и +${earnedGold} Золота.`);
+        const victimName = randNpc ? randNpc.name : "местного жителя";
+        updatedBio.push(`На месте встречи Изгнанник обнаружил лишь растерзанное тело ${victimName}. Ему пришлось вступить в бой с устроившими засаду бандитами Бездны. Разбойники перебиты, с их тел снято +${expReward} XP и +${earnedGold} Золота.`);
       } else {
         const modeText = isSurvival ? " [Жизнь и Смерть]" : "";
-        updatedBio.push(`Выполнен контракт${modeText}: "${task.title}". Встречен ${randNpc.name}. Получено +${expReward} XP и +${earnedGold} Золота.`);
+        const npcText = randNpc ? `Встречен ${randNpc.name}.` : "В этой бесприютной земле никто не встретился Изгнаннику.";
+        updatedBio.push(`Выполнен контракт${modeText}: "${task.title}". ${npcText} Получено +${expReward} XP и +${earnedGold} Золота.`);
       }
 
       const existingDefeated = prev.defeatedEnemies || [];
@@ -1975,7 +2007,7 @@ const handleWinActiveSession = (task) => {
 
     setSetupStage('resolution');
     setResolutionType('victory');
-    handleGenerateResolutionChronicle('victory', task, eName, isAmbush, randNpc.name);
+    handleGenerateResolutionChronicle('victory', task, eName, isAmbush, randNpc ? randNpc.name : '');
   };
 
   const handleRescheduleTomorrow = (task) => {
@@ -3036,8 +3068,8 @@ ${qaText}
   const triggerBreakEvent = (type) => {
     playClick();
     setIsRunning(false);
-    const npc = NPC_ENCOUNTERS[Math.floor(Math.random() * NPC_ENCOUNTERS.length)];
     const moral = character.moralCompass !== undefined ? character.moralCompass : 50;
+    const npc = chooseDynamicNpc(moral);
     const ambushChance = (40 - moral) / 40;
     const isAmbush = moral < 40 && (Math.random() < ambushChance);
 
@@ -3084,10 +3116,13 @@ ${spiritContext}
     let prompt = '';
     if (breakEvent.isAmbush) {
       prompt = `Ты — Летописец Бездны во вселенной Абаддона. Опиши короткую летопись в стиле Джо Аберкромби.
-Изгнанник (класс: ${character.class}, раса: ${character.race}) собирался сделать перерыв, но обнаружил лишь растерзанный труп «${npc.name}» и засаду разбойников Бездны. Ему пришлось драться за свою жизнь. Опиши эту внезапную схватку в темноте и то, как он перебил бандитов Бездны. 4-5 предложений.
+Изгнанник (класс: ${character.class}, раса: ${character.race}) собирался сделать перерыв, но обнаружил лишь растерзанный труп «${npc ? npc.name : 'попутчика'}» и засаду разбойников Бездны. Ему пришлось драться за свою жизнь. Опиши эту внезапную схватку в темноте и то, как он перебил бандитов Бездны. 4-5 предложений.
 ${loreGuidelines}`;
     } else {
-      if (npc.type === 'mirror') {
+      if (!npc) {
+        prompt = `Ты — Летописец Бездны во вселенной Абаддона. Изгнанник (класс: ${character.class}, раса: ${character.race}, ур.${character.level}) делает перерыв: «${activity.label}» (в лоре: ${activity.lore}) в полном одиночестве в мертвой глуши Бездны. Никого нет рядом — лишь свист ветра, треск одинокого костра и собственные мысли. Опиши его восстановление и отдых в стиле темного фэнтези. 3-4 предложения.
+${loreGuidelines}`;
+      } else if (npc.type === 'mirror') {
         prompt = `Ты — ${npc.name}, ${npc.prompt}. Изгнанник (класс: ${character.class}, раса: ${character.race}, ур.${character.level}) выбрал перерыв: «${activity.label}» (в лоре: ${activity.lore}). Порицай его прокрастинацию как грех изгнанника, напомни что он мог бы избежать Бездны будь он внимательнее к себе, но дай шанс искупиться через эту активность. Жёстко но справедливо, тёмное фэнтези. 4-5 предложений.
 ${loreGuidelines}`;
       } else if (npc.type === 'provoking') {
@@ -3119,15 +3154,20 @@ ${loreGuidelines}`;
       playSuccess();
     } catch (e) {
       if (breakEvent.isAmbush) {
-        setBreakAiText(`«Привал осквернен кровью»\n\nВместо костра и мирной беседы тебя ждал лишь изуродованный труп «${npc.name}» и оскал разбойников Бездны. Пришлось вынимать оружие. Грязь, крики, хруст стали о кости. Когда все стихло, ты остался стоять среди трупов, тяжело дыша.`);
+        const victimText = npc ? ` лишь изуродованный труп «${npc.name}» и` : '';
+        setBreakAiText(`«Привал осквернен кровью»\n\nВместо костра и мирной беседы тебя ждал${victimText} оскал разбойников Бездны. Пришлось вынимать оружие. Грязь, крики, хруст стали о кости. Когда все стихло, ты остался стоять среди трупов, тяжело дыша.`);
       } else {
-        const fallbacks = {
-          mirror: `«${npc.name} смотрит сквозь тебя ледяным взглядом»\n\nТвоя слабость — не в теле, а в разуме. Ты откладывал, прятался, убегал от себя. Именно поэтому ты здесь, в Бездне. Но сейчас у тебя есть выбор: сделать ${activity.label.toLowerCase()}, и доказать что ты сильнее своих демонов.`,
-          provoking: `«${npc.name} усмехается»\n\nХа! Ты думаешь, что заслужил отдых? Может быть. Но не затягивай — враги не ждут. Сделай ${activity.label.toLowerCase()} и возвращайся. Докажи, что ты не трус.`,
-          helping: `«${npc.name} кивает»\n\n${activity.label} — мудрый выбор, путник. В мире Бездны даже короткий привал может спасти жизнь. Позаботься о себе, чтобы потом сражаться с удвоенной силой.`,
-          motivating: `«${npc.name} улыбается»\n\nТы уже прошёл так далеко, воин. ${activity.label} — это не слабость, это мудрость. Даже величайшие герои отдыхали у костра перед решающей битвой.`
-        };
-        setBreakAiText(fallbacks[npc.type] || fallbacks.motivating);
+        if (!npc) {
+          setBreakAiText(`«Одинокий привал у дороги»\n\nВокруг ни души, лишь свист ледяного ветра в мертвой глуши Бездны. Ты устраиваешь короткий отдых: ${activity.label.toLowerCase()}, стараясь не потерять крупицы концентрации.`);
+        } else {
+          const fallbacks = {
+            mirror: `«${npc.name} смотрит сквозь тебя ледяным взглядом»\n\nТвоя слабость — не в теле, а в разуме. Ты откладывал, прятался, убегал от себя. Именно поэтому ты здесь, в Бездне. Но сейчас у тебя есть выбор: сделать ${activity.label.toLowerCase()}, и доказать что ты сильнее своих демонов.`,
+            provoking: `«${npc.name} усмехается»\n\nХа! Ты думаешь, что заслужил отдых? Может быть. Но не затягивай — враги не ждут. Сделай ${activity.label.toLowerCase()} и возвращайся. Докажи, что ты не трус.`,
+            helping: `«${npc.name} кивает»\n\n${activity.label} — мудрый выбор, путник. В мире Бездны даже короткий привал может спасти жизнь. Позаботься о себе, чтобы потом сражаться с удвоенной силой.`,
+            motivating: `«${npc.name} улыбается»\n\nТы уже прошёл так далеко, воин. ${activity.label} — это не слабость, это мудрость. Даже величайшие герои отдыхали у костра перед решающей битвой.`
+          };
+          setBreakAiText(fallbacks[npc.type] || fallbacks.motivating);
+        }
       }
     } finally {
       setBreakAiLoading(false);
@@ -3154,7 +3194,8 @@ ${loreGuidelines}`;
           const earnedGold = 5 + extraGold;
 
           const updatedBio = [...(prev.biography || [])];
-          updatedBio.push(`При попытке устроить привал Изгнанник столкнулся с засадой бандитов Бездны, убивших ${breakEvent.npc.name}. Разбойники перебиты, получено +10 XP и +5 Золота.`);
+          const killText = breakEvent.npc ? ` убивших ${breakEvent.npc.name}` : '';
+          updatedBio.push(`При попытке устроить привал Изгнанник столкнулся с засадой бандитов Бездны${killText}. Разбойники перебиты, получено +10 XP и +5 Золота.`);
 
           return {
             ...prev,
@@ -3167,7 +3208,8 @@ ${loreGuidelines}`;
         });
         spawnFloater('+10 XP', 'heal-hp');
         spawnFloater('+5 Золота', 'restore-mp');
-        setCombatLog(log => [`⚔️ Засада бандитов! NPC «${breakEvent.npc.name}» убит. Получено +10 XP и +5 Золота с тел разбойников.`, ...log.slice(0, 5)]);
+        const deathLog = breakEvent.npc ? `⚔️ Засада бандитов! NPC «${breakEvent.npc.name}» убит. Получено +10 XP и +5 Золота с тел разбойников.` : `⚔️ Засада бандитов! Внезапное нападение в глуши. Получено +10 XP и +5 Золота с тел разбойников.`;
+        setCombatLog(log => [deathLog, ...log.slice(0, 5)]);
       } else {
         triggerFlash('heal');
         if (breakEvent.type === 'big') {
@@ -3191,7 +3233,8 @@ ${loreGuidelines}`;
           }));
           spawnFloater('+8 HP', 'heal-hp');
           spawnFloater('+5 MP', 'restore-mp');
-          setCombatLog(log => [`🕯️ Мини-привал завершён. Встреча с «${breakEvent.npc.name}» укрепила дух.`, ...log.slice(0, 5)]);
+          const victoryLog = breakEvent.npc ? `🕯️ Мини-привал завершён. Встреча с «${breakEvent.npc.name}» укрепила дух.` : `🕯️ Мини-привал завершён. Полное одиночество укрепило твой дух.`;
+          setCombatLog(log => [victoryLog, ...log.slice(0, 5)]);
         }
       }
     }
@@ -4098,20 +4141,20 @@ ${loreGuidelines}`;
     const npc = breakEvent.npc;
     const npcTypeBorder = { motivating: '#d4af37', helping: '#2ecc71', provoking: '#e74c3c', mirror: '#9b59b6' };
     const npcTypeLabelMap = { motivating: '💛 Мотиватор', helping: '💚 Помощник', provoking: '🔴 Провокатор', mirror: '🪞 Зеркало Истины' };
-    const borderColor = isAmbush ? 'var(--color-blood-glow)' : (npcTypeBorder[npc.type] || '#d4af37');
-    const npcTypeLabel = isAmbush ? '👹 Засада бандитов' : (npcTypeLabelMap[npc.type] || 'Путник');
+    const borderColor = isAmbush ? 'var(--color-blood-glow)' : (npc ? (npcTypeBorder[npc.type] || '#d4af37') : '#a5b1c2');
+    const npcTypeLabel = isAmbush ? '👹 Засада бандитов' : (npc ? (npcTypeLabelMap[npc.type] || 'Путник') : '🕯️ Одинокое Убежище');
 
     return (
       <div className="break-event-overlay animate-fade-in">
         <div className="break-event-card" style={{ borderColor }}>
           {/* NPC Header */}
           <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-            <div style={{ fontSize: '3.5rem', marginBottom: '0.5rem', filter: `drop-shadow(0 0 15px ${borderColor})` }}>{isAmbush ? '👹' : npc.icon}</div>
+            <div style={{ fontSize: '3.5rem', marginBottom: '0.5rem', filter: `drop-shadow(0 0 15px ${borderColor})` }}>{isAmbush ? '👹' : (npc ? npc.icon : '⛺')}</div>
             <h1 className="gothic-title" style={{ fontSize: isBig ? '1.8rem' : '1.5rem', color: borderColor, marginBottom: '0.3rem' }}>
               {isAmbush ? '⚔️ Внезапная Засада' : (isBig ? '🏕️ Большой Привал' : '🕯️ Встреча на Пути')}
             </h1>
-            <h2 className="rpg-title" style={{ fontSize: '1.2rem', color: '#fff', marginBottom: '0.4rem', textDecoration: isAmbush ? 'line-through' : 'none' }}>
-              {isAmbush ? `${npc.name} (Убит)` : npc.name}
+            <h2 className="rpg-title" style={{ fontSize: '1.2rem', color: '#fff', marginBottom: '0.4rem', textDecoration: isAmbush && npc ? 'line-through' : 'none' }}>
+              {isAmbush ? (npc ? `${npc.name} (Убит)` : 'Спутник (Убит)') : (npc ? npc.name : 'Никого нет рядом')}
             </h2>
             <span style={{ fontSize: '0.75rem', padding: '2px 10px', background: `${borderColor}22`, border: `1px solid ${borderColor}`, color: borderColor, fontFamily: 'var(--font-rpg)' }}>
               {npcTypeLabel}
@@ -4137,7 +4180,7 @@ ${loreGuidelines}`;
                 lineHeight: '1.4',
                 borderRadius: '4px'
               }}>
-                ⚠️ Бандиты напали на лагерь и убили вашего спутника. У вас нет возможности отдохнуть или восстановить ману. Сражайтесь, чтобы выжить и забрать их скудное золото!
+                ⚠️ Бандиты напали на лагерь{npc ? ' и убили вашего спутника' : ''}. У вас нет возможности отдохнуть или восстановить ману. Сражайтесь, чтобы выжить и забрать их скудное золото!
               </div>
             ) : (
               <>
@@ -4219,7 +4262,7 @@ ${loreGuidelines}`;
               }} 
               onClick={handleBreakAiGenerate}
             >
-              {isAmbush ? '⚔️ ВСТУПИТЬ В БОЙ' : (activeTask && activeTask.pomodoroTime < 20 ? 'АКТИВИРОВАТЬ ВСТРЕЧУ' : `ПРИЗВАТЬ ${npc.name.toUpperCase()}`)}
+              {isAmbush ? '⚔️ ВСТУПИТЬ В БОЙ' : (activeTask && activeTask.pomodoroTime < 20 ? 'АКТИВИРОВАТЬ ВСТРЕЧУ' : `ПРИЗВАТЬ ${npc ? npc.name.toUpperCase() : 'СИЛУ ДУХА'}`)}
             </button>
           )}
 
@@ -4227,7 +4270,7 @@ ${loreGuidelines}`;
           {breakAiLoading && (
             <div style={{ textAlign: 'center', padding: '1.5rem' }}>
               <RefreshCw className="heartbeat-pulse fast" style={{ color: borderColor, marginBottom: '0.5rem' }} size={28} />
-              <p style={{ fontStyle: 'italic', fontSize: '0.85rem', color: 'var(--color-bone-dim)' }}>{isAmbush ? 'Идет бой...' : `${npc.name} приближается из тумана Бездны...`}</p>
+              <p style={{ fontStyle: 'italic', fontSize: '0.85rem', color: 'var(--color-bone-dim)' }}>{isAmbush ? 'Идет бой...' : `${npc ? npc.name : 'Покой'} приближается из тумана Бездны...`}</p>
             </div>
           )}
 

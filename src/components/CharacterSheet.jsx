@@ -604,7 +604,159 @@ export default function CharacterSheet({ character, setCharacter, tasks, setTask
         </div>
       </div>
 
-        </div>
+      {/* 2. Oracle's Fate Prophecy Panel */}
+      {(() => {
+        const kilometers = tasks.filter(t => t.status === 'completed').reduce((acc, t) => {
+          if (t.type === 'siege') return acc + 15;
+          if (t.type === 'relic') return acc + 10;
+          return acc + 5;
+        }, 0);
+
+        const m = character.moralCompass !== undefined ? character.moralCompass : 50;
+        const lvl = character.level || 1;
+        const hp = character.hp || 100;
+
+        let pathLabel = "🌫️ Путь Равновесия (Сталь Наемника)";
+        let pathColor = "#95a5a6";
+        let fateTitle = "🔮 Судьба скрыта в тумане";
+        let fateDesc = "Вы находитесь в Ничейных Землях. Пройдите рубеж в 50 км, чтобы пророчество Бездны обрело ясные очертания.";
+        
+        if (m >= 80) {
+          pathLabel = "☀️ Путь Искупления (К Свету)";
+          pathColor = "#ffb813";
+          if (kilometers >= 50) {
+            if (lvl >= 7) {
+              fateTitle = "☀️ ВЕЧНОЕ ПРОЩЕНИЕ И ТРИУМФ";
+              fateDesc = "Вы одолели когнитивную тьму. Империя Света распахивает врата перед великим героем, ваша душа полностью очищена от оков лени, а ваше имя навеки вписано в золотые скрижали праведников.";
+            } else {
+              fateTitle = "🌱 Вестник Рассвета в Ндравне";
+              fateDesc = "Ваша чистая душа нашла вечный покой среди светлых садов Ндравна. Но чтобы Империя Света даровала полное прощение и приняла вас обратно, вам нужно накопить больше боевого опыта и воли (достигнуть 7-го уровня).";
+            }
+          }
+        } else if (m >= 60) {
+          pathLabel = "🕯️ Путь Порядка (Закон Человека)";
+          pathColor = "#2ecc71";
+          if (kilometers >= 50) {
+            if (lvl >= 7) {
+              fateTitle = "👑 ВЕРХОВНЫЙ СОВЕТНИК КОРОНЫ";
+              fateDesc = "Вы прославились в лоскутных империях человечества. Ваша стальная дисциплина объединила княжества, и местные монархи провозгласили вас бессменным лордом-маршалом и защитником людского рода.";
+            } else {
+              fateTitle = "🛡️ Стальной Страж Человечества";
+              fateDesc = "Вы верны своему долгу и законам людей, защищая пограничные заставы. Правители княжеств уважают ваше слово, но для получения постоянных титулов и признания вам нужно закалить волю до 7-го уровня.";
+            }
+          }
+        } else if (m >= 40) {
+          pathLabel = "🌫️ Путь Равновесия (Сталь Наемника)";
+          pathColor = "#95a5a6";
+          if (kilometers >= 50) {
+            if (lvl >= 7) {
+              fateTitle = "🏔️ ЛЕГЕНДАРНЫЙ АНТИГЕРОЙ КАРГАХАУЛА";
+              fateDesc = "О ваших подвигах слагают легенды у ледяных костров Каргахаула. Безликий каратель, не знающий пощады к чудовищам, но верный своей суровой нейтральной чести и свободному ветру перевалов.";
+            } else {
+              fateTitle = "⚔️ Охотник за Головами Каргахаула";
+              fateDesc = "Вы выживаете среди заснеженных клыков гор, берясь за самые опасные контракты. Вы нейтральны к распрям Света и Тьмы, но вам нужно стать сильнее (достигнуть 7-го уровня), чтобы войти в легенды Каргахаула.";
+            }
+          }
+        } else if (m >= 20) {
+          pathLabel = "💀 Путь Изгнанника (Оковы Тьмы)";
+          pathColor = "#e74c3c";
+          if (kilometers >= 50) {
+            if (lvl >= 7) {
+              fateTitle = "🔮 ТЕМНЫЙ ВЛАДЫКА НЕКРОПОЛЯ";
+              fateDesc = "Вы полностью отреклись от света и возглавили некрополи Мертвых Земель. Став великим магом смерти и повелителем вампиров, вы подчинили себе тени и держите в вечном страхе рубежи живых.";
+            } else {
+              fateTitle = "🩸 Слуга Багрового Ковена";
+              fateDesc = "Вы якшаетесь с некромантами и вампирами в Мертвых Землях. Ваша душа осквернена грехом прокрастинации, и вы близки к потере человеческого облика. Для обретения истинного темного могущества требуется 7-й уровень.";
+            }
+          }
+        } else {
+          pathLabel = "👹 Мясник Бездны (Владыка Хаоса)";
+          pathColor = "#ff0000";
+          if (kilometers >= 50) {
+            if (lvl >= 7) {
+              fateTitle = "🔥 АРХИДЕМОН ПЕРВОЗДАННОГО ХАОСА";
+              fateDesc = "Ваша душа полностью сгорела в багровом пламени Бездны. Вы стали бичом Абаддона, кровожадным полководцем Легионов Хаоса, несущим смерть и мутации всему живому. Ваш путь завершился абсолютным злом.";
+            } else {
+              fateTitle = "🌋 Одержимый Разрушитель Хаоса";
+              fateDesc = "Вы сеете смерть и безумие, вырезая мирные поселения и впадая в ярость. Вы потеряли рассудок, и ваша оскверненная душа балансирует на грани позорной гибели. Чтобы оседлать безумие Хаоса, вам нужен 7-й уровень.";
+            }
+          }
+        }
+
+        // Premonitions based on HP
+        let premonition = null;
+        if (hp <= 30) {
+          premonition = {
+            title: "⚠️ ЧЕРНЫЙ ПРЕДВЕСТНИК ГИБЕЛИ",
+            desc: `Здоровье вашего разума критически истощено (${hp} HP). Оракул предвидит близкую позорную смерть в канаве Бездны от когнитивного истощения и лени, если вы немедленно не устроите привал у костра или не выпьете зелье!`,
+            color: "#ff3333"
+          };
+        } else if (hp > 30 && m >= 50) {
+          premonition = {
+            title: "✨ СВЕТЛОЕ ПРЕДЗНАМЕНОВАНИЕ",
+            desc: "Звезды благоволят вашему походу. Оракул видит близкий героический триумф, озаряющий мрак Абаддона.",
+            color: "#ffb813"
+          };
+        } else {
+          premonition = {
+            title: "⚔️ ПРЕДВЕСТНИК СУРОВОЙ СХВАТКИ",
+            desc: "Оракул предвидит суровую, кровавую битву. Вам придется драться зубами и ногтями за каждый дюйм своей оскверненной души, чтобы не скатиться на самое дно пропасти.",
+            color: "#ff8c00"
+          };
+        }
+
+        return (
+          <div className="rpg-panel" style={{ 
+            background: 'radial-gradient(circle, #0e0a12 0%, #050406 100%)', 
+            borderColor: pathColor,
+            boxShadow: `0 8px 20px rgba(0,0,0,0.8), inset 0 0 15px ${pathColor}1a`,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.8rem',
+            marginTop: '1rem'
+          }}>
+            <div style={{ textAlign: 'center', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '0.5rem' }}>
+              <span style={{ fontSize: '1.8rem' }}>🔮</span>
+              <h3 className="gothic-title" style={{ fontSize: '1.2rem', color: pathColor, margin: '0.2rem 0 0 0' }}>
+                Пророчество Судьбы Героя
+              </h3>
+              <span style={{ fontSize: '0.65rem', color: 'var(--color-bone-dim)', textTransform: 'uppercase', fontFamily: 'monospace' }}>
+                Вещание Оракула Бездны
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', background: 'rgba(0,0,0,0.2)', padding: '8px 12px', border: '1px solid rgba(255,255,255,0.04)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem' }}>
+                <span style={{ color: 'var(--color-bone-dim)' }}>Текущее Мировоззрение:</span>
+                <span style={{ color: pathColor, fontWeight: 'bold' }}>{pathLabel}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem' }}>
+                <span style={{ color: 'var(--color-bone-dim)' }}>Пройденный Путь:</span>
+                <span style={{ color: '#fff', fontWeight: 'bold' }}>{kilometers} км</span>
+              </div>
+            </div>
+
+            <div style={{ background: 'rgba(0,0,0,0.4)', padding: '1rem', border: `1px solid ${pathColor}33`, borderLeft: `4px solid ${pathColor}` }}>
+              <h4 style={{ margin: '0 0 4px 0', fontSize: '0.88rem', color: '#fff', fontFamily: 'var(--font-rpg)', letterSpacing: '0.5px' }}>
+                {fateTitle}
+              </h4>
+              <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--color-bone-dim)', lineHeight: '1.45', fontFamily: 'Georgia, serif', fontStyle: 'italic', textAlign: 'justify' }}>
+                {fateDesc}
+              </p>
+            </div>
+
+            <div style={{ background: 'rgba(25, 10, 10, 0.4)', padding: '0.8rem', border: `1px dashed ${premonition.color}55`, borderLeft: `3px solid ${premonition.color}` }}>
+              <h5 style={{ margin: '0 0 2px 0', fontSize: '0.75rem', color: premonition.color, fontWeight: 'bold', fontFamily: 'var(--font-rpg)' }}>
+                {premonition.title}
+              </h5>
+              <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--color-bone-dim)', lineHeight: '1.4' }}>
+                {premonition.desc}
+              </p>
+            </div>
+          </div>
+        );
+      })()}
+    </div>
       )}
 
       {sheetTab === 'trophies' && (
