@@ -3639,7 +3639,7 @@ ${loreGuidelines}`;
               Вы ставите длительный контракт или призываете его поздним вечером (после 20:00).
             </p>
             <p style={{ color: '#ffb813', fontStyle: 'italic', borderLeft: '2px solid #ffb813', paddingLeft: '8px', fontSize: '0.85rem' }}>
-              «Бездна рекомендует детально спланировать дедлайн или разделить его силы, дабы избежать штрафного урона разуму!»
+              «Оракул рекомендует детально спланировать дедлайн или разделить его силы, дабы избежать штрафного урона разуму!»
             </p>
           </div>
 
@@ -5257,10 +5257,10 @@ if (setupStage === 'resolution') {
             <div className="animate-fade-in" style={{ textAlign: 'left' }}>
               <div style={{ background: 'rgba(0,0,0,0.5)', padding: '1.5rem', border: '1px solid var(--color-iron-light)', borderRadius: '4px', marginBottom: '1.5rem' }}>
                 <h3 className="gothic-title" style={{ fontSize: '1.05rem', color: '#ffb813', marginBottom: '0.8rem', textAlign: 'center' }}>
-                  💰 РАЗДЕЛ ТРОФЕЕВ БЕЗДНЫ 💰
+                  💰 РАЗДЕЛ БОЕВЫХ ТРОФЕЕВ 💰
                 </h3>
                 <p style={{ fontSize: '0.95rem', color: '#e6dfd3', lineHeight: '1.5', textAlign: 'center', marginBottom: '1rem', fontStyle: 'italic', fontFamily: 'Georgia, serif' }}>
-                  «Бездна пристально смотрит на плоды твоего труда, Путешественник...»
+                  «Оракул Ничейных Земель пристально смотрит на плоды твоего труда, Путешественник...»
                 </p>
                 <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '0.8rem', fontSize: '0.85rem', color: 'var(--color-bone-dim)', textAlign: 'center' }}>
                   Вы провели в сессии: <strong>{Math.floor(huntTimeSpent / 60)} мин</strong>. Укажите честный характер ваших трудов:
@@ -5625,7 +5625,7 @@ if (setupStage === 'resolution') {
           </button>
         </div>
         <p style={{ fontSize: '0.95rem', color: 'var(--color-bone-dim)', marginBottom: '1.5rem', fontFamily: 'Georgia, serif', lineHeight: '1.5', fontStyle: 'italic' }}>
-          «Ввергните в этот омут все помыслы и заботы, что терзают ваш разум черным комом. Бессвязно, хаотично, со всей яростью и отчаянием. Бездна Абаддона внемлет этому шепоту, взвесит скверну каждого деяния и разделит их по законам Пути (Охота, Осады, Реликвии).»
+          «Ввергните в этот омут все помыслы и заботы, что терзают ваш разум черным комом. Бессвязно, хаотично, со всей яростью и отчаянием. Оракул Ничейных Земель внемлет этому шепоту, приоткрывая запредельные тайны Бездны, взвесит скверну каждого деяния и разделит их по законам Пути (Охота, Осады, Реликвии).»
         </p>
 
         <textarea
@@ -5650,7 +5650,7 @@ if (setupStage === 'resolution') {
             disabled={loadingAI || !messyText.trim()}
           >
             {loadingAI ? <RefreshCw className="heartbeat-pulse fast" size={16} /> : <Zap size={16} />}
-            {loadingAI ? "РАЗБИРАЕМ ХАОС..." : "СТРУКТУРИРОВАТЬ БЕЗДНОЙ"}
+            {loadingAI ? "РАЗБИРАЕМ ХАОС..." : "СТРУКТУРИРОВАТЬ ОРАКУЛОМ"}
           </button>
         </div>
       </div>
@@ -5686,7 +5686,7 @@ if (setupStage === 'resolution') {
         {loadingAI ? (
           <div style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid var(--color-iron-light)', padding: '3rem', textAlign: 'center' }}>
             <RefreshCw className="heartbeat-pulse fast" style={{ color: 'var(--color-mana-glow)', marginBottom: '1rem' }} size={32} />
-            <p style={{ fontFamily: 'var(--font-rpg)' }}>Бездна шепчет заклинания... Идет разделение шагов...</p>
+            <p style={{ fontFamily: 'var(--font-rpg)' }}>Оракул шепчет заклинания... Идет разделение шагов...</p>
           </div>
         ) : (
           <div style={{
@@ -5804,7 +5804,7 @@ if (setupStage === 'resolution') {
 
               {!currentCard.deadline && (
                 <div style={{ color: '#ffb813', fontSize: '0.75rem', fontFamily: 'var(--font-rpg)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  ⚠️ Бездна не нашла дедлайн в ваших мыслях. Пожалуйста, укажите его вручную выше!
+                  ⚠️ Оракул не нашел дедлайн в ваших мыслях. Пожалуйста, укажите его вручную выше!
                 </div>
               )}
 
@@ -5821,7 +5821,7 @@ if (setupStage === 'resolution') {
             {reviewGuidedActive ? (
               <div style={{ background: 'rgba(25, 20, 35, 0.65)', border: '1px dashed var(--color-relic-glow)', padding: '1rem', marginBottom: '1.2rem', borderRadius: '4px' }}>
                 <h4 style={{ fontSize: '0.88rem', color: 'var(--color-relic-glow)', marginBottom: '10px', fontFamily: 'var(--font-rpg)', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                  <span>💬 Бездна задает вопросы о деталях:</span>
+                  <span>💬 Оракул задает вопросы о деталях:</span>
                 </h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
                   {reviewGuidedQuestions.map((q, idx) => (
@@ -5970,7 +5970,7 @@ if (setupStage === 'resolution') {
                 fontSize: '0.85rem'
               }}>
                 <div style={{ color: 'var(--color-blood-glow)', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '5px' }}>
-                  <span>🔮 Провидение Бездны (Анализ риска провала):</span>
+                  <span>🔮 Предвидение Оракула (Анализ риска провала):</span>
                 </div>
                 {isLateHour ? (
                   <p style={{ color: 'var(--color-bone-dim)', margin: '0 0 8px 0', fontSize: '0.8rem' }}>
@@ -5978,7 +5978,7 @@ if (setupStage === 'resolution') {
                   </p>
                 ) : (
                   <p style={{ color: 'var(--color-bone-dim)', margin: '0 0 8px 0', fontSize: '0.8rem' }}>
-                    Квест определен как Длительное путешествие. Для таких тяжелых контрактов Бездна рекомендует детально спланировать дедлайн или разделить его силы.
+                    Квест определен как Длительное путешествие. Для таких тяжелых контрактов Оракул рекомендует детально спланировать дедлайн или разделить его силы.
                   </p>
                 )}
 
@@ -6402,10 +6402,10 @@ if (setupStage === 'resolution') {
         <div style={{ display: 'grid', gridTemplateColumns: '1.7fr 1.3fr', gap: '1.5rem' }}>
           
           {/* LEFT AREA: Quest Title, Timer, and Steps */}
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-              <div>
-                <h1 className="gothic-title" style={{ fontSize: '1.6rem', color: isBoss ? 'var(--color-blood-glow)' : '#fff' }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem', gap: '1.5rem' }}>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <h1 className="gothic-title" style={{ fontSize: '1.6rem', color: isBoss ? 'var(--color-blood-glow)' : '#fff', wordBreak: 'break-word' }}>
                   {activeTask.title}
                 </h1>
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
@@ -6420,7 +6420,7 @@ if (setupStage === 'resolution') {
                 </div>
               </div>
 
-              <div style={{ textAlign: 'right' }}>
+              <div style={{ textAlign: 'right', flexShrink: 0, minWidth: '120px' }}>
                 {activeTask.executionMode === 'day' ? (
                   <div style={{ fontSize: '1.1rem', fontFamily: 'var(--font-rpg)', color: '#1db954', border: '1px solid rgba(29,185,84,0.3)', padding: '4px 10px', background: 'rgba(0,0,0,0.3)', borderRadius: '4px' }}>
                     🌅 СВОБОДНЫЙ ПЕРЕХОД
@@ -6428,7 +6428,8 @@ if (setupStage === 'resolution') {
                 ) : (
                   <div style={{ 
                     fontSize: '2.5rem', 
-                    fontFamily: 'var(--font-rpg)', 
+                    fontFamily: 'monospace', 
+                    fontVariantNumeric: 'tabular-nums', 
                     color: timeLeft < 0 ? 'var(--color-blood-glow)' : isRunning ? '#fff' : 'var(--color-bone-dim)',
                     textShadow: timeLeft < 0 ? '0 0 10px var(--color-blood-glow)' : 'none'
                   }}>
@@ -6638,7 +6639,7 @@ if (setupStage === 'resolution') {
           </div>
 
           {/* RIGHT AREA: RPG Combat Arena Monster Card & Log & WOW Skills */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', position: 'relative' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', position: 'relative', minWidth: 0 }}>
             
             {/* RPG Floating Damage float container */}
             {damageFloats.length > 0 && (

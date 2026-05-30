@@ -44,6 +44,45 @@ export default function App() {
   const setTasks = (newTasksVal) => {
     setTasksState(prev => {
       const next = typeof newTasksVal === 'function' ? newTasksVal(prev) : newTasksVal;
+      
+      // Auto-clear active combat if the active task is completed or rescheduled away from today!
+      if (activeSessionSync.activeTask) {
+        const activeT = next.find(t => t.id === activeSessionSync.activeTask.id);
+        const todayStr = getVirtualTodayStr();
+        if (activeT && (activeT.status === 'completed' || activeT.date !== todayStr)) {
+          // Clear locally
+          setActiveSessionSync(curr => ({
+            ...curr,
+            activeTask: null,
+            timeLeft: 0,
+            isRunning: false
+          }));
+          localStorage.removeItem('active_task_id');
+          localStorage.removeItem('combat_time_left');
+          localStorage.setItem('combat_is_running', 'false');
+
+          // Sync clean state to backend
+          fetch('http://127.0.0.1:3001/api/active-session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              combat: {
+                activeTask: null,
+                timeLeft: 0,
+                isRunning: false,
+                enemyHp: 100,
+                combatLog: [],
+                enemyName: "",
+                combatVignette: "",
+                setupStage: "hub",
+                deadlineDmgApplied: false,
+                ticksWithoutStep: 0
+              }
+            })
+          }).catch(err => console.warn("Failed to auto-clear active session on backend:", err));
+        }
+      }
+
       fetch('http://127.0.0.1:3001/api/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -167,6 +206,37 @@ export default function App() {
       return syncData;
     });
   }, []);
+
+  const clearActiveCombat = () => {
+    setActiveSessionSync(curr => ({
+      ...curr,
+      activeTask: null,
+      timeLeft: 0,
+      isRunning: false
+    }));
+    localStorage.removeItem('active_task_id');
+    localStorage.removeItem('combat_time_left');
+    localStorage.setItem('combat_is_running', 'false');
+
+    fetch('http://127.0.0.1:3001/api/active-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        combat: {
+          activeTask: null,
+          timeLeft: 0,
+          isRunning: false,
+          enemyHp: 100,
+          combatLog: [],
+          enemyName: "",
+          combatVignette: "",
+          setupStage: "hub",
+          deadlineDmgApplied: false,
+          ticksWithoutStep: 0
+        }
+      })
+    }).catch(err => console.warn("Failed to clear active session on backend:", err));
+  };
 
   const handleTabChange = (nextTab) => {
     setActiveTab(nextTab);
@@ -781,7 +851,7 @@ ${loreGuidelines}`;
     const virtualMs = Date.now() - 2 * 60 * 60 * 1000;
     const virtualDayOfWeek = weekdaysLongRU[new Date(virtualMs).getDay()];
 
-    const systemPrompt = `Ты — Бездна во вселенной Абаддона. Твоя задача — взять хаотичные мысли СДВГ-пользователя и превратить их в структурированный JSON-массив задач, геймифицированных как квесты из мрачной фэнтези RPG.
+    const systemPrompt = `Ты — Оракул Ничейных Земель во вселенной Абаддона. Твоя задача — взять хаотичные мысли СДВГ-пользователя и превратить их в структурированный JSON-массив задач, геймифицированных как квесты из мрачной фэнтези RPG. Действие разворачивается в Ничейных Землях — суровом холодном фронтире Абаддона, где беспрерывно воюют Империя Света (люди), разрозненные людские королевства, дикий Каргахаул, Деревянные Люди, Хаос и Нежить. Иногда здесь можно встретить разведку эльфов, еще реже бродячих троллей или опасных гарпий с небесных островов. Потусторонняя Бездна — это потусторонний мир в нашем мире, запредельный мир, нечто за пределами восприятия, пробивающийся сквозь ткань реальности.
 
 СТРОГОЕ ТРЕБОВАНИЕ: НИ В КОЕМ СЛУЧАЕ не выдумывай конкретный стек технологий, базы данных, языки программирования, библиотеки, веб-сервисы или бизнес-требования, если пользователь не указал их явно в своих мыслях! Шаги в скобках должны оставаться общими и приземленными физическими действиями (например, «создать файл», «оформить шапку», «написать черновик», «вытереть пыль»), соответствующими реальному тексту пользователя. Не делай ложных допущений за пользователя!
 
@@ -1502,7 +1572,7 @@ ${contextPrompt}`;
                   <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>❓</div>
                   <h3 className="gothic-title" style={{ fontSize: '1.25rem', color: '#a894c7', marginBottom: '0.8rem' }}>Шепот Сомнений</h3>
                   <p style={{ fontSize: '0.8rem', color: 'var(--color-bone-dim)', lineHeight: '1.4' }}>
-                    Отложить решение. Выполнить спонтанно. Бездна спросит вас о режиме выполнения непосредственно перед вступлением в бой.
+                    Отложить решение. Выполнить спонтанно. Оракул Ничейных Земель спросит вас о режиме выполнения непосредственно перед вступлением в бой.
                   </p>
                 </div>
               )}
@@ -1672,7 +1742,7 @@ ${contextPrompt}`;
               💀 СУДНЫЙ ДЕНЬ БЕГЛЕЦА
             </h2>
             <p style={{ fontSize: '0.85rem', color: '#5c4033', margin: '0 0 20px 0', fontStyle: 'italic', fontFamily: 'var(--font-rpg)' }}>
-              Бездна проверяет старые долги. Контракт от {judgmentTasks[judgmentIndex].date} просрочен...
+              Ничейные Земли не прощают долгов. Контракт от {judgmentTasks[judgmentIndex].date} просрочен...
             </p>
 
             <div style={{ background: 'rgba(0,0,0,0.05)', border: '1px dashed #5c4033', padding: '1.2rem', marginBottom: '1.5rem' }}>
@@ -1778,6 +1848,9 @@ ${contextPrompt}`;
                        // Complete task and save immediately
                       const updatedTasks = tasks.map(t => t.id === task.id ? { ...t, status: 'completed' } : t);
                       setTasks(updatedTasks);
+                      if (activeSessionSync.activeTask && activeSessionSync.activeTask.id === task.id) {
+                        clearActiveCombat();
+                      }
                       fetch('http://127.0.0.1:3001/api/tasks', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -1852,10 +1925,25 @@ ${contextPrompt}`;
                     onClick={() => {
                       playClick();
                       const task = judgmentTasks[judgmentIndex];
-                      triggerRuneOfReturn(task, (runeData) => {
+                      let isNewFocusTask = false;
+                      if (task.createdAt) {
+                        const createdDate = new Date(task.createdAt);
+                        const todayDate = new Date();
+                        const yesterdayDate = new Date(todayDate);
+                        yesterdayDate.setDate(todayDate.getDate() - 1);
+                        const isCreatedToday = createdDate.toDateString() === todayDate.toDateString();
+                        const isCreatedYesterday = createdDate.toDateString() === yesterdayDate.toDateString();
+                        isNewFocusTask = isCreatedToday || (isCreatedYesterday && createdDate.getHours() >= 7);
+                      }
+
+                      const performRescheduleToday = (runeData) => {
                         const todayStr = getVirtualTodayStr();
-                        const updated = tasks.map(t => t.id === task.id ? { ...t, date: todayStr, curseLevel: Math.min(5, (t.curseLevel || 0) + 1), runeOfReturn: runeData } : t);
+                        const nextCurse = isNewFocusTask ? (task.curseLevel || 0) : Math.min(5, (task.curseLevel || 0) + 1);
+                        const updated = tasks.map(t => t.id === task.id ? { ...t, date: todayStr, curseLevel: nextCurse, runeOfReturn: isNewFocusTask ? t.runeOfReturn : runeData } : t);
                         setTasks(updated);
+                        if (activeSessionSync.activeTask && activeSessionSync.activeTask.id === task.id) {
+                          clearActiveCombat();
+                        }
                         fetch('http://127.0.0.1:3001/api/tasks', {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
@@ -1869,7 +1957,13 @@ ${contextPrompt}`;
                         } else {
                           setJudgmentOpen(false);
                         }
-                      });
+                      };
+
+                      if (isNewFocusTask) {
+                        performRescheduleToday(null);
+                      } else {
+                        triggerRuneOfReturn(task, performRescheduleToday);
+                      }
                     }}
                   >
                     📅 Перенести на СЕГОДНЯ
@@ -1880,10 +1974,28 @@ ${contextPrompt}`;
                     onClick={() => {
                       playClick();
                       const task = judgmentTasks[judgmentIndex];
-                      triggerRuneOfReturn(task, (runeData) => {
-                        const tomorrowStr = getVirtualTomorrowStr();
-                        const updated = tasks.map(t => t.id === task.id ? { ...t, date: tomorrowStr, curseLevel: Math.min(5, (t.curseLevel || 0) + 1), runeOfReturn: runeData } : t);
+                      let isNewFocusTask = false;
+                      if (task.createdAt) {
+                        const createdDate = new Date(task.createdAt);
+                        const todayDate = new Date();
+                        const yesterdayDate = new Date(todayDate);
+                        yesterdayDate.setDate(todayDate.getDate() - 1);
+                        const isCreatedToday = createdDate.toDateString() === todayDate.toDateString();
+                        const isCreatedYesterday = createdDate.toDateString() === yesterdayDate.toDateString();
+                        isNewFocusTask = isCreatedToday || (isCreatedYesterday && createdDate.getHours() >= 7);
+                      }
+
+                      const performRescheduleTomorrow = (runeData) => {
+                        let tomorrowStr = getVirtualTomorrowStr();
+                        if (isNewFocusTask) {
+                          tomorrowStr = getVirtualTodayStr();
+                        }
+                        const nextCurse = isNewFocusTask ? (task.curseLevel || 0) : Math.min(5, (task.curseLevel || 0) + 1);
+                        const updated = tasks.map(t => t.id === task.id ? { ...t, date: tomorrowStr, curseLevel: nextCurse, runeOfReturn: isNewFocusTask ? t.runeOfReturn : runeData } : t);
                         setTasks(updated);
+                        if (activeSessionSync.activeTask && activeSessionSync.activeTask.id === task.id) {
+                          clearActiveCombat();
+                        }
                         fetch('http://127.0.0.1:3001/api/tasks', {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
@@ -1897,7 +2009,13 @@ ${contextPrompt}`;
                         } else {
                           setJudgmentOpen(false);
                         }
-                      });
+                      };
+
+                      if (isNewFocusTask) {
+                        performRescheduleTomorrow(null);
+                      } else {
+                        triggerRuneOfReturn(task, performRescheduleTomorrow);
+                      }
                     }}
                   >
                     ⏳ Отложить на ЗАВТРА
@@ -1911,6 +2029,9 @@ ${contextPrompt}`;
                       triggerRuneOfReturn(task, (runeData) => {
                         const updated = tasks.map(t => t.id === task.id ? { ...t, date: null, curseLevel: Math.min(5, (t.curseLevel || 0) + 1), runeOfReturn: runeData } : t);
                         setTasks(updated);
+                        if (activeSessionSync.activeTask && activeSessionSync.activeTask.id === task.id) {
+                          clearActiveCombat();
+                        }
                         fetch('http://127.0.0.1:3001/api/tasks', {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },

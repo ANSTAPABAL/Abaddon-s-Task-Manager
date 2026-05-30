@@ -220,10 +220,10 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
         setChaosDumpOpen(false);
         playBoneCrack();
         playSuccess();
-        alert(`🔮 Бездна успешно извлекла ${newTasks.length} квестов и занесла их в ваш Задачник!`);
+        alert(`🔮 Оракул Ничейных Земель успешно извлек ${newTasks.length} квестов и занес их в ваш Задачник!`);
       }
     } catch (e) {
-      alert("Не удалось разобрать хаос Бездной: " + e.message);
+      alert("Не удалось разобрать хаос Оракулом: " + e.message);
     } finally {
       setChaosLoading(false);
     }
@@ -249,7 +249,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
   };
 
   const classifyTaskWithAI = async (title) => {
-    const systemPrompt = `Ты — Бездна во вселенной Абаддона. Твоя задача — определить тип задачи в формате JSON для ролевого планировщика:
+    const systemPrompt = `Ты — Оракул Ничейных Земель во вселенной Абаддона. Твоя задача — определить тип задачи в формате JSON для ролевого планировщика. Действие разворачивается в Ничейных Землях — суровом холодном фронтире Абаддона, где беспрерывно воюют Империя Света (люди), разрозненные людские королевства, дикий Каргахаул, Деревянные Люди, Хаос и Нежить. Иногда здесь можно встретить разведку эльфов, еще реже бродячих троллей или опасных гарпий с небесных островов. Потусторонняя Бездна — это потусторонний мир в нашем мире, запредельный мир, нечто за пределами восприятия, пробивающийся сквозь ткань реальности.
 1. "siege" — если задача сложная, крупная, пугающая, требует много времени или усилий (например, подготовиться к экзамену, написать сложный код, сдать отчет).
 2. "relic" — если задача связана с поиском ценной информации, обучением, исследованием, творчеством или чем-то редким/полезным (например, прочитать главу, изучить новую библиотеку, нарисовать эскиз).
 3. "hunt" — простая, рутинная, понятная задача на каждый день (например, помыть посуду, сходить в магазин, сделать звонок, отправить письмо).
@@ -307,7 +307,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
           background: 'radial-gradient(circle, #1a0f12 0%, #060203 100%)'
         }}>
           <h3 className="gothic-title" style={{ color: 'var(--color-blood-glow)', fontSize: '1.4rem', marginBottom: '1rem', textAlign: 'center', letterSpacing: '2px' }}>
-            🔮 ПРОТИВОСТОЯНИЕ БЕЗДНЫ
+            🔮 ПРЕДУПРЕЖДЕНИЕ ОРАКУЛА
           </h3>
           
           <div style={{ color: 'var(--color-bone)', fontSize: '0.95rem', marginBottom: '1.2rem', lineHeight: '1.5', fontFamily: 'Georgia, serif' }}>
@@ -315,7 +315,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
               Вы ставите длительный контракт или призываете его поздним вечером (после 20:00).
             </p>
             <p style={{ color: '#ffb813', fontStyle: 'italic', borderLeft: '2px solid #ffb813', paddingLeft: '8px', fontSize: '0.85rem' }}>
-              «Бездна рекомендует детально спланировать дедлайн или разделить его силы, дабы избежать штрафного урона разуму!»
+              «Оракул рекомендует детально спланировать дедлайн или разделить его силы, дабы избежать штрафного урона разуму!»
             </p>
           </div>
 
@@ -1023,15 +1023,17 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
     const targetTask = tasks.find(t => t.id === taskId);
     if (!targetTask) return;
 
+    const isPostponing = targetTask.date && targetDateStr && targetDateStr > targetTask.date;
+
     const performPostpone = (runeData) => {
       const updatedTasks = tasks.map(t => {
         if (t.id === taskId) {
-          const nextCurse = Math.min(5, t.curseLevel + 1);
+          const nextCurse = isPostponing ? Math.min(5, t.curseLevel + 1) : t.curseLevel;
           return {
             ...t,
             date: targetDateStr,
             curseLevel: nextCurse,
-            runeOfReturn: runeData
+            runeOfReturn: isPostponing ? runeData : t.runeOfReturn
           };
         }
         return t;
@@ -1044,7 +1046,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
       }
     };
 
-    if (triggerRuneOfReturn) {
+    if (isPostponing && triggerRuneOfReturn) {
       triggerRuneOfReturn(targetTask, performPostpone);
     } else {
       performPostpone(null);
@@ -1089,14 +1091,14 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
     playClick();
 
     // Check if the date is actually changing (meaning a reschedule/postponement)
-    const isRescheduling = targetTask.date && targetTask.date !== targetDateStr && targetDateStr !== null;
+    const isRescheduling = targetTask.date && targetDateStr && targetDateStr > targetTask.date;
 
     const performDrop = (runeData) => {
       let dateChanged = false;
       const updatedTasks = tasks.map(t => {
         if (t.id === taskId) {
           let curse = t.curseLevel;
-          if (t.date && t.date !== targetDateStr && targetDateStr !== null) {
+          if (t.date && targetDateStr && targetDateStr > t.date) {
             curse = Math.min(5, curse + 1);
             dateChanged = true;
           }
@@ -1104,7 +1106,7 @@ export default function TweekPlanner({ tasks, setTasks, character, setCharacter,
             ...t,
             date: targetDateStr,
             curseLevel: curse,
-            runeOfReturn: runeData || t.runeOfReturn
+            runeOfReturn: (t.date && targetDateStr && targetDateStr > t.date) ? (runeData || t.runeOfReturn) : t.runeOfReturn
           };
         }
         return t;
